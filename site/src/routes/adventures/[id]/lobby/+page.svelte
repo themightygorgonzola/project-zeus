@@ -71,7 +71,14 @@
 	}
 
 	/* ── actions ─────────────────────────────────────────── */
+	let readyInflight = $state(false);
+
 	function toggleReady() {
+		// Ignore rapid double-clicks — wait for the in-flight POST to resolve.
+		// SSE will deliver the authoritative state and clear the lock.
+		if (readyInflight) return;
+		readyInflight = true;
+
 		// Flip instantly — fire POST in background, SSE brings authoritative state
 		const prevReady = isReady;
 		members = members.map((m) =>
@@ -89,6 +96,9 @@
 				members = members.map((m) =>
 					m.userId === currentUserId ? { ...m, isReady: prevReady } : m
 				);
+			})
+			.finally(() => {
+				readyInflight = false;
 			});
 	}
 
@@ -155,6 +165,7 @@
 						class:btn-primary={!isReady}
 						class:btn-danger={isReady}
 						onclick={toggleReady}
+						disabled={readyInflight}
 					>
 						{isReady ? 'Cancel Ready' : 'Ready Up ⚔️'}
 					</button>
