@@ -56,7 +56,7 @@
 
 		<div class="error-actions">
 			<a href={info.action.href} class="btn btn-primary">{info.action.label}</a>
-			<button class="btn btn-ghost" onclick={() => history.back()}>← Go Back</button>
+			<a href="/adventures" class="btn btn-ghost">My Adventures</a>
 		</div>
 	</div>
 </div>
