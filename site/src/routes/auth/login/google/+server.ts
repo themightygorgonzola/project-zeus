@@ -2,6 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getGoogleProvider } from '$server/auth/google';
 import { generateState, generateCodeVerifier } from 'arctic';
+import { dev } from '$app/environment';
 
 export const GET: RequestHandler = async ({ cookies }) => {
 	const google = getGoogleProvider();
@@ -12,7 +13,7 @@ export const GET: RequestHandler = async ({ cookies }) => {
 		path: '/',
 		httpOnly: true,
 		sameSite: 'lax',
-		secure: true,
+		secure: !dev,
 		maxAge: 60 * 10 // 10 minutes
 	});
 
@@ -20,7 +21,7 @@ export const GET: RequestHandler = async ({ cookies }) => {
 		path: '/',
 		httpOnly: true,
 		sameSite: 'lax',
-		secure: true,
+		secure: !dev,
 		maxAge: 60 * 10
 	});
 

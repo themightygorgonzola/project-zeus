@@ -2,6 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getDiscordProvider } from '$server/auth/discord';
 import { generateState, generateCodeVerifier } from 'arctic';
+import { dev } from '$app/environment';
 
 export const GET: RequestHandler = async ({ cookies }) => {
 	const discord = getDiscordProvider();
@@ -12,7 +13,7 @@ export const GET: RequestHandler = async ({ cookies }) => {
 		path: '/',
 		httpOnly: true,
 		sameSite: 'lax',
-		secure: true,
+		secure: !dev,
 		maxAge: 60 * 10
 	});
 
@@ -20,7 +21,7 @@ export const GET: RequestHandler = async ({ cookies }) => {
 		path: '/',
 		httpOnly: true,
 		sameSite: 'lax',
-		secure: true,
+		secure: !dev,
 		maxAge: 60 * 10
 	});
 

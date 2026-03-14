@@ -67,6 +67,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 			username,
 			avatarUrl,
 			isTestUser: false,
+			isAdmin: false,
 			createdAt: Date.now()
 		});
 	}

@@ -51,13 +51,13 @@
 				{/if}
 			{/if}
 
-			<div class="divider"><span>Later</span></div>
+			<div class="divider"><span>or</span></div>
 
-			<div class="providers muted">
-				<a href="/auth/login/google?returnTo={encodeURIComponent(data.returnTo)}" class="provider-btn google disabled" aria-disabled="true">
+			<div class="providers">
+				<a href="/auth/login/google?returnTo={encodeURIComponent(data.returnTo)}" class="provider-btn google">
 					Continue with Google
 				</a>
-				<a href="/auth/login/discord?returnTo={encodeURIComponent(data.returnTo)}" class="provider-btn discord disabled" aria-disabled="true">
+				<a href="/auth/login/discord?returnTo={encodeURIComponent(data.returnTo)}" class="provider-btn discord">
 					Continue with Discord
 				</a>
 			</div>
@@ -223,13 +223,5 @@
 		font-size: 0.8rem;
 		color: #ff9980;
 		letter-spacing: 0.02em;
-	}
-
-	.providers.muted {
-		opacity: 0.55;
-	}
-
-	.provider-btn.disabled {
-		pointer-events: none;
 	}
 </style>
