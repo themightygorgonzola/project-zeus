@@ -5,14 +5,7 @@ import { users } from '$server/db/schema';
 import { eq } from 'drizzle-orm';
 import { createSession, SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from '$server/auth/sessions';
 import { ensureDevUsers, isDevAuthEnabled } from '$server/auth/dev-users';
-
-function normalizeReturnTo(returnTo: string | null) {
-	if (!returnTo || !returnTo.startsWith('/') || returnTo.startsWith('//')) {
-		return '/adventures';
-	}
-
-	return returnTo;
-}
+import { normalizeReturnTo } from '$server/auth/return-to';
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
 	if (!isDevAuthEnabled()) {

@@ -16,6 +16,30 @@
 				For now, use a seeded party account while branding and production auth are still in flux.
 			</p>
 
+			{#if data.allowGuestJoin}
+				<form method="POST" action="/auth/guest-login" class="guest-card">
+					<input type="hidden" name="returnTo" value={data.returnTo} />
+					<div class="guest-copy">
+						<strong>Joining this game?</strong>
+						<span>Hop in as a guest now and change the name before you enter.</span>
+					</div>
+					<label class="guest-field">
+						<span>Display name</span>
+						<input
+							type="text"
+							name="displayName"
+							maxlength="32"
+							autocomplete="nickname"
+							value={data.defaultGuestName}
+							required
+						/>
+					</label>
+					<button type="submit" class="provider-btn guest">Continue as Guest</button>
+				</form>
+
+				<div class="divider"><span>or sign in</span></div>
+			{/if}
+
 			{#if data.devAuthEnabled}
 				<div class="test-accounts">
 					{#each data.testUsers as account}
@@ -51,7 +75,7 @@
 				{/if}
 			{/if}
 
-			<div class="divider"><span>or</span></div>
+			<div class="divider"><span>{data.allowGuestJoin ? 'use an account instead' : 'or'}</span></div>
 
 			<div class="providers">
 				<a href="/auth/login/google?returnTo={encodeURIComponent(data.returnTo)}" class="provider-btn google">
@@ -102,6 +126,58 @@
 		grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 		gap: 1rem;
 		margin-top: 1.5rem;
+	}
+
+	.guest-card {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		padding: 1.1rem;
+		border-radius: 14px;
+		border: 1px solid rgba(124, 156, 255, 0.28);
+		background: linear-gradient(180deg, rgba(124, 156, 255, 0.12), rgba(124, 156, 255, 0.05));
+		margin-bottom: 1rem;
+	}
+
+	.guest-copy {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		text-align: left;
+	}
+
+	.guest-copy span {
+		font-size: 0.92rem;
+		color: var(--text-muted);
+	}
+
+	.guest-field {
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+		text-align: left;
+	}
+
+	.guest-field span {
+		font-size: 0.82rem;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--text-muted);
+	}
+
+	.guest-field input {
+		width: 100%;
+		padding: 0.8rem 0.9rem;
+		border-radius: 10px;
+		border: 1px solid var(--border);
+		background: rgba(255, 255, 255, 0.06);
+		color: var(--text);
+		font: inherit;
+	}
+
+	.guest-field input:focus {
+		outline: 2px solid rgba(124, 156, 255, 0.4);
+		outline-offset: 2px;
 	}
 
 	.test-card {
@@ -199,6 +275,13 @@
 	.provider-btn.dev {
 		width: 100%;
 		background: linear-gradient(180deg, rgba(124,156,255,0.22), rgba(124,156,255,0.08));
+	}
+
+	.provider-btn.guest {
+		width: 100%;
+		background: linear-gradient(180deg, rgba(108, 221, 173, 0.26), rgba(108, 221, 173, 0.1));
+		border-color: rgba(108, 221, 173, 0.35);
+		color: #c3ffe8;
 	}
 
 	.provider-btn.admin {

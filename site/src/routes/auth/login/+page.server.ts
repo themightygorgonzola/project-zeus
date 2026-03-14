@@ -1,17 +1,12 @@
 import type { PageServerLoad } from './$types';
+import { createGuestName } from '$server/auth/guest-users';
 import { ensureDevUsers, isDevAuthEnabled } from '$server/auth/dev-users';
+import { isLobbyReturnTo, normalizeReturnTo } from '$server/auth/return-to';
 import { redirect } from '@sveltejs/kit';
-
-function normalizeReturnTo(returnTo: string | null) {
-	if (!returnTo || !returnTo.startsWith('/') || returnTo.startsWith('//')) {
-		return '/adventures';
-	}
-
-	return returnTo;
-}
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const returnTo = normalizeReturnTo(url.searchParams.get('returnTo'));
+	const allowGuestJoin = isLobbyReturnTo(returnTo);
 
 	if (locals.user) {
 		redirect(302, returnTo);
@@ -26,6 +21,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		devAuthEnabled,
 		testUsers,
 		adminUser,
+		allowGuestJoin,
+		defaultGuestName: allowGuestJoin ? createGuestName() : null,
 		returnTo
 	};
 };

@@ -5,6 +5,7 @@ import { db } from '$server/db/client';
 import { users } from '$server/db/schema';
 import { eq } from 'drizzle-orm';
 import { createSession, SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from '$server/auth/sessions';
+import { normalizeReturnTo } from '$server/auth/return-to';
 import { ulid } from 'ulid';
 import type { OAuth2Tokens } from 'arctic';
 
@@ -18,6 +19,7 @@ interface DiscordUser {
 export const GET: RequestHandler = async ({ url, cookies }) => {
 	const code = url.searchParams.get('code');
 	const state = url.searchParams.get('state');
+	const returnTo = normalizeReturnTo(cookies.get('discord_oauth_return_to'));
 	const storedState = cookies.get('discord_oauth_state');
 
 	const codeVerifier = cookies.get('discord_code_verifier');
@@ -78,6 +80,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 	cookies.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTIONS);
 	cookies.delete('discord_oauth_state', { path: '/' });
 	cookies.delete('discord_code_verifier', { path: '/' });
+	cookies.delete('discord_oauth_return_to', { path: '/' });
 
-	redirect(302, '/adventures');
+	redirect(302, returnTo);
 };

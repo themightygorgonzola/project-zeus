@@ -1,6 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getDiscordProvider } from '$server/auth/discord';
+import { normalizeReturnTo } from '$server/auth/return-to';
 import { generateState, generateCodeVerifier } from 'arctic';
 import { dev } from '$app/environment';
 
@@ -8,6 +9,7 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
 	const discord = getDiscordProvider(url.origin);
 	const state = generateState();
 	const codeVerifier = generateCodeVerifier();
+	const returnTo = normalizeReturnTo(url.searchParams.get('returnTo'));
 
 	cookies.set('discord_oauth_state', state, {
 		path: '/',
@@ -18,6 +20,14 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
 	});
 
 	cookies.set('discord_code_verifier', codeVerifier, {
+		path: '/',
+		httpOnly: true,
+		sameSite: 'lax',
+		secure: !dev,
+		maxAge: 60 * 10
+	});
+
+	cookies.set('discord_oauth_return_to', returnTo, {
 		path: '/',
 		httpOnly: true,
 		sameSite: 'lax',
