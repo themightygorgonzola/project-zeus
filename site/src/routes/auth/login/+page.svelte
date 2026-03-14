@@ -33,6 +33,22 @@
 						</form>
 					{/each}
 				</div>
+
+				{#if data.adminUser}
+					<div class="divider"><span>Admin</span></div>
+					<form method="POST" action="/auth/dev-login" class="admin-card">
+						<input type="hidden" name="email" value={data.adminUser.email} />
+						<input type="hidden" name="returnTo" value="/admin" />
+						<div class="account-meta">
+							<img src={data.adminUser.avatarUrl} alt="" class="avatar" />
+							<div>
+								<strong>{data.adminUser.username}</strong>
+								<span class="admin-badge">⚙ Database Admin</span>
+							</div>
+						</div>
+						<button type="submit" class="provider-btn admin">Enter Admin Panel</button>
+					</form>
+				{/if}
 			{/if}
 
 			<div class="divider"><span>Later</span></div>
@@ -183,6 +199,30 @@
 	.provider-btn.dev {
 		width: 100%;
 		background: linear-gradient(180deg, rgba(124,156,255,0.22), rgba(124,156,255,0.08));
+	}
+
+	.provider-btn.admin {
+		width: 100%;
+		background: linear-gradient(180deg, rgba(255, 100, 80, 0.28), rgba(255, 100, 80, 0.1));
+		color: #ffb3a7;
+		border-color: rgba(255, 100, 80, 0.35);
+	}
+
+	.admin-card {
+		display: flex;
+		flex-direction: column;
+		gap: 0.9rem;
+		padding: 1rem 1.25rem;
+		border-radius: 14px;
+		border: 1px solid rgba(255, 100, 80, 0.3);
+		background: rgba(255, 80, 50, 0.06);
+		margin-top: 0.5rem;
+	}
+
+	.admin-badge {
+		font-size: 0.8rem;
+		color: #ff9980;
+		letter-spacing: 0.02em;
 	}
 
 	.providers.muted {

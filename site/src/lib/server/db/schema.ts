@@ -9,6 +9,7 @@ export const users = sqliteTable('users', {
 	username: text('username').notNull(),
 	avatarUrl: text('avatar_url'),
 	isTestUser: integer('is_test_user', { mode: 'boolean' }).notNull().default(false),
+	isAdmin: integer('is_admin', { mode: 'boolean' }).notNull().default(false),
 	createdAt: integer('created_at', { mode: 'number' }).notNull()
 });
 

@@ -1,320 +1,152 @@
-Discover existing codebase architecture
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/package.json)
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/tsconfig.json)
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/context.txt#1-1), lines 1 to 100
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/README.md)
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/ProjectZeus.github.io/index.html)
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/ProjectZeus.github.io/app.js)
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/ProjectZeus.github.io/styles.css)
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/ProjectZeus.github.io/README.md#1-1), lines 1 to 100
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/ProjectZeus.github.io/frontend/render-site.js)
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/ProjectZeus.github.io/frontend/adapters/world-view-model.js)
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/ProjectZeus.github.io/worldgen/prototype-generator.js)
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/generated/world-context.json#1-1), lines 1 to 100
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/generated/world-schema.json#1-1), lines 1 to 100
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/src/cli.js)
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/src/services/openai.js)
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/src/commands/ask.js)
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/src/engine/azgaar/index.ts)
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/src/engine/azgaar/pipeline.ts#1-1), lines 1 to 260
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/src/engine/azgaar/options.ts)
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/scripts/publish-site-world.ts)
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/scripts/build-world-context.js)
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/src/engine/azgaar/serialize.ts)
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/src/engine/azgaar/pipeline.ts#260-260), lines 260 to 392
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/src/engine/azgaar/legacy-runtime.ts#1-1), lines 1 to 200
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/src/engine/azgaar/types.ts)
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/src/world/generator.js#1-1), lines 1 to 200
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/src/world/loadMap.js)
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/src/world/schema.js#1-1), lines 1 to 100
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/src/world/generator.js#200-200), lines 200 to 436
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/src/engine/azgaar/legacy-runtime.ts#200-200), lines 200 to 322
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/ProjectZeus.github.io/README.md#100-100), lines 100 to 214
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/src/config/index.js)
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/src/commands/models.js)
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/scripts/generate-azgaar-world.ts)
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/context.txt#1-1), lines 1 to 100
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/context.txt#100-100), lines 100 to 375
-
-Read [](file:///c%3A/MySoftwareFolder/project-zeus/src/engine/azgaar/headless-dom.ts#1-1), lines 1 to 100
-
-Read [](file:///c%3A/Users/dawso/AppData/Roaming/Code/User/workspaceStorage/89e6fd124969d465ac09bc6a5075591e/GitHub.copilot-chat/chat-session-resources/46110fc7-f827-44f7-ba4b-e52a8d16de09/toolu_01MDK9v2PLeYFwhmbUHEjukU__vscode-1773450355821/content.txt)
-
-Good research done. I have a thorough picture of the codebase — vanilla JS/TS, zero-build-step static site on GitHub Pages, Azgaar headless engine, OpenAI integration, dark glassmorphism design. Currently it's a world-data viewer with no auth, no persistence, no game flow.
-
-Before drafting the architecture, I need to nail down a few directional calls with you: 
-
-Asked 4 questions (Frontend, Backend, Hosting, Auth Style)
-
-Asked 3 questions (Framework, DB Choice, Custom BE)
-
-All decisions locked in. Here's the full plan:
-
----
-
-## Plan: SvelteKit Adventure Platform — Core Architecture
-
-**TL;DR**: Stand up a SvelteKit app deployed on Vercel, with file-based routing, Google + Discord OAuth (via Arctic + custom session management), Turso (hosted SQLite) through Drizzle ORM, and SvelteKit API routes for auth, lobby, and AI proxy. The existing Azgaar engine and world-context pipeline stay untouched in src. The site lives in a new `site/` directory with its own package.json. The current ProjectZeus.github.io/ stays as-is (legacy world viewer) until the new app is ready to replace it. Six screens: Landing → Login → Adventures Dashboard → Create Adventure → Lobby → Adventure Screen (TBD). Multiplayer lobby uses short-polling for MVP with a clear upgrade path to WebSockets/PartyKit later.
-
----
-
-### Stack Summary
-
-| Layer | Choice | Why |
-|-------|--------|-----|
-| Framework | **SvelteKit (Svelte 5)** | File-based routing, server routes, Vercel adapter, tiny bundles |
-| Hosting | **Vercel** | Free tier, auto-deploy from GitHub, serverless functions built-in |
-| Database | **Turso** (hosted libSQL/SQLite) + **Drizzle ORM** | Works with serverless (no persistent filesystem needed), free tier, migrations, type-safe |
-| Auth | **Arctic** (OAuth) + cookie sessions | Lightweight, framework-agnostic. Lucia is deprecated; Arctic is its successor for OAuth flows |
-| AI Proxy | **SvelteKit `+server.ts` route** | Proxies OpenAI calls server-side so the API key never hits the browser |
-| Real-time (lobby) | **Short-polling** (MVP) | Simple, no extra infra. Upgrade to PartyKit/WebSockets when needed |
-| Styling | **CSS custom properties** (carry over existing design tokens from styles.css) | Keep the dark glassmorphism aesthetic, no CSS framework needed |
-
----
-
-### Directory Structure
-
-```
-project-zeus/
-├── src/                          # Existing — engine, CLI, world pipeline (untouched)
-├── generated/                    # Existing — world JSON artifacts
-├── scripts/                      # Existing — generation/publish scripts
-├── ProjectZeus.github.io/        # Existing — legacy viewer (keep for now)
-├── site/                         # NEW — SvelteKit app
-│   ├── package.json
-│   ├── svelte.config.js          # Vercel adapter config
-│   ├── vite.config.ts
-│   ├── drizzle.config.ts         # Drizzle Kit config (points to Turso)
-│   ├── drizzle/                  # Auto-generated migration SQL files
-│   ├── src/
-│   │   ├── app.html              # Shell HTML
-│   │   ├── app.css               # Global styles (port design tokens)
-│   │   ├── hooks.server.ts       # Auth middleware — validate session on every request
-│   │   ├── lib/
-│   │   │   ├── server/
-│   │   │   │   ├── db/
-│   │   │   │   │   ├── client.ts       # Drizzle + Turso client
-│   │   │   │   │   └── schema.ts       # Table definitions
-│   │   │   │   ├── auth/
-│   │   │   │   │   ├── sessions.ts     # Create/validate/delete sessions
-│   │   │   │   │   ├── google.ts       # Arctic Google OAuth provider
-│   │   │   │   │   └── discord.ts      # Arctic Discord OAuth provider
-│   │   │   │   └── ai/
-│   │   │   │       └── openai.ts       # OpenAI proxy (reuse patterns from src/services/openai.js)
-│   │   │   ├── components/
-│   │   │   │   ├── Nav.svelte          # Top nav (logo, auth state, sign out)
-│   │   │   │   ├── AuthGuard.svelte    # Redirect to login if unauthenticated
-│   │   │   │   ├── AdventureCard.svelte
-│   │   │   │   ├── LobbyPlayer.svelte
-│   │   │   │   └── GlassPanel.svelte   # Reusable glassmorphism container
-│   │   │   ├── stores/
-│   │   │   │   ├── auth.ts             # User session store
-│   │   │   │   └── lobby.ts            # Lobby polling store
-│   │   │   └── types/
-│   │   │       └── index.ts            # Shared types (User, Adventure, LobbyState)
-│   │   └── routes/
-│   │       ├── +layout.svelte          # Root layout: Nav, global styles
-│   │       ├── +layout.server.ts       # Load session user for all routes
-│   │       ├── +page.svelte            # Landing page
-│   │       ├── auth/
-│   │       │   ├── login/+page.svelte          # Sign-in page (Google/Discord buttons)
-│   │       │   ├── callback/
-│   │       │   │   ├── google/+server.ts       # Google OAuth callback
-│   │       │   │   └── discord/+server.ts      # Discord OAuth callback
-│   │       │   └── logout/+server.ts           # POST → clear session, redirect
-│   │       ├── adventures/
-│   │       │   ├── +page.svelte                # Dashboard: list + create
-│   │       │   ├── +page.server.ts             # Load user's adventures
-│   │       │   ├── new/
-│   │       │   │   ├── +page.svelte            # Create adventure form
-│   │       │   │   └── +page.server.ts         # Form action: insert adventure
-│   │       │   └── [id]/
-│   │       │       ├── +page.svelte            # Adventure screen (TBD)
-│   │       │       ├── +page.server.ts         # Load adventure + state
-│   │       │       └── lobby/
-│   │       │           ├── +page.svelte        # Lobby UI
-│   │       │           └── +page.server.ts     # Load lobby state
-│   │       └── api/
-│   │           └── lobby/
-│   │               └── [id]/
-│   │                   ├── +server.ts          # GET: poll lobby state
-│   │                   ├── ready/+server.ts    # POST: toggle ready
-│   │                   └── join/+server.ts     # POST: join lobby
-│   └── static/
-│       └── favicon.ico
-```
-
----
-
-### Database Schema (Drizzle)
-
-**`users`** table:
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | text (ULID) | Primary key |
-| `google_id` | text, nullable, unique | From Google OAuth |
-| `discord_id` | text, nullable, unique | From Discord OAuth |
-| `username` | text | Display name (from OAuth profile) |
-| `avatar_url` | text, nullable | Profile picture |
-| `created_at` | integer (unix ms) | |
-
-**`sessions`** table:
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | text | Primary key (random token) |
-| `user_id` | text | FK → users |
-| `expires_at` | integer (unix ms) | 30-day expiry |
-
-**`adventures`** table:
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | text (ULID) | Primary key |
-| `name` | text | User-provided adventure name |
-| `owner_id` | text | FK → users |
-| `world_seed` | text, nullable | Azgaar seed if generated |
-| `mode` | text | `'solo'` or `'multiplayer'` |
-| `status` | text | `'lobby'` → `'active'` → `'completed'` |
-| `created_at` | integer | |
-| `updated_at` | integer | |
-
-**`adventure_members`** table:
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `adventure_id` | text | FK → adventures |
-| `user_id` | text | FK → users |
-| `role` | text | `'owner'` or `'player'` |
-| `is_ready` | integer (0/1) | Lobby ready-up flag |
-| `joined_at` | integer | |
-
-**`adventure_state`** table:
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `adventure_id` | text | FK → adventures, unique |
-| `state_json` | text | Serialized game state (TBD shape) |
-| `updated_at` | integer | |
-
----
-
-### Steps
-
-**Phase 0 — Scaffold**
-
-1. Create `site/` directory. Run `npx sv create` with Svelte 5, TypeScript, SvelteKit. Install the Vercel adapter (`@sveltejs/adapter-vercel`).
-2. Install dependencies: `drizzle-orm`, `@libsql/client` (Turso driver), `drizzle-kit`, `arctic`, `oslo` (crypto utils for sessions), `ulid`.
-3. Create a Turso database (free tier) via `turso db create project-zeus`. Get the URL + auth token. Store in .env as `TURSO_URL` and `TURSO_AUTH_TOKEN`.
-4. Set up OAuth apps: create a Google Cloud OAuth 2.0 client and a Discord Developer Application. Store client IDs/secrets in .env.
-5. Configure svelte.config.js with `adapter-vercel` and any path aliases (e.g., `$engine` → `../src/engine` if we need to import engine code later).
-
-**Phase 1 — Database + Auth**
-
-6. Define the Drizzle schema in `site/src/lib/server/db/schema.ts` with all five tables listed above.
-7. Create `site/src/lib/server/db/client.ts` — initialize Turso client + Drizzle instance. Export `db`.
-8. Run `drizzle-kit generate` + `drizzle-kit migrate` to push schema to Turso.
-9. Implement `site/src/lib/server/auth/google.ts` and `discord.ts` — configure Arctic providers with client ID/secret and callback URLs.
-10. Implement `site/src/lib/server/auth/sessions.ts` — functions: `createSession(userId)` → generates random token, inserts into `sessions`, returns Set-Cookie header; `validateSession(cookieToken)` → looks up session, checks expiry, returns user or null; `deleteSession(token)`.
-11. Implement `site/src/hooks.server.ts` — on every request, read the session cookie, call `validateSession()`, attach `event.locals.user` (or null). This makes auth state available to all `+page.server.ts` load functions.
-12. Build auth routes:
-    - `site/src/routes/auth/login/+page.svelte` — two buttons (Google, Discord). Each links to the OAuth provider's authorize URL (generated by Arctic).
-    - `site/src/routes/auth/callback/google/+server.ts` — exchanges code for tokens, extracts profile, upserts into `users`, calls `createSession()`, redirects to `/adventures`.
-    - `site/src/routes/auth/callback/discord/+server.ts` — same flow for Discord.
-    - `site/src/routes/auth/logout/+server.ts` — POST handler, deletes session, clears cookie, redirects to `/`.
-
-**Phase 2 — Layout + Landing Page**
-
-13. Port the design tokens from styles.css (CSS custom properties: `--bg`, `--surface`, `--accent`, `--accent-2`, `--text`, `--text-muted`, etc.) into `site/src/app.css`. Keep the dark theme and glassmorphism foundation.
-14. Build `site/src/lib/components/Nav.svelte` — minimal top bar: placeholder logo/text on the left, user avatar + sign-out on the right (if authenticated), "Sign In" button otherwise. Data comes from the parent layout.
-15. Build `site/src/lib/components/GlassPanel.svelte` — a reusable `<slot>`-based wrapper applying the `.panel-card` glassmorphism style. Use this everywhere.
-16. Build `site/src/routes/+layout.svelte` — wraps all pages with `<Nav>`, passes user from `+layout.server.ts` data.
-17. Build `site/src/routes/+layout.server.ts` — returns `{ user: event.locals.user }` so all pages have access.
-18. Build `site/src/routes/+page.svelte` — landing page. Hero section with a tagline (placeholder copy), a brief pitch blurb, and a single "Begin Your Adventure" CTA button that links to `/auth/login` (or `/adventures` if already signed in). Keep it minimal and atmospheric — dark background, maybe a subtle gradient or world-art placeholder. This page should feel like opening a book.
-
-**Phase 3 — Adventures Dashboard + Creation**
-
-19. Build `site/src/routes/adventures/+page.server.ts` — protected: if no user, redirect to `/auth/login`. Otherwise, query `adventures` joined with `adventure_members` for this user. Return the list.
-20. Build `site/src/routes/adventures/+page.svelte` — shows the user's adventures as `AdventureCard` components (name, mode, status, member count, created date). Empty state: "No adventures yet." A prominent "New Adventure" button links to `/adventures/new`.
-21. Build `site/src/lib/components/AdventureCard.svelte` — glass panel showing adventure name, mode badge (solo/multiplayer), status badge (lobby/active/completed), and a "Continue" or "Join Lobby" action link.
-22. Build `site/src/routes/adventures/new/+page.svelte` — form with: adventure name input, solo/multiplayer toggle, and a "Create" button. Multiplayer shows a note: "You'll get an invite link to share."
-23. Build `site/src/routes/adventures/new/+page.server.ts` — form action: validate input, insert into `adventures` (status: `'lobby'` for multiplayer, `'active'` for solo), insert into `adventure_members` (role: `'owner'`, ready: true for solo). Redirect to `/adventures/[id]/lobby` for multiplayer, or `/adventures/[id]` for solo.
-
-**Phase 4 — Multiplayer Lobby**
-
-24. Build `site/src/routes/api/lobby/[id]/+server.ts` — GET handler: return lobby state (adventure info + members list + ready statuses). This is the polling endpoint.
-25. Build `site/src/routes/api/lobby/[id]/join/+server.ts` — POST handler: insert user into `adventure_members` if not already present and adventure is in lobby status.
-26. Build `site/src/routes/api/lobby/[id]/ready/+server.ts` — POST handler: toggle `is_ready` for the current user. If ALL members are now ready, update adventure status to `'active'`.
-27. Build `site/src/routes/adventures/[id]/lobby/+page.server.ts` — load adventure + members. If adventure status is `'active'`, redirect to `/adventures/[id]`.
-28. Build `site/src/routes/adventures/[id]/lobby/+page.svelte` — shows: adventure name, shareable invite link (just the URL), list of players with ready indicators (`LobbyPlayer` components), a "Ready Up" toggle button, and a status message ("Waiting for all players..."). Polls `GET /api/lobby/[id]` every 3 seconds via `setInterval` in `onMount`. When all ready and status flips to `'active'`, auto-navigates to `/adventures/[id]`.
-29. Build `site/src/lib/components/LobbyPlayer.svelte` — avatar, username, ready/not-ready indicator.
-30. Build `site/src/lib/stores/lobby.ts` — a Svelte store that manages polling interval, exposes `members`, `allReady`, `adventureStatus`. Cleans up interval on component destroy.
-
-**Phase 5 — Adventure Screen (Stub)**
-
-31. Build `site/src/routes/adventures/[id]/+page.server.ts` — load adventure + state. If status is `'lobby'`, redirect to lobby. If user is not a member, 403.
-32. Build `site/src/routes/adventures/[id]/+page.svelte` — placeholder adventure screen. Show: adventure name, mode, member list, world seed, and a big "Adventure begins here — TBD" panel. This is the frontier; everything past this point is designed later.
-
-**Phase 6 — Deploy + Verify**
-
-33. Connect the GitHub repo to Vercel. Set the root directory to `site/`. Configure environment variables (Turso, Google OAuth, Discord OAuth, OpenAI key).
-34. Push to main. Verify auto-deploy.
-35. Verify the full flow end-to-end: landing → sign in (Google or Discord) → adventures dashboard → create solo adventure → see adventure screen. Then: create multiplayer adventure → share lobby link → second user joins → both ready up → auto-navigate to adventure screen.
-
----
-
-### Verification
-
-- **Auth flow**: Sign in with Google → lands on `/adventures`. Sign in with Discord → same. Sign out → lands on `/`. Revisit `/adventures` while logged out → redirects to login.
-- **Adventure CRUD**: Create solo → goes directly to adventure screen. Create multiplayer → lands in lobby.
-- **Lobby**: Open lobby link in incognito (second user signs in) → appears in member list. Both click ready → both navigate to adventure screen.
-- **DB**: Check Turso dashboard — tables populated, sessions have proper expiry, adventures and members created correctly.
-- **Mobile**: Test on narrow viewport — nav collapses gracefully, lobby and dashboard are usable.
-
----
-
-### Decisions
-
-- **Arctic over Lucia**: Lucia Auth was deprecated (early 2025). Arctic is its OAuth successor; we pair it with manual cookie session management rather than a session library.
-- **Turso over raw SQLite**: Vercel serverless functions have no persistent filesystem. Turso is hosted libSQL (SQLite-compatible) that works over HTTP — perfect for serverless. Free tier covers this scale easily.
-- **Short-polling over WebSockets for lobby**: Vercel serverless doesn't support persistent WebSocket connections. 3-second polling is fine for a lobby of 2-6 players. Clear upgrade path to PartyKit when real-time demands grow.
-- **Monorepo with `site/` subdirectory**: Keeps the existing engine code in src untouched. SvelteKit lives in `site/` with its own dependencies. Later, the engine can be imported via Vite aliases if we want to run world generation server-side.
-- **No CSS framework**: The existing design language (dark theme, glassmorphism, Inter font, CSS custom properties) is clean and distinctive. We port the tokens and build on them with Svelte scoped styles + the `GlassPanel` component.
-- **ULID for IDs**: Sortable, URL-safe, no collision risk. Better than UUIDs for adventure URLs.
+11:37:24.537 Running build in Washington, D.C., USA (East) – iad1
+11:37:24.538 Build machine configuration: 2 cores, 8 GB
+11:37:24.555 Cloning github.com/themightygorgonzola/project-zeus (Branch: main, Commit: fb2ee82)
+11:37:24.556 Skipping build cache, deployment was triggered without cache.
+11:37:24.932 Cloning completed: 377.000ms
+11:37:26.491 Running "vercel build"
+11:37:27.111 Vercel CLI 50.32.4
+11:37:27.734 Running "install" command: `npm install`...
+11:37:30.148 npm warn deprecated @esbuild-kit/core-utils@3.3.2: Merged into tsx: https://tsx.is
+11:37:30.150 npm warn deprecated @esbuild-kit/esm-loader@2.6.5: Merged into tsx: https://tsx.is
+11:37:30.491 npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+11:37:31.128 npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+11:37:32.667 
+11:37:32.667 added 176 packages, and audited 177 packages in 5s
+11:37:32.668 
+11:37:32.668 28 packages are looking for funding
+11:37:32.668   run `npm fund` for details
+11:37:32.700 
+11:37:32.701 7 vulnerabilities (2 low, 5 moderate)
+11:37:32.701 
+11:37:32.702 To address all issues (including breaking changes), run:
+11:37:32.702   npm audit fix --force
+11:37:32.703 
+11:37:32.703 Run `npm audit` for details.
+11:37:32.949 
+11:37:32.950 > project-zeus-site@0.1.0 build
+11:37:32.950 > vite build
+11:37:32.951 
+11:37:33.187 ▲ [WARNING] Cannot find base config file "./.svelte-kit/tsconfig.json" [tsconfig.json]
+11:37:33.187 
+11:37:33.187     tsconfig.json:2:12:
+11:37:33.188       2 │   "extends": "./.svelte-kit/tsconfig.json",
+11:37:33.188         ╵              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+11:37:33.188 
+11:37:34.117 [36mvite v6.4.1 [32mbuilding SSR bundle for production...[36m[39m
+11:37:34.170 transforming...
+11:37:35.515 [32m✓[39m 188 modules transformed.
+11:37:35.665 rendering chunks...
+11:37:36.798 [36mvite v6.4.1 [32mbuilding for production...[36m[39m
+11:37:36.804 transforming...
+11:37:37.814 [32m✓[39m 179 modules transformed.
+11:37:37.918 rendering chunks...
+11:37:37.947 computing gzip size...
+11:37:38.130 [2m.svelte-kit/output/client/[22m[32m_app/version.json                              [39m[1m[2m 0.03 kB[22m[1m[22m[2m │ gzip:  0.05 kB[22m
+11:37:38.131 [2m.svelte-kit/output/client/[22m[32m.vite/manifest.json                            [39m[1m[2m 7.09 kB[22m[1m[22m[2m │ gzip:  1.00 kB[22m
+11:37:38.132 [2m.svelte-kit/output/client/[22m[35m_app/immutable/assets/GlassPanel.pNFszRMM.css  [39m[1m[2m 0.20 kB[22m[1m[22m[2m │ gzip:  0.15 kB[22m
+11:37:38.132 [2m.svelte-kit/output/client/[22m[35m_app/immutable/assets/3.CSLzzWCb.css           [39m[1m[2m 1.57 kB[22m[1m[22m[2m │ gzip:  0.60 kB[22m
+11:37:38.132 [2m.svelte-kit/output/client/[22m[35m_app/immutable/assets/6.Dvqn-qBd.css           [39m[1m[2m 1.67 kB[22m[1m[22m[2m │ gzip:  0.59 kB[22m
+11:37:38.132 [2m.svelte-kit/output/client/[22m[35m_app/immutable/assets/4.ChdzdyaL.css           [39m[1m[2m 1.92 kB[22m[1m[22m[2m │ gzip:  0.65 kB[22m
+11:37:38.133 [2m.svelte-kit/output/client/[22m[35m_app/immutable/assets/7.BDo7qBhl.css           [39m[1m[2m 2.19 kB[22m[1m[22m[2m │ gzip:  0.77 kB[22m
+11:37:38.133 [2m.svelte-kit/output/client/[22m[35m_app/immutable/assets/2.wG4aY4CN.css           [39m[1m[2m 2.57 kB[22m[1m[22m[2m │ gzip:  0.97 kB[22m
+11:37:38.133 [2m.svelte-kit/output/client/[22m[35m_app/immutable/assets/5.DkSBcTy1.css           [39m[1m[2m 2.77 kB[22m[1m[22m[2m │ gzip:  0.87 kB[22m
+11:37:38.133 [2m.svelte-kit/output/client/[22m[35m_app/immutable/assets/0.Cw90TlQx.css           [39m[1m[2m 3.91 kB[22m[1m[22m[2m │ gzip:  1.41 kB[22m
+11:37:38.133 [2m.svelte-kit/output/client/[22m[36m_app/immutable/entry/start.8UV8KDum.js         [39m[1m[2m 0.08 kB[22m[1m[22m[2m │ gzip:  0.09 kB[22m
+11:37:38.134 [2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/Bzak7iHL.js              [39m[1m[2m 0.10 kB[22m[1m[22m[2m │ gzip:  0.10 kB[22m
+11:37:38.134 [2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/CnhMmHmL.js              [39m[1m[2m 0.37 kB[22m[1m[22m[2m │ gzip:  0.27 kB[22m
+11:37:38.134 [2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/k37cEf_I.js              [39m[1m[2m 0.38 kB[22m[1m[22m[2m │ gzip:  0.28 kB[22m
+11:37:38.135 [2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/cK-SeNs1.js              [39m[1m[2m 0.64 kB[22m[1m[22m[2m │ gzip:  0.43 kB[22m
+11:37:38.135 [2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/YNEH4maI.js              [39m[1m[2m 1.01 kB[22m[1m[22m[2m │ gzip:  0.60 kB[22m
+11:37:38.135 [2m.svelte-kit/output/client/[22m[36m_app/immutable/nodes/1.DVz9efQC.js             [39m[1m[2m 1.03 kB[22m[1m[22m[2m │ gzip:  0.60 kB[22m
+11:37:38.135 [2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/hF-6pwQC.js              [39m[1m[2m 1.27 kB[22m[1m[22m[2m │ gzip:  0.71 kB[22m
+11:37:38.136 [2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/BRhjyWQz.js              [39m[1m[2m 1.43 kB[22m[1m[22m[2m │ gzip:  0.83 kB[22m
+11:37:38.136 [2m.svelte-kit/output/client/[22m[36m_app/immutable/nodes/0.CrhgLrYe.js             [39m[1m[2m 1.74 kB[22m[1m[22m[2m │ gzip:  0.83 kB[22m
+11:37:38.136 [2m.svelte-kit/output/client/[22m[36m_app/immutable/nodes/7.eF0-27Nl.js             [39m[1m[2m 2.35 kB[22m[1m[22m[2m │ gzip:  1.11 kB[22m
+11:37:38.136 [2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/HEW4_RgH.js              [39m[1m[2m 2.55 kB[22m[1m[22m[2m │ gzip:  1.16 kB[22m
+11:37:38.136 [2m.svelte-kit/output/client/[22m[36m_app/immutable/nodes/2.CLOQcSwc.js             [39m[1m[2m 2.93 kB[22m[1m[22m[2m │ gzip:  1.15 kB[22m
+11:37:38.136 [2m.svelte-kit/output/client/[22m[36m_app/immutable/nodes/3.COzR5nfo.js             [39m[1m[2m 3.22 kB[22m[1m[22m[2m │ gzip:  1.45 kB[22m
+11:37:38.137 [2m.svelte-kit/output/client/[22m[36m_app/immutable/nodes/4.CbFCJzj1.js             [39m[1m[2m 3.34 kB[22m[1m[22m[2m │ gzip:  1.40 kB[22m
+11:37:38.137 [2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/Bobxs8dk.js              [39m[1m[2m 3.92 kB[22m[1m[22m[2m │ gzip:  1.88 kB[22m
+11:37:38.137 [2m.svelte-kit/output/client/[22m[36m_app/immutable/nodes/5.CNDW4JST.js             [39m[1m[2m 5.19 kB[22m[1m[22m[2m │ gzip:  2.32 kB[22m
+11:37:38.137 [2m.svelte-kit/output/client/[22m[36m_app/immutable/nodes/6.w3Cb3dia.js             [39m[1m[2m 5.88 kB[22m[1m[22m[2m │ gzip:  2.61 kB[22m
+11:37:38.138 [2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/7o_WohxM.js              [39m[1m[2m 7.60 kB[22m[1m[22m[2m │ gzip:  3.27 kB[22m
+11:37:38.138 [2m.svelte-kit/output/client/[22m[36m_app/immutable/entry/app.BvhTlpwI.js           [39m[1m[2m 7.78 kB[22m[1m[22m[2m │ gzip:  3.41 kB[22m
+11:37:38.138 [2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/B22D_QmL.js              [39m[1m[2m26.02 kB[22m[1m[22m[2m │ gzip: 10.20 kB[22m
+11:37:38.138 [2m.svelte-kit/output/client/[22m[36m_app/immutable/chunks/BT4ZHjb6.js              [39m[1m[2m35.14 kB[22m[1m[22m[2m │ gzip: 13.42 kB[22m
+11:37:38.139 [32m✓ built in 1.33s[39m
+11:37:38.650 [2m.svelte-kit/output/server/[22m[32m.vite/manifest.json                                     [39m[1m[2m 11.94 kB[22m[1m[22m
+11:37:38.651 [2m.svelte-kit/output/server/[22m[35m_app/immutable/assets/GlassPanel.DNIoJB0d.css           [39m[1m[2m  0.17 kB[22m[1m[22m
+11:37:38.651 [2m.svelte-kit/output/server/[22m[35m_app/immutable/assets/_page.CSLzzWCb.css                [39m[1m[2m  1.57 kB[22m[1m[22m
+11:37:38.651 [2m.svelte-kit/output/server/[22m[35m_app/immutable/assets/_page.Dvqn-qBd.css                [39m[1m[2m  1.67 kB[22m[1m[22m
+11:37:38.652 [2m.svelte-kit/output/server/[22m[35m_app/immutable/assets/_page.ChdzdyaL.css                [39m[1m[2m  1.92 kB[22m[1m[22m
+11:37:38.652 [2m.svelte-kit/output/server/[22m[35m_app/immutable/assets/_page.BDo7qBhl.css                [39m[1m[2m  2.19 kB[22m[1m[22m
+11:37:38.652 [2m.svelte-kit/output/server/[22m[35m_app/immutable/assets/_page.srGy2Bzq.css                [39m[1m[2m  2.52 kB[22m[1m[22m
+11:37:38.652 [2m.svelte-kit/output/server/[22m[35m_app/immutable/assets/_page.DkSBcTy1.css                [39m[1m[2m  2.77 kB[22m[1m[22m
+11:37:38.652 [2m.svelte-kit/output/server/[22m[35m_app/immutable/assets/_layout.BDfSlYVI.css              [39m[1m[2m  3.88 kB[22m[1m[22m
+11:37:38.652 [2m.svelte-kit/output/server/[22m[36mchunks/false.js                                         [39m[1m[2m  0.04 kB[22m[1m[22m
+11:37:38.652 [2m.svelte-kit/output/server/[22m[36mentries/pages/_layout.server.ts.js                      [39m[1m[2m  0.10 kB[22m[1m[22m
+11:37:38.653 [2m.svelte-kit/output/server/[22m[36mchunks/shared-server.js                                 [39m[1m[2m  0.28 kB[22m[1m[22m
+11:37:38.653 [2m.svelte-kit/output/server/[22m[36mchunks/GlassPanel.js                                    [39m[1m[2m  0.32 kB[22m[1m[22m
+11:37:38.653 [2m.svelte-kit/output/server/[22m[36mchunks/google.js                                        [39m[1m[2m  0.34 kB[22m[1m[22m
+11:37:38.653 [2m.svelte-kit/output/server/[22m[36mchunks/discord.js                                       [39m[1m[2m  0.35 kB[22m[1m[22m
+11:37:38.653 [2m.svelte-kit/output/server/[22m[36mentries/endpoints/api/lobby/_id_/_server.ts.js          [39m[1m[2m  0.36 kB[22m[1m[22m
+11:37:38.653 [2m.svelte-kit/output/server/[22m[36mentries/endpoints/auth/logout/_server.ts.js             [39m[1m[2m  0.37 kB[22m[1m[22m
+11:37:38.653 [2m.svelte-kit/output/server/[22m[36minternal.js                                             [39m[1m[2m  0.41 kB[22m[1m[22m
+11:37:38.654 [2m.svelte-kit/output/server/[22m[36mchunks/state.svelte.js                                  [39m[1m[2m  0.46 kB[22m[1m[22m
+11:37:38.654 [2m.svelte-kit/output/server/[22m[36mchunks/environment.js                                   [39m[1m[2m  0.62 kB[22m[1m[22m
+11:37:38.654 [2m.svelte-kit/output/server/[22m[36mentries/pages/auth/login/_page.server.ts.js             [39m[1m[2m  0.67 kB[22m[1m[22m
+11:37:38.654 [2m.svelte-kit/output/server/[22m[36mentries/hooks.server.js                                 [39m[1m[2m  0.73 kB[22m[1m[22m
+11:37:38.654 [2m.svelte-kit/output/server/[22m[36mentries/endpoints/auth/login/discord/_server.ts.js      [39m[1m[2m  0.77 kB[22m[1m[22m
+11:37:38.654 [2m.svelte-kit/output/server/[22m[36mentries/endpoints/auth/login/google/_server.ts.js       [39m[1m[2m  0.79 kB[22m[1m[22m
+11:37:38.654 [2m.svelte-kit/output/server/[22m[36mentries/pages/adventures/_page.server.ts.js             [39m[1m[2m  0.83 kB[22m[1m[22m
+11:37:38.654 [2m.svelte-kit/output/server/[22m[36mchunks/utils.js                                         [39m[1m[2m  1.15 kB[22m[1m[22m
+11:37:38.655 [2m.svelte-kit/output/server/[22m[36mentries/fallbacks/error.svelte.js                       [39m[1m[2m  1.17 kB[22m[1m[22m
+11:37:38.656 [2m.svelte-kit/output/server/[22m[36mentries/endpoints/api/lobby/_id_/join/_server.ts.js     [39m[1m[2m  1.23 kB[22m[1m[22m
+11:37:38.656 [2m.svelte-kit/output/server/[22m[36mentries/endpoints/auth/dev-login/_server.ts.js          [39m[1m[2m  1.25 kB[22m[1m[22m
+11:37:38.656 [2m.svelte-kit/output/server/[22m[36mchunks/index.js                                         [39m[1m[2m  1.44 kB[22m[1m[22m
+11:37:38.656 [2m.svelte-kit/output/server/[22m[36mentries/pages/adventures/_id_/_page.server.ts.js        [39m[1m[2m  1.55 kB[22m[1m[22m
+11:37:38.656 [2m.svelte-kit/output/server/[22m[36mentries/endpoints/api/lobby/_id_/stream/_server.ts.js   [39m[1m[2m  1.73 kB[22m[1m[22m
+11:37:38.656 [2m.svelte-kit/output/server/[22m[36mentries/pages/adventures/new/_page.server.ts.js         [39m[1m[2m  1.82 kB[22m[1m[22m
+11:37:38.656 [2m.svelte-kit/output/server/[22m[36mentries/pages/_layout.svelte.js                         [39m[1m[2m  1.84 kB[22m[1m[22m
+11:37:38.657 [2m.svelte-kit/output/server/[22m[36mentries/pages/adventures/_id_/lobby/_page.server.ts.js  [39m[1m[2m  1.86 kB[22m[1m[22m
+11:37:38.657 [2m.svelte-kit/output/server/[22m[36mchunks/sessions.js                                      [39m[1m[2m  1.87 kB[22m[1m[22m
+11:37:38.657 [2m.svelte-kit/output/server/[22m[36mentries/endpoints/auth/callback/google/_server.ts.js    [39m[1m[2m  1.92 kB[22m[1m[22m
+11:37:38.657 [2m.svelte-kit/output/server/[22m[36mentries/endpoints/auth/callback/discord/_server.ts.js   [39m[1m[2m  2.21 kB[22m[1m[22m
+11:37:38.657 [2m.svelte-kit/output/server/[22m[36mentries/endpoints/api/lobby/_id_/ready/_server.ts.js    [39m[1m[2m  2.28 kB[22m[1m[22m
+11:37:38.657 [2m.svelte-kit/output/server/[22m[36mchunks/lobby.js                                         [39m[1m[2m  2.45 kB[22m[1m[22m
+11:37:38.657 [2m.svelte-kit/output/server/[22m[36mentries/pages/auth/login/_page.svelte.js                [39m[1m[2m  2.67 kB[22m[1m[22m
+11:37:38.657 [2m.svelte-kit/output/server/[22m[36mchunks/client.js                                        [39m[1m[2m  2.84 kB[22m[1m[22m
+11:37:38.657 [2m.svelte-kit/output/server/[22m[36mentries/pages/adventures/new/_page.svelte.js            [39m[1m[2m  2.94 kB[22m[1m[22m
+11:37:38.658 [2m.svelte-kit/output/server/[22m[36mentries/pages/_page.svelte.js                           [39m[1m[2m  3.01 kB[22m[1m[22m
+11:37:38.658 [2m.svelte-kit/output/server/[22m[36mchunks/internal.js                                      [39m[1m[2m  3.24 kB[22m[1m[22m
+11:37:38.658 [2m.svelte-kit/output/server/[22m[36mentries/pages/adventures/_page.svelte.js                [39m[1m[2m  3.79 kB[22m[1m[22m
+11:37:38.658 [2m.svelte-kit/output/server/[22m[36mentries/pages/adventures/_id_/_page.svelte.js           [39m[1m[2m  3.86 kB[22m[1m[22m
+11:37:38.659 [2m.svelte-kit/output/server/[22m[36mchunks/dev-users.js                                     [39m[1m[2m  4.00 kB[22m[1m[22m
+11:37:38.659 [2m.svelte-kit/output/server/[22m[36mentries/pages/adventures/_id_/lobby/_page.svelte.js     [39m[1m[2m  5.09 kB[22m[1m[22m
+11:37:38.659 [2m.svelte-kit/output/server/[22m[36mchunks/exports.js                                       [39m[1m[2m  5.54 kB[22m[1m[22m
+11:37:38.659 [2m.svelte-kit/output/server/[22m[36mchunks/attributes.js                                    [39m[1m[2m  5.98 kB[22m[1m[22m
+11:37:38.659 [2m.svelte-kit/output/server/[22m[36mremote-entry.js                                         [39m[1m[2m 19.02 kB[22m[1m[22m
+11:37:38.660 [2m.svelte-kit/output/server/[22m[36mchunks/shared.js                                        [39m[1m[2m 27.07 kB[22m[1m[22m
+11:37:38.660 [2m.svelte-kit/output/server/[22m[36mchunks/index2.js                                        [39m[1m[2m 32.17 kB[22m[1m[22m
+11:37:38.660 [2m.svelte-kit/output/server/[22m[36mchunks/root.js                                          [39m[1m[2m 79.04 kB[22m[1m[22m
+11:37:38.660 [2m.svelte-kit/output/server/[22m[36mindex.js                                                [39m[1m[2m125.80 kB[22m[1m[22m
+11:37:38.660 [32m✓ built in 4.51s[39m
+11:37:38.661 
+11:37:38.661 Run npm run preview to preview your production build locally.
+11:37:38.665 
+11:37:38.665 > Using @sveltejs/adapter-vercel
+11:37:39.827   Warning: The following modules failed to locate dependencies that may (or may not) be required for your app to work:
+11:37:39.828   node_modules/@neon-rs/load/dist/index.js
+11:37:39.829     - [1m[36m/index.node[39m[22m
+11:37:39.829   node_modules/ws/lib/buffer-util.js
+11:37:39.829     - [1m[36mbufferutil[39m[22m
+11:37:39.829   node_modules/ws/lib/validation.js
+11:37:39.829     - [1m[36mutf-8-validate[39m[22m
+11:37:39.909   ✔ done
+11:37:40.241 Build Completed in /vercel/output [13s]
+11:37:40.430 Deploying outputs...
+11:37:45.954 Deployment completed
+11:37:46.983 Creating build cache...
+11:37:51.905 Created build cache: 5s
+11:37:51.906 Uploading build cache [36.59 MB]
+11:37:52.503 Build cache uploaded: 603.323ms

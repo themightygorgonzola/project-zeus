@@ -16,6 +16,7 @@ export async function bootstrapDatabase() {
 			username TEXT NOT NULL,
 			avatar_url TEXT,
 			is_test_user INTEGER NOT NULL DEFAULT 0,
+			is_admin INTEGER NOT NULL DEFAULT 0,
 			created_at INTEGER NOT NULL
 		)
 	`);

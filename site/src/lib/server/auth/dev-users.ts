@@ -10,6 +10,7 @@ export interface DevTestUser {
 	email: string;
 	username: string;
 	avatarUrl: string;
+	isAdmin?: boolean;
 }
 
 export const DEV_TEST_USERS: DevTestUser[] = [
@@ -36,6 +37,13 @@ export const DEV_TEST_USERS: DevTestUser[] = [
 		email: 'cleric@local.party',
 		username: 'Sister Ilya',
 		avatarUrl: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Ilya'
+	},
+	{
+		key: 'admin',
+		email: 'admin@local.party',
+		username: 'The Admin',
+		avatarUrl: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Admin&backgroundColor=ff0000',
+		isAdmin: true
 	}
 ];
 
@@ -62,6 +70,7 @@ export async function ensureDevUsers() {
 				username: profile.username,
 				avatarUrl: profile.avatarUrl,
 				isTestUser: true,
+				isAdmin: profile.isAdmin ?? false,
 				createdAt: Date.now()
 			});
 		} else {
@@ -70,7 +79,8 @@ export async function ensureDevUsers() {
 				.set({
 					username: profile.username,
 					avatarUrl: profile.avatarUrl,
-					isTestUser: true
+					isTestUser: true,
+					isAdmin: profile.isAdmin ?? false
 				})
 				.where(eq(users.id, existing[0].id));
 		}

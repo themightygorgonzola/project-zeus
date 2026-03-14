@@ -70,6 +70,7 @@ export async function validateSession(
 			discordId: user.discordId,
 			email: user.email,
 			isTestUser: user.isTestUser,
+			isAdmin: user.isAdmin,
 			createdAt: user.createdAt
 		}
 	};

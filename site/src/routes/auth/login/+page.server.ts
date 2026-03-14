@@ -18,11 +18,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	}
 
 	const devAuthEnabled = isDevAuthEnabled();
-	const testUsers = devAuthEnabled ? await ensureDevUsers() : [];
+	const allDevUsers = devAuthEnabled ? await ensureDevUsers() : [];
+	const testUsers = allDevUsers.filter((u) => !u.isAdmin);
+	const adminUser = allDevUsers.find((u) => u.isAdmin) ?? null;
 
 	return {
 		devAuthEnabled,
 		testUsers,
+		adminUser,
 		returnTo
 	};
 };
