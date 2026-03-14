@@ -15,6 +15,9 @@ import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { eventBus } from '$server/realtime/event-bus';
 import { getLobbyState } from '$server/realtime/lobby';
+import { db } from '$server/db/client';
+import { adventureMembers } from '$server/db/schema';
+import { eq, and } from 'drizzle-orm';
 
 const HEARTBEAT_MS = 15_000;
 
@@ -24,6 +27,22 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
 	}
 
 	const adventureId = params.id;
+
+	// Verify the caller is a member of this adventure
+	const membership = await db
+		.select()
+		.from(adventureMembers)
+		.where(
+			and(
+				eq(adventureMembers.adventureId, adventureId),
+				eq(adventureMembers.userId, locals.user.id)
+			)
+		)
+		.limit(1);
+	if (membership.length === 0) {
+		error(403, 'Not a member of this adventure');
+	}
+
 	const encoder = new TextEncoder();
 
 	const stream = new ReadableStream({

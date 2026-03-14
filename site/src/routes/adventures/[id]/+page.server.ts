@@ -59,10 +59,20 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 		.where(eq(adventureState.adventureId, params.id))
 		.limit(1);
 
+	let parsedState = {};
+	if (state.length > 0) {
+		try {
+			parsedState = JSON.parse(state[0].stateJson);
+		} catch {
+			// Corrupted state — fall back to empty
+			parsedState = {};
+		}
+	}
+
 	return {
 		adventure: adventure[0],
 		members,
-		state: state.length > 0 ? JSON.parse(state[0].stateJson) : {},
+		state: parsedState,
 		currentUserId: locals.user.id
 	};
 };

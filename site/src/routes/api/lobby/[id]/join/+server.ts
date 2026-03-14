@@ -4,6 +4,7 @@ import { db } from '$server/db/client';
 import { adventures, adventureMembers } from '$server/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { broadcastLobbyUpdate } from '$server/realtime/lobby';
+import { MAX_LOBBY_SIZE } from '$server/config/constants';
 
 /** POST /api/lobby/[id]/join — join an adventure lobby */
 export const POST: RequestHandler = async ({ params, locals }) => {
@@ -39,6 +40,15 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 
 	if (existing.length > 0) {
 		return json({ ok: true, message: 'Already a member' });
+	}
+
+	// Enforce lobby size cap
+	const currentMembers = await db
+		.select()
+		.from(adventureMembers)
+		.where(eq(adventureMembers.adventureId, params.id));
+	if (currentMembers.length >= MAX_LOBBY_SIZE) {
+		error(400, `Lobby is full (max ${MAX_LOBBY_SIZE} players)`);
 	}
 
 	await db.insert(adventureMembers).values({

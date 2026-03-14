@@ -34,31 +34,31 @@ export const actions: Actions = {
 
 		const isSolo = mode === 'solo';
 
-		// Create adventure
-		await db.insert(adventures).values({
-			id: adventureId,
-			name,
-			ownerId: locals.user.id,
-			mode,
-			status: isSolo ? 'active' : 'lobby',
-			createdAt: now,
-			updatedAt: now
-		});
+		// Create adventure + member + state atomically
+		await db.transaction(async (tx) => {
+			await tx.insert(adventures).values({
+				id: adventureId,
+				name,
+				ownerId: locals.user!.id,
+				mode,
+				status: isSolo ? 'active' : 'lobby',
+				createdAt: now,
+				updatedAt: now
+			});
 
-		// Add owner as member
-		await db.insert(adventureMembers).values({
-			adventureId,
-			userId: locals.user.id,
-			role: 'owner',
-			isReady: isSolo, // Solo starts ready
-			joinedAt: now
-		});
+			await tx.insert(adventureMembers).values({
+				adventureId,
+				userId: locals.user!.id,
+				role: 'owner',
+				isReady: isSolo,
+				joinedAt: now
+			});
 
-		// Create initial empty state
-		await db.insert(adventureState).values({
-			adventureId,
-			stateJson: JSON.stringify({ started: isSolo, events: [] }),
-			updatedAt: now
+			await tx.insert(adventureState).values({
+				adventureId,
+				stateJson: JSON.stringify({ started: isSolo, events: [] }),
+				updatedAt: now
+			});
 		});
 
 		// Route based on mode

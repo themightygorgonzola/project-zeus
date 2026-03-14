@@ -4,6 +4,7 @@ import { db } from '$server/db/client';
 import { adventures, adventureMembers, users } from '$server/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { broadcastLobbyUpdate } from '$server/realtime/lobby';
+import { MAX_LOBBY_SIZE } from '$server/config/constants';
 
 export const load: PageServerLoad = async ({ params, locals, url }) => {
 	if (!locals.user) {
@@ -40,6 +41,15 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 	if (membership.length === 0) {
 		// Auto-join as player if lobby is still open
 		if (adventure[0].status === 'lobby') {
+			// Enforce lobby size cap
+			const currentMembers = await db
+				.select()
+				.from(adventureMembers)
+				.where(eq(adventureMembers.adventureId, params.id));
+			if (currentMembers.length >= MAX_LOBBY_SIZE) {
+				error(400, `Lobby is full (max ${MAX_LOBBY_SIZE} players)`);
+			}
+
 			await db.insert(adventureMembers).values({
 				adventureId: params.id,
 				userId: locals.user.id,

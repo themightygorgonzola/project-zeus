@@ -1,4 +1,5 @@
 import { env } from '$env/dynamic/private';
+import { dev } from '$app/environment';
 import { db } from '$server/db/client';
 import { users } from '$server/db/schema';
 import { bootstrapDatabase } from '$server/db/bootstrap';
@@ -48,7 +49,10 @@ export const DEV_TEST_USERS: DevTestUser[] = [
 ];
 
 export function isDevAuthEnabled() {
-	return (env.ENABLE_DEV_AUTH ?? 'true').toLowerCase() === 'true';
+	// Explicit env var takes priority; otherwise auto-enable in local dev only
+	const explicit = env.ENABLE_DEV_AUTH;
+	if (explicit !== undefined) return explicit.toLowerCase() === 'true';
+	return dev;
 }
 
 export async function ensureDevUsers() {

@@ -32,8 +32,33 @@
 
 	let copied = $state(false);
 
-	/* ── SSE real-time connection ────────────────────────── */
+	/* ── SSE real-time connection + polling fallback ─────── */
 	let eventSource: EventSource | null = null;
+	let lastEventAt = 0; // ms timestamp of last real SSE event
+	let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+	const POLL_INTERVAL = 3_000;
+	const SSE_GRACE = 5_000; // skip poll if SSE delivered recently
+
+	function applyLobbyState(state: LobbyState) {
+		members = state.members;
+		adventureStatus = state.adventure.status;
+	}
+
+	async function pollLobby() {
+		// Skip poll if SSE has been active recently
+		if (Date.now() - lastEventAt < SSE_GRACE) return;
+		try {
+			const res = await fetch(`/api/lobby/${adventureId}`);
+			if (!res.ok) return;
+			const state: LobbyState = await res.json();
+			if (state.adventure.status === 'active') {
+				goto(`/adventures/${adventureId}`);
+				return;
+			}
+			applyLobbyState(state);
+		} catch { /* network hiccup — try again next interval */ }
+	}
 
 	function connectSSE() {
 		if (eventSource) return;
@@ -42,9 +67,9 @@
 
 		eventSource.addEventListener('lobby-update', (e: MessageEvent) => {
 			const state: LobbyState = JSON.parse(e.data);
-			members = state.members;
-			adventureStatus = state.adventure.status;
+			applyLobbyState(state);
 			connected = true;
+			lastEventAt = Date.now();
 		});
 
 		eventSource.addEventListener('adventure-started', (e: MessageEvent) => {
@@ -58,15 +83,21 @@
 
 		eventSource.onerror = () => {
 			connected = false;
-			// EventSource auto-reconnects; no manual retry needed.
-			// The browser will re-establish the connection automatically.
 		};
+
+		// Start polling as a fallback for serverless environments where
+		// the in-memory event bus can't reach across instances.
+		pollTimer = setInterval(pollLobby, POLL_INTERVAL);
 	}
 
 	function disconnectSSE() {
 		if (eventSource) {
 			eventSource.close();
 			eventSource = null;
+		}
+		if (pollTimer) {
+			clearInterval(pollTimer);
+			pollTimer = null;
 		}
 	}
 
