@@ -25,7 +25,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 		error(400, 'Invalid OAuth state');
 	}
 
-	const google = getGoogleProvider();
+	const google = getGoogleProvider(url.origin);
 	let tokens: OAuth2Tokens;
 
 	try {

@@ -26,7 +26,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 		error(400, 'Invalid OAuth state');
 	}
 
-	const discord = getDiscordProvider();
+	const discord = getDiscordProvider(url.origin);
 	let tokens: OAuth2Tokens;
 
 	try {

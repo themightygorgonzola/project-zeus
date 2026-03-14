@@ -4,8 +4,8 @@ import { getGoogleProvider } from '$server/auth/google';
 import { generateState, generateCodeVerifier } from 'arctic';
 import { dev } from '$app/environment';
 
-export const GET: RequestHandler = async ({ cookies }) => {
-	const google = getGoogleProvider();
+export const GET: RequestHandler = async ({ cookies, url }) => {
+	const google = getGoogleProvider(url.origin);
 	const state = generateState();
 	const codeVerifier = generateCodeVerifier();
 
@@ -25,7 +25,7 @@ export const GET: RequestHandler = async ({ cookies }) => {
 		maxAge: 60 * 10
 	});
 
-	const url = google.createAuthorizationURL(state, codeVerifier, ['openid', 'profile']);
+	const authUrl = google.createAuthorizationURL(state, codeVerifier, ['openid', 'profile']);
 
-	redirect(302, url.toString());
+	redirect(302, authUrl.toString());
 };

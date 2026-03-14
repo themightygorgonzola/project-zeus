@@ -4,8 +4,8 @@ import { getDiscordProvider } from '$server/auth/discord';
 import { generateState, generateCodeVerifier } from 'arctic';
 import { dev } from '$app/environment';
 
-export const GET: RequestHandler = async ({ cookies }) => {
-	const discord = getDiscordProvider();
+export const GET: RequestHandler = async ({ cookies, url }) => {
+	const discord = getDiscordProvider(url.origin);
 	const state = generateState();
 	const codeVerifier = generateCodeVerifier();
 
@@ -25,7 +25,7 @@ export const GET: RequestHandler = async ({ cookies }) => {
 		maxAge: 60 * 10
 	});
 
-	const url = discord.createAuthorizationURL(state, codeVerifier, ['identify']);
+	const authUrl = discord.createAuthorizationURL(state, codeVerifier, ['identify']);
 
-	redirect(302, url.toString());
+	redirect(302, authUrl.toString());
 };
