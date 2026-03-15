@@ -14,8 +14,7 @@
     "map:context": "node scripts/build-world-context.js \"Vigia Full 2026-03-13-19-01.json\" generated/world-context.json",
     "story:demo": "node scripts/demo-party-progression.js 8",
     "azgaar:generate": "tsx scripts/generate-azgaar-world.ts",
-    "azgaar:world": "tsx scripts/generate-azgaar-world.ts 575079333 generated/azgaar-world.json",
-    "site:publish-world": "tsx scripts/publish-site-world.ts"
+	    "azgaar:world": "tsx scripts/generate-azgaar-world.ts 575079333 generated/azgaar-world.json"
   },
   "keywords": [],
   "author": "",
