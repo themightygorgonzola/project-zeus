@@ -4,6 +4,9 @@ import { db } from '$server/db/client';
 import { adventures, adventureMembers, adventureState } from '$server/db/schema';
 import { createWorldSeed, generatePrototypeWorld, toWorldSnapshot } from '$lib/worldgen/prototype';
 import { ulid } from 'ulid';
+import { createInitialGameState } from '$lib/game/state';
+import { bootstrapAdventureContent } from '$lib/game/world-bridge';
+import type { PrototypeWorld } from '$lib/worldgen/prototype';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.user) {
@@ -84,12 +87,7 @@ export const actions: Actions = {
 
 			await tx.insert(adventureState).values({
 				adventureId,
-				stateJson: JSON.stringify({
-					started: isSolo,
-					events: [],
-					world,
-					worldAcceptedAt: now
-				}),
+				stateJson: JSON.stringify(buildInitialState(isSolo, world as PrototypeWorld, savedWorldSeed)),
 				updatedAt: now
 			});
 		});
@@ -102,3 +100,24 @@ export const actions: Actions = {
 		}
 	}
 };
+
+/**
+ * Build the initial state blob for a new adventure.
+ * For solo adventures, immediately bootstraps adventure content (location, NPCs, quest).
+ * For multiplayer, the bootstrap happens after character creation when the game goes active.
+ * The PrototypeWorld is stored alongside the GameState for context assembly.
+ */
+function buildInitialState(isSolo: boolean, world: PrototypeWorld, worldSeed: string) {
+	const gameState = createInitialGameState(worldSeed);
+
+	if (isSolo) {
+		bootstrapAdventureContent(gameState, world);
+	}
+
+	// Store both the new GameState and the world (for GM context + legacy compat)
+	return {
+		...gameState,
+		world,
+		worldAcceptedAt: Date.now()
+	};
+}

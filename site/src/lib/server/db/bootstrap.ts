@@ -65,6 +65,23 @@ export async function bootstrapDatabase() {
 		)
 	`);
 
+	await dbClient.execute(`
+		CREATE TABLE IF NOT EXISTS adventure_turns (
+			id TEXT PRIMARY KEY NOT NULL,
+			adventure_id TEXT NOT NULL,
+			turn_number INTEGER NOT NULL,
+			actor_type TEXT NOT NULL,
+			actor_id TEXT NOT NULL,
+			action TEXT NOT NULL DEFAULT '',
+			intent TEXT NOT NULL DEFAULT 'unknown',
+			mechanics_json TEXT NOT NULL DEFAULT '[]',
+			state_changes_json TEXT NOT NULL DEFAULT '{}',
+			narrative_text TEXT NOT NULL DEFAULT '',
+			created_at INTEGER NOT NULL,
+			FOREIGN KEY (adventure_id) REFERENCES adventures(id)
+		)
+	`);
+
 	// ─── Indexes for common query paths ──────────────────────
 	await dbClient.execute(
 		'CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions(user_id)'
@@ -74,6 +91,12 @@ export async function bootstrapDatabase() {
 	);
 	await dbClient.execute(
 		'CREATE INDEX IF NOT EXISTS adventure_members_user_id_idx ON adventure_members(user_id)'
+	);
+	await dbClient.execute(
+		'CREATE INDEX IF NOT EXISTS adventure_turns_adventure_id_idx ON adventure_turns(adventure_id)'
+	);
+	await dbClient.execute(
+		'CREATE INDEX IF NOT EXISTS adventure_turns_turn_number_idx ON adventure_turns(adventure_id, turn_number)'
 	);
 
 	bootstrapped = true;

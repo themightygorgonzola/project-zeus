@@ -41,6 +41,7 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	const result = await dispatchAdventureTurn({
 		adventureId,
 		playerAction,
+		actorUserId: locals.user.id,
 		purpose: body.purpose,
 		mode: body.mode,
 		model: body.model

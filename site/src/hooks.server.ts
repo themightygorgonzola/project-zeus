@@ -2,11 +2,15 @@ import type { Handle } from '@sveltejs/kit';
 import { json } from '@sveltejs/kit';
 import { validateSession, SESSION_COOKIE } from '$server/auth/sessions';
 import { dbClient } from '$server/db/client';
+import { bootstrapDatabase } from '$server/db/bootstrap';
 import { apiLimiter, authLimiter } from '$server/security/rate-limit';
 
 // Warm the libsql WebSocket connection at startup so the first real
 // request doesn't pay the TCP + TLS handshake cost.
 dbClient.execute('SELECT 1').catch(() => {});
+
+// Ensure all tables (including adventure_turns) exist before any request lands.
+bootstrapDatabase().catch((e) => console.error('[bootstrap] DB init failed:', e));
 
 function getClientIP(event: Parameters<Handle>[0]['event']): string {
 	return (

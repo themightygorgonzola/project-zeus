@@ -70,3 +70,27 @@ export const adventureState = sqliteTable('adventure_state', {
 	stateJson: text('state_json').notNull().default('{}'),
 	updatedAt: integer('updated_at', { mode: 'number' }).notNull()
 });
+
+// ─── Adventure Turns (durable turn/chat history) ─────────
+export const adventureTurns = sqliteTable(
+	'adventure_turns',
+	{
+		id: text('id').primaryKey(), // ULID
+		adventureId: text('adventure_id')
+			.notNull()
+			.references(() => adventures.id),
+		turnNumber: integer('turn_number', { mode: 'number' }).notNull(),
+		actorType: text('actor_type', { enum: ['player', 'gm'] }).notNull(),
+		actorId: text('actor_id').notNull(),
+		action: text('action').notNull().default(''),
+		intent: text('intent').notNull().default('unknown'),
+		mechanicsJson: text('mechanics_json').notNull().default('[]'),
+		stateChangesJson: text('state_changes_json').notNull().default('{}'),
+		narrativeText: text('narrative_text').notNull().default(''),
+		createdAt: integer('created_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('adventure_turns_adventure_id_idx').on(t.adventureId),
+		index('adventure_turns_turn_number_idx').on(t.adventureId, t.turnNumber)
+	]
+);

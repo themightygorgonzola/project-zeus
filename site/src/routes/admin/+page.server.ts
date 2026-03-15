@@ -1,11 +1,11 @@
 import type { PageServerLoad, Actions } from './$types';
 import { db } from '$server/db/client';
-import { users, sessions, adventures, adventureMembers, adventureState } from '$server/db/schema';
+import { users, sessions, adventures, adventureMembers, adventureState, adventureTurns } from '$server/db/schema';
 import { eq, lt, inArray } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async () => {
-	const [allUsers, allAdventures, allSessions] = await Promise.all([
+	const [allUsers, allAdventures, allSessions, allTurnRows, allStateRows] = await Promise.all([
 		db.select().from(users).orderBy(users.createdAt),
 		db.select().from(adventures).orderBy(adventures.createdAt),
 		db
@@ -18,7 +18,9 @@ export const load: PageServerLoad = async () => {
 			})
 			.from(sessions)
 			.innerJoin(users, eq(sessions.userId, users.id))
-			.orderBy(sessions.expiresAt)
+			.orderBy(sessions.expiresAt),
+		db.select({ adventureId: adventureTurns.adventureId }).from(adventureTurns).catch(() => []),
+		db.select({ adventureId: adventureState.adventureId, stateJson: adventureState.stateJson }).from(adventureState).catch(() => [])
 	]);
 
 	const memberCounts = await db
@@ -35,6 +37,37 @@ export const load: PageServerLoad = async () => {
 		ownerMap[u.id] = u.username;
 	}
 
+	// Turn counts per adventure
+	const turnCountMap: Record<string, number> = {};
+	for (const row of allTurnRows) {
+		turnCountMap[row.adventureId] = (turnCountMap[row.adventureId] ?? 0) + 1;
+	}
+
+	// Parse game state blobs for debug info
+	const stateDebugMap: Record<string, {
+		characterCount: number;
+		npcCount: number;
+		questCount: number;
+		partyLocationId: string;
+		stateVersion: number;
+		nextTurnNumber: number;
+	}> = {};
+	for (const row of allStateRows) {
+		try {
+			const gs = JSON.parse(row.stateJson ?? '{}');
+			stateDebugMap[row.adventureId] = {
+				characterCount: Object.keys(gs.characters ?? {}).length,
+				npcCount: Object.keys(gs.npcs ?? {}).length,
+				questCount: Object.keys(gs.quests ?? {}).length,
+				partyLocationId: gs.partyLocationId ?? '—',
+				stateVersion: gs.stateVersion ?? gs.version ?? 0,
+				nextTurnNumber: gs.nextTurnNumber ?? 0
+			};
+		} catch {
+			// unparseable state blob — skip
+		}
+	}
+
 	return {
 		users: allUsers,
 		adventures: allAdventures.map((a) => ({
@@ -49,12 +82,28 @@ export const load: PageServerLoad = async () => {
 			totalAdventures: allAdventures.length,
 			activeSessions: allSessions.filter((s) => s.expiresAt > Date.now()).length,
 			expiredSessions: allSessions.filter((s) => s.expiresAt <= Date.now()).length
-		}
+		},
+		adventureDebug: allAdventures.map((a) => ({
+			id: a.id,
+			name: a.name,
+			ownerName: ownerMap[a.ownerId] ?? a.ownerId,
+			status: a.status,
+			turnsInDb: turnCountMap[a.id] ?? 0,
+			...(stateDebugMap[a.id] ?? {
+				characterCount: 0,
+				npcCount: 0,
+				questCount: 0,
+				partyLocationId: '—',
+				stateVersion: 0,
+				nextTurnNumber: 0
+			})
+		}))
 	};
 };
 
 // ─── Helper: delete an adventure and all its dependent rows ───────────────────
 async function deleteAdventureCascade(adventureId: string) {
+	await db.delete(adventureTurns).where(eq(adventureTurns.adventureId, adventureId)).catch(() => {});
 	await db.delete(adventureState).where(eq(adventureState.adventureId, adventureId));
 	await db.delete(adventureMembers).where(eq(adventureMembers.adventureId, adventureId));
 	await db.delete(adventures).where(eq(adventures.id, adventureId));

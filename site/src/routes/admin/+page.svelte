@@ -3,7 +3,7 @@
 
 	let { data } = $props();
 
-	type Tab = 'overview' | 'users' | 'adventures' | 'sessions' | 'cleanup';
+	type Tab = 'overview' | 'users' | 'adventures' | 'sessions' | 'cleanup' | 'gamestate';
 	let activeTab = $state<Tab>('overview');
 
 	function formatDate(ts: number) {
@@ -69,7 +69,7 @@
 
 	<!-- Tab bar -->
 	<div class="tab-bar">
-		{#each (['overview', 'users', 'adventures', 'sessions', 'cleanup'] as Tab[]) as tab}
+		{#each (['overview', 'users', 'adventures', 'sessions', 'cleanup', 'gamestate'] as Tab[]) as tab}
 			<button
 				class="tab-btn"
 				class:active={activeTab === tab}
@@ -266,7 +266,49 @@
 				</tbody>
 			</table>
 		</div>
-
+	<!-- ── GAME STATE ──────────────────────────────────────────── -->
+	{:else if activeTab === 'gamestate'}
+		<div class="panel">
+			<h2>Game State Debug ({data.adventureDebug.length} adventures)</h2>
+			<p class="section-hint">Live snapshot of in-DB game state. Turns = rows in <code>adventure_turns</code>. 0 turns means persistence is broken or no turns taken yet.</p>
+			<table class="data-table">
+				<thead>
+					<tr>
+						<th>ID</th>
+						<th>Name</th>
+						<th>Owner</th>
+						<th>Status</th>
+						<th title="Rows in adventure_turns table">Turns (DB)</th>
+						<th title="nextTurnNumber from GameState">Turn #</th>
+						<th>Ver</th>
+						<th>Characters</th>
+						<th>NPCs</th>
+						<th>Quests</th>
+						<th>Party Location</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each data.adventureDebug.slice().reverse() as dbg}
+						<tr class:warn-row={dbg.turnsInDb === 0 && dbg.status === 'active'}>
+							<td class="mono muted id-cell">{dbg.id.slice(0, 10)}…</td>
+							<td>{dbg.name}</td>
+							<td>{dbg.ownerName}</td>
+							<td><span class="badge status-{dbg.status}">{dbg.status}</span></td>
+							<td class:danger-text={dbg.turnsInDb === 0 && dbg.status === 'active'}>{dbg.turnsInDb}</td>
+							<td class="muted">{dbg.nextTurnNumber}</td>
+							<td class="muted">{dbg.stateVersion}</td>
+							<td>{dbg.characterCount}</td>
+							<td>{dbg.npcCount}</td>
+							<td>{dbg.questCount}</td>
+							<td class="mono muted">{dbg.partyLocationId}</td>
+						</tr>
+					{/each}
+					{#if data.adventureDebug.length === 0}
+						<tr><td colspan="11" class="empty">No adventures yet.</td></tr>
+					{/if}
+				</tbody>
+			</table>
+		</div>
 	<!-- ── CLEANUP ────────────────────────────────────────────── -->
 	{:else if activeTab === 'cleanup'}
 		<div class="panel">
@@ -561,6 +603,10 @@
 
 	.expired-row td {
 		opacity: 0.55;
+	}
+
+	.warn-row td {
+		background: rgba(255, 211, 107, 0.06);
 	}
 
 	.mono {

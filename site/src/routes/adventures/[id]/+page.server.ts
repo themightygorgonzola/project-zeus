@@ -3,6 +3,7 @@ import type { PageServerLoad } from './$types';
 import { db } from '$server/db/client';
 import { adventures, adventureMembers, adventureState, users } from '$server/db/schema';
 import { eq, and } from 'drizzle-orm';
+import { createInitialGameState, migrateState } from '$lib/game/state';
 
 export const load: PageServerLoad = async ({ params, locals, url }) => {
 	if (!locals.user) {
@@ -60,12 +61,15 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 		.limit(1);
 
 	let parsedState = {};
+	let gameState = createInitialGameState(adventure[0].worldSeed ?? '');
 	if (state.length > 0) {
 		try {
 			parsedState = JSON.parse(state[0].stateJson);
+			gameState = migrateState(parsedState);
 		} catch {
 			// Corrupted state — fall back to empty
 			parsedState = {};
+			gameState = createInitialGameState(adventure[0].worldSeed ?? '');
 		}
 	}
 
@@ -73,6 +77,7 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 		adventure: adventure[0],
 		members,
 		state: parsedState,
+		gameState,
 		currentUserId: locals.user.id
 	};
 };

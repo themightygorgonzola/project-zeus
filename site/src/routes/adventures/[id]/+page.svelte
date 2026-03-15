@@ -3,6 +3,9 @@
 	import PartySocket from 'partysocket';
 	import { PUBLIC_PARTYKIT_HOST } from '$env/static/public';
 	import GlassPanel from '$components/GlassPanel.svelte';
+	import CharacterCreation from '$components/CharacterCreation.svelte';
+	import CharacterSheet from '$components/CharacterSheet.svelte';
+	import type { PlayerCharacter } from '$lib/game';
 	import { toWorldSnapshot, type PrototypeWorld } from '$lib/worldgen/prototype';
 
 	let { data } = $props();
@@ -12,10 +15,22 @@
 
 	let adventureId = $derived(data.adventure.id);
 	let currentUserId = $derived(data.currentUserId);
+	let loadedPartyCharacters = $derived(
+		Object.fromEntries(
+			(((data.gameState as { characters?: PlayerCharacter[] } | undefined)?.characters ?? []) as PlayerCharacter[])
+				.map((character) => [character.userId, character])
+		)
+	);
+	let partyCharacters = $state<Record<string, PlayerCharacter>>({});
+	let currentCharacter = $derived(partyCharacters[currentUserId] ?? null);
 	let currentUsername = $derived(
 		((data.members as Array<{ userId: string; username: string }>)
 			.find((m) => m.userId === data.currentUserId))?.username ?? 'Unknown'
 	);
+
+	$effect(() => {
+		partyCharacters = loadedPartyCharacters;
+	});
 
 	/* ── chat ────────────────────────────────────────── */
 	interface ChatMessage {
@@ -155,6 +170,18 @@
 		e.preventDefault();
 		const text = chatInput.trim();
 		if (!text || !socket) return;
+		if (text.startsWith('/gm ') && !currentCharacter) {
+			messages = [...messages, {
+				id: `gm-blocked-${Date.now()}`,
+				userId: 'system',
+				username: 'System',
+				text: 'Create your character in the modal before asking the GM to resolve actions.',
+				ts: Date.now(),
+				isError: true
+			}];
+			await scrollChatToBottom();
+			return;
+		}
 		chatInput = '';
 
 		// /gm <message> → trigger the AI game master
@@ -216,6 +243,10 @@
 		}));
 	}
 
+	function handleCharacterCreated(character: PlayerCharacter) {
+		partyCharacters = { ...partyCharacters, [character.userId]: character };
+	}
+
 	onMount(() => { connectPartyKit(); });
 	onDestroy(() => { disconnectPartyKit(); });
 </script>
@@ -247,6 +278,16 @@
 			<div class="side-column">
 				<GlassPanel>
 					<div class="panel-inner">
+						{#if currentCharacter}
+							<CharacterSheet character={currentCharacter} />
+						{:else}
+							<CharacterCreation adventureId={adventureId} onCreated={handleCharacterCreated} />
+						{/if}
+					</div>
+				</GlassPanel>
+
+				<GlassPanel>
+					<div class="panel-inner">
 						<h2>Party</h2>
 						<div class="party-list">
 							{#each data.members as member}
@@ -265,6 +306,9 @@
 												<span class="you-tag">(you)</span>
 											{/if}
 										</span>
+										{#if partyCharacters[member.userId]}
+											<span class="member-character">{partyCharacters[member.userId].name}</span>
+										{/if}
 										<span class="member-role text-muted">{member.role}</span>
 									</div>
 								</div>
@@ -301,6 +345,9 @@
 									<p class="text-muted chat-subtitle">
 										Chat with the party, or type <span class="gm-inline">/gm &lt;action&gt;</span> to prompt the GM.
 									</p>
+									{#if !currentCharacter}
+										<p class="creation-warning">Finish character creation in the modal to unlock GM actions.</p>
+									{/if}
 								</div>
 								<span class="connection-dot" class:live={connected} title={connected ? 'Live' : 'Connecting…'}></span>
 							</div>
@@ -331,12 +378,12 @@
 									class="chat-input main-chat-input"
 									class:gm-input={chatInput.startsWith('/gm ')}
 									type="text"
-									placeholder="Type a message… or /gm <action>"
+									placeholder={currentCharacter ? 'Type a message… or /gm <action>' : 'Type a message… GM actions unlock after character creation'}
 									bind:value={chatInput}
 									maxlength={500}
 									disabled={gmThinking}
 								/>
-								<button type="submit" class="btn chat-send main-chat-send" class:btn-primary={!chatInput.startsWith('/gm ')} class:btn-gm={chatInput.startsWith('/gm ')} disabled={!chatInput.trim() || gmThinking}>
+								<button type="submit" class="btn chat-send main-chat-send" class:btn-primary={!chatInput.startsWith('/gm ')} class:btn-gm={chatInput.startsWith('/gm ')} disabled={!chatInput.trim() || gmThinking || (chatInput.startsWith('/gm ') && !currentCharacter)}>
 									{chatInput.startsWith('/gm ') ? '✨' : '↑'}
 								</button>
 							</form>
@@ -463,6 +510,12 @@
 		display: block;
 		font-weight: 600;
 		font-size: 0.92rem;
+	}
+
+	.member-character {
+		display: block;
+		font-size: 0.78rem;
+		color: var(--accent);
 	}
 
 	.you-tag {
@@ -610,6 +663,12 @@
 	.chat-subtitle {
 		margin: 0;
 		font-size: 0.92rem;
+	}
+
+	.creation-warning {
+		margin-top: 0.4rem;
+		font-size: 0.85rem;
+		color: #f5c842;
 	}
 
 	.gm-inline {
