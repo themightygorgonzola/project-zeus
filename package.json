@@ -1,32 +1,24 @@
 {
   "name": "project-zeus",
   "version": "1.0.0",
-  "description": "CLI tool for querying the OpenAI API",
+  "description": "Project Zeus world tooling and operators scripts",
   "type": "module",
-  "bin": {
-    "zeus": "./src/cli.js"
-  },
   "scripts": {
-    "start": "node src/cli.js",
-    "ask": "node src/cli.js ask",
     "map:analyze": "node scripts/analyze-map.js \"Vigia Full 2026-03-13-19-01.json\"",
     "map:schema": "node scripts/infer-map-schema.js \"Vigia Full 2026-03-13-19-01.json\" generated/world-schema.json",
     "map:context": "node scripts/build-world-context.js \"Vigia Full 2026-03-13-19-01.json\" generated/world-context.json",
     "story:demo": "node scripts/demo-party-progression.js 8",
     "azgaar:generate": "tsx scripts/generate-azgaar-world.ts",
-	    "azgaar:world": "tsx scripts/generate-azgaar-world.ts 575079333 generated/azgaar-world.json"
+    "azgaar:world": "tsx scripts/generate-azgaar-world.ts 575079333 generated/azgaar-world.json"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "alea": "^1.0.1",
-    "commander": "^14.0.3",
     "d3": "^7.9.0",
     "delaunator": "^5.0.1",
-    "dotenv": "^17.3.1",
     "flatqueue": "^3.0.0",
-    "openai": "^6.29.0",
     "polylabel": "^2.0.1",
     "tsx": "^4.20.5"
   },

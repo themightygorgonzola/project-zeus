@@ -11,7 +11,7 @@ It currently combines:
 - OpenAI for GM responses
 - Vercel for the main web deployment
 
-There is also an older root-level CLI in `src/` for direct OpenAI querying, but the actively evolving game app lives in `site/`.
+The actively served application lives in `site/`. The remaining root `src/` code only exists to support the world-generation and analysis scripts kept in `scripts/`.
 
 ---
 
@@ -35,7 +35,7 @@ There is also an older root-level CLI in `src/` for direct OpenAI querying, but 
 - `scripts/`
   - Windows-safe helper scripts for validation, local dev, and releases
 - `src/`
-  - legacy root CLI for direct OpenAI commands
+  - retained world-generation / map-processing code used by root scripts
 
 ### Important current behavior
 
