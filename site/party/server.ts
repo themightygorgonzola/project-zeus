@@ -51,17 +51,25 @@ export default class AdventureRoom implements Party.Server {
     switch (data.type) {
       case "player:ready":
         this.room.broadcast(
-          JSON.stringify({ type: "player:ready", connectionId: sender.id })
+          JSON.stringify({
+            type: "player:ready",
+            connectionId: sender.id,
+            userId: data.userId,
+          })
         );
         break;
 
       case "player:chat":
+        // Exclude sender — they've already added their own message optimistically
         this.room.broadcast(
           JSON.stringify({
             type: "player:chat",
             connectionId: sender.id,
+            userId: data.userId,
+            username: data.username,
             text: data.text,
-          })
+          }),
+          [sender.id]
         );
         break;
 

@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { onMount, onDestroy, tick } from 'svelte';
+	import PartySocket from 'partysocket';
+	import { PUBLIC_PARTYKIT_HOST } from '$env/static/public';
 	import GlassPanel from '$components/GlassPanel.svelte';
 	import { toWorldSnapshot, type PrototypeWorld } from '$lib/worldgen/prototype';
 
@@ -6,6 +9,80 @@
 	let worldSnapshot = $derived(
 		toWorldSnapshot((data.state as { world?: PrototypeWorld } | undefined)?.world)
 	);
+
+	let adventureId = $derived(data.adventure.id);
+	let currentUserId = $derived(data.currentUserId);
+	let currentUsername = $derived(
+		((data.members as Array<{ userId: string; username: string }>)
+			.find((m) => m.userId === data.currentUserId))?.username ?? 'Unknown'
+	);
+
+	/* ── chat ────────────────────────────────────────── */
+	interface ChatMessage {
+		id: string;
+		userId: string;
+		username: string;
+		text: string;
+		ts: number;
+	}
+
+	let messages = $state<ChatMessage[]>([]);
+	let chatInput = $state('');
+	let chatEl = $state<HTMLDivElement | null>(null);
+	let socket: PartySocket | null = null;
+	let connected = $state(false);
+
+	function connectPartyKit() {
+		socket = new PartySocket({ host: PUBLIC_PARTYKIT_HOST, room: adventureId });
+		socket.addEventListener('open', () => { connected = true; });
+		socket.addEventListener('close', () => { connected = false; });
+		socket.addEventListener('message', async (e: MessageEvent) => {
+			let msg: { type: string; [key: string]: unknown };
+			try { msg = JSON.parse(e.data); } catch { return; }
+			if (msg.type === 'player:chat') {
+				messages = [...messages, {
+					id: `${msg.connectionId}-${Date.now()}`,
+					userId: String(msg.userId ?? ''),
+					username: String(msg.username ?? 'Unknown'),
+					text: String(msg.text ?? ''),
+					ts: Date.now(),
+				}];
+				await tick();
+				chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' });
+			}
+		});
+	}
+
+	function disconnectPartyKit() {
+		socket?.close();
+		socket = null;
+	}
+
+	async function sendChat(e: SubmitEvent) {
+		e.preventDefault();
+		const text = chatInput.trim();
+		if (!text || !socket) return;
+		chatInput = '';
+		// Optimistic — add own message immediately
+		messages = [...messages, {
+			id: `local-${Date.now()}`,
+			userId: currentUserId,
+			username: currentUsername,
+			text,
+			ts: Date.now(),
+		}];
+		await tick();
+		chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' });
+		socket.send(JSON.stringify({
+			type: 'player:chat',
+			userId: currentUserId,
+			username: currentUsername,
+			text,
+		}));
+	}
+
+	onMount(() => { connectPartyKit(); });
+	onDestroy(() => { disconnectPartyKit(); });
 </script>
 
 <svelte:head>
@@ -78,7 +155,38 @@
 						</div>
 					</GlassPanel>
 				{/if}
-			</div>
+			<!-- Chat panel -->
+			<GlassPanel>
+				<div class="panel-inner chat-panel">
+					<div class="chat-header">
+						<h2>Party Chat</h2>
+						<span class="connection-dot" class:live={connected} title={connected ? 'Live' : 'Connecting…'}></span>
+					</div>
+					<div class="chat-messages" bind:this={chatEl}>
+						{#if messages.length === 0}
+							<p class="chat-empty text-muted">No messages yet…</p>
+						{/if}
+						{#each messages as msg (msg.id)}
+							<div class="chat-msg" class:own={msg.userId === currentUserId}>
+								<span class="chat-name">{msg.username}</span>
+								<span class="chat-text">{msg.text}</span>
+							</div>
+						{/each}
+					</div>
+					<form class="chat-form" onsubmit={sendChat}>
+						<input
+							class="chat-input"
+							type="text"
+							placeholder="Say something…"
+							bind:value={chatInput}
+							maxlength={280}
+						/>
+						<button type="submit" class="btn btn-primary chat-send" disabled={!chatInput.trim()}>
+							↑
+						</button>
+					</form>
+				</div>
+			</GlassPanel>			</div>
 
 			<!-- Main narrative area (TBD) -->
 			<GlassPanel>
@@ -302,6 +410,114 @@
 		padding-left: 0.85rem;
 		border-left: 3px solid var(--accent);
 		color: var(--text-muted);
+	}
+
+	/* Chat panel */
+	.chat-panel {
+		display: flex;
+		flex-direction: column;
+		gap: 0.65rem;
+		max-height: 340px;
+	}
+
+	.chat-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.connection-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: var(--text-muted);
+		opacity: 0.35;
+		transition: all 0.3s ease;
+		flex-shrink: 0;
+	}
+
+	.connection-dot.live {
+		background: var(--accent-2);
+		opacity: 1;
+		box-shadow: 0 0 5px var(--accent-2);
+	}
+
+	.chat-messages {
+		flex: 1;
+		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+		min-height: 80px;
+		max-height: 200px;
+		scrollbar-width: thin;
+	}
+
+	.chat-empty {
+		margin: 0;
+		font-size: 0.82rem;
+		text-align: center;
+		padding: 1.5rem 0;
+	}
+
+	.chat-msg {
+		display: flex;
+		flex-direction: column;
+		gap: 0.1rem;
+		padding: 0.35rem 0.6rem;
+		border-radius: 10px;
+		background: rgba(255, 255, 255, 0.04);
+	}
+
+	.chat-msg.own {
+		background: rgba(124, 156, 255, 0.1);
+		border: 1px solid rgba(124, 156, 255, 0.15);
+	}
+
+	.chat-name {
+		font-size: 0.72rem;
+		font-weight: 700;
+		color: var(--accent);
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+	}
+
+	.chat-msg.own .chat-name {
+		color: var(--accent-2, var(--accent));
+	}
+
+	.chat-text {
+		font-size: 0.88rem;
+		line-height: 1.4;
+		word-break: break-word;
+	}
+
+	.chat-form {
+		display: flex;
+		gap: 0.4rem;
+	}
+
+	.chat-input {
+		flex: 1;
+		background: rgba(255, 255, 255, 0.05);
+		border: 1px solid var(--border);
+		color: inherit;
+		padding: 0.45rem 0.7rem;
+		border-radius: 10px;
+		font-size: 0.88rem;
+		font-family: inherit;
+	}
+
+	.chat-input:focus {
+		outline: none;
+		border-color: var(--accent);
+	}
+
+	.chat-send {
+		padding: 0.45rem 0.75rem;
+		border-radius: 10px;
+		min-width: 2.2rem;
+		font-size: 1rem;
 	}
 
 	@media (max-width: 768px) {

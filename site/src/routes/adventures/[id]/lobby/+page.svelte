@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
+	import PartySocket from 'partysocket';
+	import { PUBLIC_PARTYKIT_HOST } from '$env/static/public';
 	import GlassPanel from '$components/GlassPanel.svelte';
 	import LobbyPlayer from '$components/LobbyPlayer.svelte';
 	import type { LobbyState, LobbyMember } from '$types';
@@ -32,22 +34,12 @@
 
 	let copied = $state(false);
 
-	/* ── SSE real-time connection + polling fallback ─────── */
-	let eventSource: EventSource | null = null;
-	let lastEventAt = 0; // ms timestamp of last real SSE event
+	/* ── PartyKit real-time connection ───────────────────── */
+	let socket: PartySocket | null = null;
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
+	const POLL_INTERVAL = 5_000;
 
-	const POLL_INTERVAL = 3_000;
-	const SSE_GRACE = 5_000; // skip poll if SSE delivered recently
-
-	function applyLobbyState(state: LobbyState) {
-		members = state.members;
-		adventureStatus = state.adventure.status;
-	}
-
-	async function pollLobby() {
-		// Skip poll if SSE has been active recently
-		if (Date.now() - lastEventAt < SSE_GRACE) return;
+	async function fetchLobbyState() {
 		try {
 			const res = await fetch(`/api/lobby/${adventureId}`);
 			if (!res.ok) return;
@@ -56,65 +48,59 @@
 				goto(`/adventures/${adventureId}`);
 				return;
 			}
-			applyLobbyState(state);
-		} catch { /* network hiccup — try again next interval */ }
+			members = state.members;
+			adventureStatus = state.adventure.status;
+		} catch { /* network hiccup */ }
 	}
 
-	function connectSSE() {
-		if (eventSource) return;
+	function connectPartyKit() {
+		socket = new PartySocket({ host: PUBLIC_PARTYKIT_HOST, room: adventureId });
 
-		eventSource = new EventSource(`/api/lobby/${adventureId}/stream`);
+		socket.addEventListener('open', () => { connected = true; });
+		socket.addEventListener('close', () => { connected = false; });
 
-		eventSource.addEventListener('lobby-update', (e: MessageEvent) => {
-			const state: LobbyState = JSON.parse(e.data);
-			applyLobbyState(state);
-			connected = true;
-			lastEventAt = Date.now();
+		socket.addEventListener('message', (e: MessageEvent) => {
+			let msg: { type: string; [key: string]: unknown };
+			try { msg = JSON.parse(e.data); } catch { return; }
+
+			switch (msg.type) {
+				case 'player:joined':
+				case 'player:left':
+				case 'player:ready':
+					// Re-fetch authoritative state from Turso
+					fetchLobbyState();
+					break;
+				case 'adventure:started':
+					goto(`/adventures/${adventureId}`);
+					break;
+			}
 		});
 
-		eventSource.addEventListener('adventure-started', (e: MessageEvent) => {
-			const { adventureId: id } = JSON.parse(e.data);
-			goto(`/adventures/${id}`);
-		});
-
-		eventSource.addEventListener('open', () => {
-			connected = true;
-		});
-
-		eventSource.onerror = () => {
-			connected = false;
-		};
-
-		// Start polling as a fallback for serverless environments where
-		// the in-memory event bus can't reach across instances.
-		pollTimer = setInterval(pollLobby, POLL_INTERVAL);
+		// Light fallback — catches adventure-started if WS is slow
+		pollTimer = setInterval(fetchLobbyState, POLL_INTERVAL);
 	}
 
-	function disconnectSSE() {
-		if (eventSource) {
-			eventSource.close();
-			eventSource = null;
-		}
-		if (pollTimer) {
-			clearInterval(pollTimer);
-			pollTimer = null;
-		}
+	function disconnectPartyKit() {
+		socket?.close();
+		socket = null;
+		if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 	}
 
 	/* ── actions ─────────────────────────────────────────── */
 	let readyInflight = $state(false);
 
 	function toggleReady() {
-		// Ignore rapid double-clicks — wait for the in-flight POST to resolve.
-		// SSE will deliver the authoritative state and clear the lock.
 		if (readyInflight) return;
 		readyInflight = true;
 
-		// Flip instantly — fire POST in background, SSE brings authoritative state
+		// Optimistic flip for self
 		const prevReady = isReady;
 		members = members.map((m) =>
 			m.userId === currentUserId ? { ...m, isReady: !prevReady } : m
 		);
+
+		// Signal other players instantly via PartyKit
+		socket?.send(JSON.stringify({ type: 'player:ready', userId: currentUserId }));
 
 		fetch(`/api/lobby/${adventureId}/ready`, { method: 'POST' })
 			.then((res) => res.json())
@@ -141,11 +127,11 @@
 
 	/* ── lifecycle ───────────────────────────────────────── */
 	onMount(() => {
-		connectSSE();
+		connectPartyKit();
 	});
 
 	onDestroy(() => {
-		disconnectSSE();
+		disconnectPartyKit();
 	});
 
 	const currentMember = $derived(members.find((m) => m.userId === currentUserId));
