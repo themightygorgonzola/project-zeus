@@ -15,6 +15,151 @@ The actively served application lives in `site/`. Everything outside `site/` is 
 
 ---
 
+## Fresh clone: start a new workspace from zero
+
+This section is the fastest safe path for a brand-new machine or collaborator.
+
+### 1. Clone the repo
+
+Open a terminal and run:
+
+```powershell
+git clone https://github.com/themightygorgonzola/project-zeus.git
+cd project-zeus
+```
+
+After this, keep using the repo root:
+
+`c:\MySoftwareFolder\project-zeus`
+
+Do **not** treat `site/` as a separate git repo. Git actions should be driven from the repo root.
+
+### 2. Install the site dependencies
+
+From the repo root:
+
+```powershell
+cd site
+npm install
+cd ..
+```
+
+The live application is in `site/`, so that is the only package directory that needs `npm install`.
+
+### 3. Create your local env file
+
+Copy:
+
+- `site/.env.example`
+
+to:
+
+- `site/.env`
+
+Then fill in the required local values.
+
+At minimum, local work commonly needs:
+
+- Turso credentials
+- OAuth credentials if you are testing auth flows
+- `OPENAI_API_KEY` if you are testing GM responses
+- local PartyKit host values
+- local Trigger.dev dev secret if you are testing background mode
+
+### 4. Start the local workspace
+
+From the repo root:
+
+```bat
+scripts\site-dev.bat
+```
+
+This is the preferred way to start local development on Windows.
+
+### 5. Check repo/worktree status
+
+From the repo root:
+
+```bat
+scripts\site-status.bat
+```
+
+Use this instead of raw `git status` unless you are deliberately debugging git.
+
+### 6. Save work safely
+
+From the repo root:
+
+```bat
+scripts\site-save.bat --message "describe your change"
+```
+
+This is the preferred replacement for manual stage + commit steps.
+
+### 7. Ship work safely
+
+From the repo root:
+
+```bat
+scripts\site-ship.bat --message "describe your change"
+```
+
+This is the preferred replacement for manually remembering to:
+
+- validate
+- commit
+- push
+- decide whether PartyKit also needs deployment
+
+### Fresh-clone rules
+
+For a new operator, the safest defaults are:
+
+- work from the repo root
+- remember the live app is in `site/`
+- prefer `scripts\site-status.bat`, `scripts\site-save.bat`, `scripts\site-ship.bat`, `scripts\site-check.bat`, and `scripts\site-dev.bat`
+- avoid raw git/npm deployment commands unless you are intentionally debugging
+
+---
+
+## Agent + cooperator handoff packet
+
+If you are handing this repo to another person and another AI agent, the minimum handoff packet should be:
+
+- this `README.md`
+- the real local `site/.env` values
+- the repo URL
+- confirmation that the operator should use `scripts\*.bat` from the repo root
+
+If those four things are present, an agent should be able to walk a cooperator through:
+
+- cloning the repo
+- installing dependencies
+- starting local development
+- understanding which local service is which
+- editing the app safely
+- testing locally
+- validating before release
+- saving work with a commit
+- pushing to git
+- understanding what deploys automatically and what does not
+
+### Requirements before the handoff is useful
+
+The cooperator also needs:
+
+- Git installed
+- Node.js installed
+- GitHub access to the repo
+- permission to log in to any needed services
+- the willingness to use the checked-in scripts instead of improvising shell commands
+
+### Most important handoff rule
+
+If there is a choice between a raw command and a checked-in helper script, prefer the helper script.
+
+---
+
 ## What this repository contains
 
 ### Main surfaces
@@ -33,7 +178,7 @@ The actively served application lives in `site/`. Everything outside `site/` is 
   - shared AI orchestration layer
   - model routing, OpenAI calls, PartyKit AI event fanout
 - `scripts/`
-  - Windows-safe helper scripts for validation, local dev, and releases
+  - Windows-safe helper scripts for status, save, validation, local dev, and releases
 
 ### Important current behavior
 
@@ -41,6 +186,23 @@ The actively served application lives in `site/`. Everything outside `site/` is 
 - durable adventure state lives in Turso
 - interactive `/gm` chat now defaults to an **inline fast path** through the app server
 - slower / heavier AI jobs can still go through Trigger.dev using the same shared AI execution logic
+
+### Full stack at a glance
+
+- `site/`
+  - SvelteKit app
+  - Vite dev server
+  - Vercel deployment target
+- Turso
+  - durable database
+- PartyKit
+  - realtime room server
+- Trigger.dev
+  - background task runner
+- OpenAI
+  - GM/model inference
+- `scripts/`
+  - Windows-safe operator wrapper layer
 
 ---
 
@@ -63,6 +225,29 @@ The safest default on this machine is:
 - let them use `npm.cmd` instead of `npm.ps1`
 
 This is important because PowerShell execution policy on this machine can block `npm` / `npx` script shims.
+
+### Preferred operator commands
+
+If you are not deeply comfortable with git or deployment tooling, use these and stick to them:
+
+- `scripts\site-status.bat`
+  - safe repo status
+  - tells you whether PartyKit probably needs a deploy
+- `scripts\site-save.bat --message "what changed"`
+  - runs validation by default
+  - stages everything
+  - creates a commit
+- `scripts\site-ship.bat --message "what changed"`
+  - validates
+  - saves uncommitted work if needed
+  - pushes to git
+  - deploys PartyKit only when needed
+- `scripts\site-check.bat`
+  - validation only
+- `scripts\site-dev.bat`
+  - local development windows
+
+For routine work, these should be preferred over raw `git add`, `git commit`, `git push`, or manual PartyKit deploy commands.
 
 ### Final intended root layout
 
@@ -213,6 +398,77 @@ Current plumbing is OpenAI-only, but model selection is now centralized so the r
 
 ## Local development
 
+### Dev flow vs prod flow
+
+This repo has two main operating modes.
+
+#### Dev flow
+
+Use dev flow when you want to:
+
+- run the site locally
+- edit pages, API routes, PartyKit code, or Trigger tasks
+- test changes before pushing
+- validate that the project still type-checks
+
+Dev flow usually means:
+
+1. `scripts\site-status.bat`
+2. `scripts\site-dev.bat`
+3. make edits
+4. `scripts\site-check.bat`
+5. `scripts\site-save.bat --message "describe your change"`
+
+#### Prod flow
+
+Use prod flow when you want to:
+
+- publish changes to the live app
+- push committed work to git
+- trigger Vercel production deployment
+- trigger Trigger.dev production deployment
+- deploy PartyKit if PartyKit code changed
+
+Prod flow usually means:
+
+1. `scripts\site-status.bat`
+2. `scripts\site-ship.bat --message "describe your change"`
+
+If you want a lower-level, more explicit production flow, use `scripts\site-release.bat`.
+
+### What each local service actually is
+
+This is a common point of confusion.
+
+#### `http://localhost:5173`
+
+This is the main SvelteKit app.
+
+Use this in the browser for normal site work.
+
+#### `http://localhost:1999`
+
+This is the PartyKit dev server.
+
+It is **not** the main app homepage. Visiting it directly may show `404 Not Found`, which is normal. It exists to handle realtime room/socket traffic for the app running on `localhost:5173`.
+
+#### Trigger.dev local dev
+
+This is not usually the thing you browse to directly first. It provides the local Trigger task development flow and may prompt for login in the terminal.
+
+### What `scripts\site-dev.bat` launches
+
+By default, it opens separate windows for:
+
+- `npm run dev`
+  - app server
+- `npm run party:dev`
+  - PartyKit dev server
+- `npm run trigger:dev`
+  - Trigger.dev local dev tunnel
+
+This means the script already acts as the main auto-launch helper for local work.
+
 ### Required local services
 
 For a full local multiplayer / AI loop you usually want all three running:
@@ -259,6 +515,68 @@ scripts\site-check.bat
 
 This runs the site `check` script safely using `npm.cmd` rather than the blocked PowerShell shim.
 
+### What counts as testing in this repo today
+
+The main checked-in validation/test flow right now is:
+
+- `scripts\site-check.bat`
+  - runs Svelte/TypeScript validation
+- `scripts\site-dev.bat`
+  - launches the local services needed for manual testing
+- the smoke-test playbooks later in this README
+
+There is not yet a full end-to-end automated browser test suite. Right now, the repo relies on validation plus manual smoke testing.
+
+### Safe save flow
+
+From the repo root:
+
+```bat
+scripts\site-save.bat --message "describe your change"
+```
+
+This is the preferred replacement for manually running git stage + commit commands.
+
+### Safe ship flow
+
+From the repo root:
+
+```bat
+scripts\site-ship.bat --message "describe your change"
+```
+
+This is the preferred replacement for the usual human sequence of:
+
+- validate
+- git add
+- git commit
+- git push
+- remember whether PartyKit also needs deployment
+
+Useful flags:
+
+```bat
+scripts\site-ship.bat --skip-check
+scripts\site-ship.bat --skip-party-deploy
+scripts\site-ship.bat --force-party-deploy
+scripts\site-ship.bat --help
+```
+
+### Safe status flow
+
+From the repo root:
+
+```bat
+scripts\site-status.bat
+```
+
+Use this when you want a simple answer to:
+
+- what branch am I on?
+- do I have unsaved work?
+- do I have unpushed commits?
+- do my current changes probably require a PartyKit deploy?
+
 ---
 
 ## Environment variable ownership
@@ -282,6 +600,29 @@ Common values:
 - `PUBLIC_PARTYKIT_HOST=localhost:1999`
 - `PARTYKIT_HOST=localhost:1999`
 - `AI_INTERACTIVE_MODE=inline`
+
+Expected local meanings from `site/.env.example`:
+
+- `TURSO_URL`
+  - Turso database URL
+- `TURSO_AUTH_TOKEN`
+  - Turso access token
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`
+  - Google auth configuration
+- `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_REDIRECT_URI`
+  - Discord auth configuration
+- `OPENAI_API_KEY`
+  - required for GM responses
+- `OPENAI_MODEL`, `OPENAI_MODEL_INTERACTIVE`, `OPENAI_MODEL_BACKGROUND`
+  - OpenAI model selection
+- `AI_INTERACTIVE_MODE`
+  - interactive AI route mode; usually `inline`
+- `ENABLE_DEV_AUTH`
+  - local/dev auth convenience; never set true in production
+- `TRIGGER_SECRET_KEY`
+  - local Trigger.dev secret, typically `tr_dev_...`
+- `PUBLIC_PARTYKIT_HOST`, `PARTYKIT_HOST`
+  - PartyKit host split for browser/server use
 
 ### 2. Vercel env vars
 
@@ -352,6 +693,116 @@ If any of these change, the GitHub Action should redeploy Trigger automatically 
 ### Changes that require only Vercel deploy
 
 Most page/UI/API route changes only need a normal git push to `main`.
+
+---
+
+## Common operator tasks: exact handling
+
+This section is intended to be copy-followable by an agent guiding a non-technical cooperator.
+
+### Task: start local work from zero
+
+1. clone the repo
+2. install `site/` dependencies
+3. create `site/.env`
+4. run `scripts\site-status.bat`
+5. run `scripts\site-dev.bat`
+6. open `http://localhost:5173`
+
+### Task: edit normal UI or route code
+
+Examples:
+
+- Svelte pages/components
+- server routes
+- non-PartyKit app logic
+
+Flow:
+
+1. `scripts\site-dev.bat`
+2. edit the code
+3. test in `http://localhost:5173`
+4. `scripts\site-check.bat`
+5. `scripts\site-save.bat --message "describe your change"`
+6. `scripts\site-ship.bat`
+
+Deploy consequence:
+
+- Vercel should update on push to `main`
+- PartyKit deploy usually not needed unless PartyKit files changed
+
+### Task: edit PartyKit realtime behavior
+
+Examples:
+
+- `site/party/server.ts`
+- `site/partykit.json`
+
+Flow:
+
+1. `scripts\site-dev.bat --party`
+2. if also testing the whole app, run `scripts\site-dev.bat --app`
+3. test through the app at `http://localhost:5173`
+4. `scripts\site-check.bat`
+5. `scripts\site-save.bat --message "describe your change"`
+6. `scripts\site-ship.bat`
+
+Deploy consequence:
+
+- PartyKit must be deployed for production behavior to change
+- `site-ship` will try to detect this automatically
+
+### Task: edit Trigger.dev jobs or background AI flow
+
+Examples:
+
+- `site/src/trigger/`
+- `site/trigger.config.ts`
+- shared AI code used by Trigger tasks
+
+Flow:
+
+1. `scripts\site-dev.bat --trigger`
+2. if also testing the app path, run `scripts\site-dev.bat --app`
+3. complete any Trigger.dev login prompts if needed
+4. test the relevant feature
+5. `scripts\site-check.bat`
+6. `scripts\site-save.bat --message "describe your change"`
+7. `scripts\site-ship.bat`
+
+Deploy consequence:
+
+- Trigger.dev production deployment is handled by GitHub Actions on push to `main`
+
+### Task: save work without shipping yet
+
+Use:
+
+```bat
+scripts\site-save.bat --message "describe your change"
+```
+
+This validates, stages all changes, and creates a commit.
+
+### Task: ship work to production
+
+Use:
+
+```bat
+scripts\site-ship.bat --message "describe your change"
+```
+
+This is the main safe push/deploy wrapper for routine use.
+
+### Task: just inspect what is going on
+
+Use:
+
+```bat
+scripts\site-status.bat
+```
+
+This is the best first command when the operator is unsure what state the repo is in.
 
 ---
 
@@ -455,6 +906,19 @@ Use the helper script or explicitly deploy from `site/`.
 ### 4. Trigger.dev env mismatch
 
 Trigger.dev tasks do not run with Vercel env vars unless you also add the same values in Trigger.dev project env settings.
+
+### 4b. Trigger.dev login / setup prompts during `trigger dev`
+
+Common prompts include:
+
+- asking whether to install Trigger.dev code agent rules
+  - safe default here: `No`
+- asking you to login in the browser
+  - normal on a fresh machine
+- warning that Trigger packages should be pinned to the exact CLI version
+  - safe default here: `Yes`
+
+If the CLI offers to pin `@trigger.dev/sdk` and `@trigger.dev/build` to the exact installed version, accept the update and then save the resulting `site/package.json` / lockfile changes.
 
 ### 5. Wrong host split between local and prod
 
@@ -596,14 +1060,16 @@ Rotate immediately if exposed:
 ### Build / test locally
 
 ```bat
+scripts\site-status.bat
 scripts\site-dev.bat
 scripts\site-check.bat
+scripts\site-save.bat --message "describe your change"
 ```
 
 ### Release safely
 
 ```bat
-scripts\site-release.bat
+scripts\site-ship.bat --message "describe your change"
 ```
 
 ### When in doubt

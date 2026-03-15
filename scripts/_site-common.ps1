@@ -77,6 +77,45 @@ function Get-GitStatus {
 	}
 }
 
+function Invoke-GitAddAll {
+	param([string]$RepoRoot)
+
+	Ensure-Git | Out-Null
+	Push-Location $RepoRoot
+	try {
+		Write-Step 'Staging all changes'
+		& git add -A
+		if ($LASTEXITCODE -ne 0) {
+			throw 'git add -A failed.'
+		}
+	} finally {
+		Pop-Location
+	}
+}
+
+function Invoke-GitCommit {
+	param(
+		[string]$RepoRoot,
+		[string]$Message
+	)
+
+	if ([string]::IsNullOrWhiteSpace($Message)) {
+		throw 'Commit message is required.'
+	}
+
+	Ensure-Git | Out-Null
+	Push-Location $RepoRoot
+	try {
+		Write-Step "Creating commit: $Message"
+		& git commit -m $Message
+		if ($LASTEXITCODE -ne 0) {
+			throw 'git commit failed.'
+		}
+	} finally {
+		Pop-Location
+	}
+}
+
 function Invoke-GitPush {
 	param([string]$RepoRoot)
 
@@ -106,5 +145,79 @@ function Get-CurrentBranch {
 		return $branch
 	} finally {
 		Pop-Location
+	}
+}
+
+function Get-WorkingTreeFiles {
+	param([string]$RepoRoot)
+
+	Ensure-Git | Out-Null
+	Push-Location $RepoRoot
+	try {
+		$modified = @(& git diff --name-only)
+		$staged = @(& git diff --cached --name-only)
+		$untracked = @(& git ls-files --others --exclude-standard)
+
+		if ($LASTEXITCODE -ne 0) {
+			throw 'Could not determine working tree files.'
+		}
+
+		return @($modified + $staged + $untracked | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)
+	} finally {
+		Pop-Location
+	}
+}
+
+function Get-UnpushedFiles {
+	param([string]$RepoRoot)
+
+	Ensure-Git | Out-Null
+	Push-Location $RepoRoot
+	try {
+		$hasUpstream = $true
+		& git rev-parse --abbrev-ref '@{u}' *> $null
+		if ($LASTEXITCODE -ne 0) {
+			$hasUpstream = $false
+		}
+
+		if (-not $hasUpstream) {
+			return @()
+		}
+
+		$files = @(& git diff --name-only '@{u}..HEAD')
+		if ($LASTEXITCODE -ne 0) {
+			throw 'Could not determine unpushed files.'
+		}
+
+		return @($files | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)
+	} finally {
+		Pop-Location
+	}
+}
+
+function Test-PartyKitChangeSet {
+	param([string[]]$Files)
+
+	foreach ($file in $Files) {
+		if ($file -match '^site/party/' -or $file -eq 'site/partykit.json') {
+			return $true
+		}
+	}
+
+	return $false
+}
+
+function Get-ChangeSummary {
+	param([string]$RepoRoot)
+
+	$working = @(Get-WorkingTreeFiles -RepoRoot $RepoRoot)
+	$unpushed = @(Get-UnpushedFiles -RepoRoot $RepoRoot)
+	$combined = @($working + $unpushed | Sort-Object -Unique)
+
+	[pscustomobject]@{
+		WorkingTreeFiles = @($working)
+		UnpushedFiles = @($unpushed)
+		CombinedFiles = @($combined)
+		NeedsPartyKitDeploy = (Test-PartyKitChangeSet -Files $combined)
 	}
 }
