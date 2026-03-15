@@ -230,83 +230,92 @@
 						</div>
 					</GlassPanel>
 				{/if}
-			<!-- Chat panel -->
-			<GlassPanel>
-				<div class="panel-inner chat-panel">
-					<div class="chat-header">
-						<h2>Party Chat</h2>
-						<span class="connection-dot" class:live={connected} title={connected ? 'Live' : 'Connecting…'}></span>
-					</div>
-					<div class="chat-messages" bind:this={chatEl}>
-						{#if messages.length === 0}
-							<p class="chat-empty text-muted">No messages yet…<br/><span style="font-size:0.78rem">Tip: type <code>/gm do something</code> to ask the GM</span></p>
-						{/if}
-						{#each messages as msg (msg.id)}
-							<div class="chat-msg" class:own={msg.userId === currentUserId} class:gm={msg.isGm} class:pending={msg.isPending}>
-								<span class="chat-name">{msg.username}</span>
-								{#if msg.isPending}
-									<span class="chat-text gm-thinking">
-										<span class="thinking-dot"></span>
-										<span class="thinking-dot"></span>
-										<span class="thinking-dot"></span>
-									</span>
-								{:else}
-									<span class="chat-text">{msg.text}</span>
-								{/if}
-							</div>
-						{/each}
-					</div>
-					<form class="chat-form" onsubmit={sendChat}>
-						<input
-							class="chat-input"
-							class:gm-input={chatInput.startsWith('/gm ')}
-							type="text"
-							placeholder="Chat… or /gm <action>"
-							bind:value={chatInput}
-							maxlength={500}
-							disabled={gmThinking}
-						/>
-						<button type="submit" class="btn chat-send" class:btn-primary={!chatInput.startsWith('/gm ')} class:btn-gm={chatInput.startsWith('/gm ')} disabled={!chatInput.trim() || gmThinking}>
-							{chatInput.startsWith('/gm ') ? '✨' : '↑'}
-						</button>
-					</form>
 				</div>
-			</GlassPanel>			</div>
 
-			<!-- Main narrative area (TBD) -->
-			<GlassPanel>
-				<div class="narrative-area">
-					<div class="tbd-notice">
-						<span class="tbd-icon">⚔️</span>
-						<h2>The Adventure Begins Here</h2>
-						<p class="text-muted">
-							This is where the narrative engine, world context, and AI-driven storytelling
-							will come to life. Character creation, scene descriptions, dialogue choices,
-							dice rolls, and combat — all grounded in the world data from Azgaar.
-						</p>
-						<div class="tbd-tags">
-							<span class="tbd-tag">Narrative Engine</span>
-							<span class="tbd-tag">Character Creation</span>
-							<span class="tbd-tag">World Context</span>
-							<span class="tbd-tag">5e Mechanics</span>
-							<span class="tbd-tag">AI Game Master</span>
+				<div class="main-column">
+					<GlassPanel>
+						<div class="main-chat-panel">
+							<div class="chat-header chat-header-main">
+								<div>
+									<h2>Adventure Chat</h2>
+									<p class="text-muted chat-subtitle">
+										Chat with the party, or type <span class="gm-inline">/gm &lt;action&gt;</span> to prompt the GM.
+									</p>
+								</div>
+								<span class="connection-dot" class:live={connected} title={connected ? 'Live' : 'Connecting…'}></span>
+							</div>
+							<div class="chat-messages main-chat-messages" bind:this={chatEl}>
+								{#if messages.length === 0}
+									<p class="chat-empty text-muted">
+										No messages yet…<br />
+										<span class="chat-tip">Try <span class="gm-inline">/gm I step into the ruins and look for tracks</span></span>
+									</p>
+								{/if}
+								{#each messages as msg (msg.id)}
+									<div class="chat-msg" class:own={msg.userId === currentUserId} class:gm={msg.isGm} class:pending={msg.isPending}>
+										<span class="chat-name">{msg.username}</span>
+										{#if msg.isPending}
+											<span class="chat-text gm-thinking">
+												<span class="thinking-dot"></span>
+												<span class="thinking-dot"></span>
+												<span class="thinking-dot"></span>
+											</span>
+										{:else}
+											<span class="chat-text">{msg.text}</span>
+										{/if}
+									</div>
+								{/each}
+							</div>
+							<form class="chat-form main-chat-form" onsubmit={sendChat}>
+								<input
+									class="chat-input main-chat-input"
+									class:gm-input={chatInput.startsWith('/gm ')}
+									type="text"
+									placeholder="Type a message… or /gm <action>"
+									bind:value={chatInput}
+									maxlength={500}
+									disabled={gmThinking}
+								/>
+								<button type="submit" class="btn chat-send main-chat-send" class:btn-primary={!chatInput.startsWith('/gm ')} class:btn-gm={chatInput.startsWith('/gm ')} disabled={!chatInput.trim() || gmThinking}>
+									{chatInput.startsWith('/gm ') ? '✨' : '↑'}
+								</button>
+							</form>
 						</div>
+					</GlassPanel>
 
-						{#if worldSnapshot}
-							<div class="world-proof">
-								<h3>Saved World Proof</h3>
-								<p class="text-muted">
-									The selected world was persisted with this adventure and is already available in
-									state as `world` for the narrative layer.
-								</p>
-								{#if worldSnapshot.teaser}
-									<blockquote>{worldSnapshot.teaser}</blockquote>
-								{/if}
+					<GlassPanel>
+						<div class="status-panel">
+							<div class="status-header">
+								<h2>Prototype Status</h2>
+								<span class="badge badge-active">Live Test</span>
 							</div>
-						{/if}
-					</div>
+							<p class="text-muted">
+								This page is now centered on the realtime party chat and GM loop. The larger
+								adventure narrative surface will be layered on top of this once the interaction
+								pipeline feels solid.
+							</p>
+
+							<div class="tbd-tags compact-tags">
+								<span class="tbd-tag">PartyKit Realtime</span>
+								<span class="tbd-tag">Trigger.dev Jobs</span>
+								<span class="tbd-tag">OpenAI GM</span>
+								<span class="tbd-tag">World Context</span>
+							</div>
+
+							{#if worldSnapshot}
+								<div class="world-proof compact-world-proof">
+									<h3>Current World Context</h3>
+									<p class="text-muted">
+										The world data is still attached to this adventure and ready for the future narrative layer.
+									</p>
+									{#if worldSnapshot.teaser}
+										<blockquote>{worldSnapshot.teaser}</blockquote>
+									{/if}
+								</div>
+							{/if}
+						</div>
+					</GlassPanel>
 				</div>
-			</GlassPanel>
 		</div>
 	</div>
 </div>
@@ -331,7 +340,7 @@
 
 	.adventure-grid {
 		display: grid;
-		grid-template-columns: 280px 1fr;
+		grid-template-columns: 280px minmax(0, 1fr);
 		gap: 1.5rem;
 		align-items: start;
 	}
@@ -340,6 +349,13 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1.5rem;
+	}
+
+	.main-column {
+		display: flex;
+		flex-direction: column;
+		gap: 1.5rem;
+		min-width: 0;
 	}
 
 	.panel-inner {
@@ -427,14 +443,36 @@
 		color: var(--text-muted);
 	}
 
-	/* Narrative TBD */
-	.narrative-area {
-		min-height: 400px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
+	.status-panel {
+		padding: 1.15rem 1.25rem;
 	}
 
+	.status-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 1rem;
+		margin-bottom: 0.85rem;
+	}
+
+	.status-header h2 {
+		margin: 0;
+		font-size: 1rem;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--text-muted);
+	}
+
+	.compact-tags {
+		justify-content: flex-start;
+		margin-top: 1rem;
+	}
+
+	.compact-world-proof {
+		margin-top: 1rem;
+	}
+
+	/* Narrative TBD */
 	.tbd-notice {
 		text-align: center;
 		max-width: 500px;
@@ -445,15 +483,6 @@
 		font-size: 3rem;
 		display: block;
 		margin-bottom: 1rem;
-	}
-
-	.tbd-notice h2 {
-		margin: 0 0 0.75rem;
-	}
-
-	.tbd-notice p {
-		margin: 0 0 1.5rem;
-		line-height: 1.6;
 	}
 
 	.tbd-tags {
@@ -505,6 +534,29 @@
 		max-height: 340px;
 	}
 
+	.main-chat-panel {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		padding: 1rem 1.15rem 1.15rem;
+		min-height: 68vh;
+	}
+
+	.chat-header-main h2 {
+		margin: 0 0 0.2rem;
+		font-size: 1.15rem;
+	}
+
+	.chat-subtitle {
+		margin: 0;
+		font-size: 0.92rem;
+	}
+
+	.gm-inline {
+		color: #f5c842;
+		font-weight: 600;
+	}
+
 	.chat-header {
 		display: flex;
 		align-items: center;
@@ -538,6 +590,12 @@
 		scrollbar-width: thin;
 	}
 
+	.main-chat-messages {
+		min-height: 420px;
+		max-height: none;
+		padding-right: 0.15rem;
+	}
+
 	.chat-empty {
 		margin: 0;
 		font-size: 0.82rem;
@@ -545,12 +603,16 @@
 		padding: 1.5rem 0;
 	}
 
+	.chat-tip {
+		font-size: 0.82rem;
+	}
+
 	.chat-msg {
 		display: flex;
 		flex-direction: column;
 		gap: 0.1rem;
-		padding: 0.35rem 0.6rem;
-		border-radius: 10px;
+		padding: 0.6rem 0.8rem;
+		border-radius: 14px;
 		background: rgba(255, 255, 255, 0.04);
 	}
 
@@ -625,14 +687,18 @@
 	}
 
 	.chat-text {
-		font-size: 0.88rem;
-		line-height: 1.4;
+		font-size: 0.96rem;
+		line-height: 1.55;
 		word-break: break-word;
 	}
 
 	.chat-form {
 		display: flex;
 		gap: 0.4rem;
+	}
+
+	.main-chat-form {
+		align-items: stretch;
 	}
 
 	.chat-input {
@@ -644,6 +710,12 @@
 		border-radius: 10px;
 		font-size: 0.88rem;
 		font-family: inherit;
+	}
+
+	.main-chat-input {
+		padding: 0.85rem 1rem;
+		border-radius: 14px;
+		font-size: 0.98rem;
 	}
 
 	.chat-input:focus {
@@ -658,9 +730,23 @@
 		font-size: 1rem;
 	}
 
+	.main-chat-send {
+		min-width: 3.2rem;
+		border-radius: 14px;
+		font-size: 1.1rem;
+	}
+
 	@media (max-width: 768px) {
 		.adventure-grid {
 			grid-template-columns: 1fr;
+		}
+
+		.main-chat-panel {
+			min-height: 56vh;
+		}
+
+		.main-chat-messages {
+			min-height: 320px;
 		}
 	}
 </style>
