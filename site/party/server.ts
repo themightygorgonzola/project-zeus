@@ -55,7 +55,9 @@ export default class AdventureRoom implements Party.Server {
             type: "player:ready",
             connectionId: sender.id,
             userId: data.userId,
-          })
+            isReady: data.isReady,
+          }),
+          [sender.id] // don't echo to sender — they already updated optimistically
         );
         break;
 
@@ -69,6 +71,14 @@ export default class AdventureRoom implements Party.Server {
             username: data.username,
             text: data.text,
           }),
+          [sender.id]
+        );
+        break;
+
+      case "adventure:started":
+        // Broadcast to everyone except the sender who is already redirecting
+        this.room.broadcast(
+          JSON.stringify({ type: "adventure:started" }),
           [sender.id]
         );
         break;

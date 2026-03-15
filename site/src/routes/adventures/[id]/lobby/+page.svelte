@@ -66,9 +66,16 @@
 			switch (msg.type) {
 				case 'player:joined':
 				case 'player:left':
-				case 'player:ready':
-					// Re-fetch authoritative state from Turso
+					// Re-fetch to get the new member list
 					fetchLobbyState();
+					break;
+				case 'player:ready':
+					// Update directly — sender already wrote to Turso before broadcasting
+					members = members.map((m) =>
+						m.userId === String(msg.userId)
+							? { ...m, isReady: Boolean(msg.isReady) }
+							: m
+					);
 					break;
 				case 'adventure:started':
 					goto(`/adventures/${adventureId}`);
@@ -93,20 +100,28 @@
 		if (readyInflight) return;
 		readyInflight = true;
 
-		// Optimistic flip for self
+		// Optimistic flip for self only
 		const prevReady = isReady;
+		const newReady = !prevReady;
 		members = members.map((m) =>
-			m.userId === currentUserId ? { ...m, isReady: !prevReady } : m
+			m.userId === currentUserId ? { ...m, isReady: newReady } : m
 		);
-
-		// Signal other players instantly via PartyKit
-		socket?.send(JSON.stringify({ type: 'player:ready', userId: currentUserId }));
 
 		fetch(`/api/lobby/${adventureId}/ready`, { method: 'POST' })
 			.then((res) => res.json())
 			.then((result) => {
-				if (result.started) goto(`/adventures/${adventureId}`);
-				// SSE will deliver the confirmed lobby-update or adventure-started
+				if (result.started) {
+					// Tell all other players immediately, then redirect
+					socket?.send(JSON.stringify({ type: 'adventure:started' }));
+					goto(`/adventures/${adventureId}`);
+				} else {
+					// Turso is now updated — safe to broadcast the confirmed isReady
+					socket?.send(JSON.stringify({
+						type: 'player:ready',
+						userId: currentUserId,
+						isReady: result.ready,
+					}));
+				}
 			})
 			.catch(() => {
 				// Network error — revert the optimistic flip
