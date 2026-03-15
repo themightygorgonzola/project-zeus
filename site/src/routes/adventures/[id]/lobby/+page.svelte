@@ -179,6 +179,24 @@
 					</div>
 				</div>
 
+				{#if data.worldSnapshot}
+					<div class="world-preview">
+						<div class="world-preview-header">
+							<div>
+								<h2>Selected World</h2>
+								<p class="text-muted">This map was locked in during creation and saved with the adventure.</p>
+							</div>
+							<span class="world-seed">Seed {data.worldSnapshot.seed}</span>
+						</div>
+						<strong class="world-name">{data.worldSnapshot.title}</strong>
+						<div class="world-preview-stats">
+							{#each data.worldSnapshot.stats.slice(0, 4) as [label, value]}
+								<span>{label}: {value}</span>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
 				<!-- Players -->
 				<div class="players-section">
 					<h2>Adventurers ({members.length})</h2>
@@ -289,6 +307,57 @@
 		font-family: monospace;
 	}
 
+	.world-preview {
+		display: flex;
+		flex-direction: column;
+		gap: 0.65rem;
+		padding: 0.95rem 1rem;
+		border-radius: 14px;
+		border: 1px solid rgba(124, 156, 255, 0.2);
+		background: rgba(124, 156, 255, 0.07);
+	}
+
+	.world-preview-header {
+		display: flex;
+		justify-content: space-between;
+		gap: 1rem;
+		align-items: flex-start;
+	}
+
+	.world-preview-header h2 {
+		margin: 0 0 0.25rem;
+		font-size: 1rem;
+	}
+
+	.world-preview-header p {
+		margin: 0;
+		font-size: 0.85rem;
+	}
+
+	.world-seed {
+		font-family: monospace;
+		font-size: 0.78rem;
+		color: var(--text-muted);
+	}
+
+	.world-name {
+		font-size: 1rem;
+	}
+
+	.world-preview-stats {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+
+	.world-preview-stats span {
+		font-size: 0.82rem;
+		color: var(--text-muted);
+		padding: 0.3rem 0.55rem;
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.04);
+	}
+
 	/* Players */
 	.players-section h2 {
 		margin: 0 0 0.75rem;
@@ -327,5 +396,11 @@
 	@keyframes pulse {
 		0%, 100% { opacity: 1; }
 		50% { opacity: 0.6; }
+	}
+
+	@media (max-width: 560px) {
+		.world-preview-header {
+			flex-direction: column;
+		}
 	}
 </style>

@@ -1,10 +1,11 @@
 import { redirect, error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { db } from '$server/db/client';
-import { adventures, adventureMembers, users } from '$server/db/schema';
+import { adventures, adventureMembers, adventureState, users } from '$server/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { broadcastLobbyUpdate } from '$server/realtime/lobby';
 import { MAX_LOBBY_SIZE } from '$server/config/constants';
+import { toWorldSnapshot, type PrototypeWorld } from '$lib/worldgen/prototype';
 
 export const load: PageServerLoad = async ({ params, locals, url }) => {
 	if (!locals.user) {
@@ -80,9 +81,26 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 		.innerJoin(users, eq(adventureMembers.userId, users.id))
 		.where(eq(adventureMembers.adventureId, params.id));
 
+	const state = await db
+		.select()
+		.from(adventureState)
+		.where(eq(adventureState.adventureId, params.id))
+		.limit(1);
+
+	let worldSnapshot = null;
+	if (state.length > 0) {
+		try {
+			const parsed = JSON.parse(state[0].stateJson) as { world?: PrototypeWorld };
+			worldSnapshot = toWorldSnapshot(parsed.world);
+		} catch {
+			worldSnapshot = null;
+		}
+	}
+
 	return {
 		adventure: adventure[0],
 		members,
-		currentUserId: locals.user.id
+		currentUserId: locals.user.id,
+		worldSnapshot
 	};
 };

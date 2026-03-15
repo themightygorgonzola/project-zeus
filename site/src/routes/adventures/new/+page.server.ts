@@ -2,13 +2,22 @@ import { redirect, fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { db } from '$server/db/client';
 import { adventures, adventureMembers, adventureState } from '$server/db/schema';
+import { createWorldSeed, generatePrototypeWorld, toWorldSnapshot } from '$lib/worldgen/prototype';
 import { ulid } from 'ulid';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.user) {
 		redirect(302, `/auth/login?returnTo=${encodeURIComponent(url.pathname + url.search)}`);
 	}
-	return {};
+
+	const initialWorldSeed = createWorldSeed();
+	const initialWorld = generatePrototypeWorld(initialWorldSeed);
+
+	return {
+		initialWorld,
+		initialWorldSeed,
+		initialWorldSnapshot: toWorldSnapshot(initialWorld)
+	};
 };
 
 export const actions: Actions = {
@@ -20,6 +29,8 @@ export const actions: Actions = {
 		const formData = await request.formData();
 		const name = formData.get('name')?.toString().trim();
 		const mode = formData.get('mode')?.toString();
+		const worldSeed = formData.get('worldSeed')?.toString().trim();
+		const worldDataRaw = formData.get('worldData')?.toString();
 
 		if (!name || name.length < 1 || name.length > 100) {
 			return fail(400, { error: 'Adventure name is required (max 100 characters).' });
@@ -29,8 +40,24 @@ export const actions: Actions = {
 			return fail(400, { error: 'Invalid mode.' });
 		}
 
+		if (!worldDataRaw) {
+			return fail(400, { error: 'Generate a world before creating the adventure.' });
+		}
+
+		let world: unknown;
+		try {
+			world = JSON.parse(worldDataRaw);
+		} catch {
+			return fail(400, { error: 'Selected world data was invalid. Please reroll and try again.' });
+		}
+
+		if (!world || typeof world !== 'object') {
+			return fail(400, { error: 'Selected world data was invalid. Please reroll and try again.' });
+		}
+
 		const now = Date.now();
 		const adventureId = ulid();
+		const savedWorldSeed = worldSeed || ((world as { seed?: string }).seed ?? String(now));
 
 		const isSolo = mode === 'solo';
 
@@ -40,6 +67,7 @@ export const actions: Actions = {
 				id: adventureId,
 				name,
 				ownerId: locals.user!.id,
+				worldSeed: savedWorldSeed,
 				mode,
 				status: isSolo ? 'active' : 'lobby',
 				createdAt: now,
@@ -56,7 +84,12 @@ export const actions: Actions = {
 
 			await tx.insert(adventureState).values({
 				adventureId,
-				stateJson: JSON.stringify({ started: isSolo, events: [] }),
+				stateJson: JSON.stringify({
+					started: isSolo,
+					events: [],
+					world,
+					worldAcceptedAt: now
+				}),
 				updatedAt: now
 			});
 		});
