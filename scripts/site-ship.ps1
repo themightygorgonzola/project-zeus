@@ -31,7 +31,7 @@ $common = Join-Path $PSScriptRoot '_site-common.ps1'
 $repoRoot = Get-RepoRoot -ScriptPath $PSCommandPath
 $siteRoot = Get-SiteRoot -RepoRoot $repoRoot
 $branch = Get-CurrentBranch -RepoRoot $repoRoot
-$status = Get-GitStatus -RepoRoot $repoRoot
+$status = @(Get-GitStatus -RepoRoot $repoRoot)
 $preSummary = Get-ChangeSummary -RepoRoot $repoRoot
 
 Write-Step "Repo root: $repoRoot"

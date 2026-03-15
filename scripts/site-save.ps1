@@ -26,7 +26,7 @@ $common = Join-Path $PSScriptRoot '_site-common.ps1'
 
 $repoRoot = Get-RepoRoot -ScriptPath $PSCommandPath
 $siteRoot = Get-SiteRoot -RepoRoot $repoRoot
-$status = Get-GitStatus -RepoRoot $repoRoot
+$status = @(Get-GitStatus -RepoRoot $repoRoot)
 
 if ($status.Count -eq 0) {
 	Write-Host 'No changes to save.' -ForegroundColor Yellow
