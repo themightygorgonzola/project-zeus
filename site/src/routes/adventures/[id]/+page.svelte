@@ -24,6 +24,8 @@
 		username: string;
 		text: string;
 		ts: number;
+		isGm?: boolean;
+		isPending?: boolean;
 	}
 
 	let messages = $state<ChatMessage[]>([]);
@@ -31,6 +33,8 @@
 	let chatEl = $state<HTMLDivElement | null>(null);
 	let socket: PartySocket | null = null;
 	let connected = $state(false);
+	let gmPendingId = $state<string | null>(null);
+	let gmThinking = $state(false);
 
 	function connectPartyKit() {
 		socket = new PartySocket({ host: PUBLIC_PARTYKIT_HOST, room: adventureId });
@@ -39,6 +43,7 @@
 		socket.addEventListener('message', async (e: MessageEvent) => {
 			let msg: { type: string; [key: string]: unknown };
 			try { msg = JSON.parse(e.data); } catch { return; }
+
 			if (msg.type === 'player:chat') {
 				messages = [...messages, {
 					id: `${msg.connectionId}-${Date.now()}`,
@@ -47,6 +52,46 @@
 					text: String(msg.text ?? ''),
 					ts: Date.now(),
 				}];
+				await tick();
+				chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' });
+			}
+
+			if (msg.type === 'ai:turn:start') {
+				gmThinking = true;
+				const pendingId = `gm-pending-${Date.now()}`;
+				gmPendingId = pendingId;
+				messages = [...messages, {
+					id: pendingId,
+					userId: 'gm',
+					username: 'Game Master',
+					text: '',
+					ts: Date.now(),
+					isGm: true,
+					isPending: true,
+				}];
+				await tick();
+				chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' });
+			}
+
+			if (msg.type === 'ai:turn:end') {
+				gmThinking = false;
+				const text = String(msg.text ?? '');
+				if (gmPendingId) {
+					// Replace the pending placeholder with the real response
+					messages = messages.map((m) =>
+						m.id === gmPendingId ? { ...m, text, isPending: false } : m
+					);
+					gmPendingId = null;
+				} else {
+					messages = [...messages, {
+						id: `gm-${Date.now()}`,
+						userId: 'gm',
+						username: 'Game Master',
+						text,
+						ts: Date.now(),
+						isGm: true,
+					}];
+				}
 				await tick();
 				chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' });
 			}
@@ -63,7 +108,37 @@
 		const text = chatInput.trim();
 		if (!text || !socket) return;
 		chatInput = '';
-		// Optimistic — add own message immediately
+
+		// /gm <message> → trigger the AI game master
+		if (text.startsWith('/gm ')) {
+			const playerAction = text.slice(4).trim();
+			if (!playerAction) return;
+			// Show the player's action in chat first
+			messages = [...messages, {
+				id: `local-${Date.now()}`,
+				userId: currentUserId,
+				username: currentUsername,
+				text,
+				ts: Date.now(),
+			}];
+			socket.send(JSON.stringify({
+				type: 'player:chat',
+				userId: currentUserId,
+				username: currentUsername,
+				text,
+			}));
+			await tick();
+			chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' });
+			// Trigger the AI turn
+			await fetch(`/api/adventure/${adventureId}/turn`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ playerAction }),
+			});
+			return;
+		}
+
+		// Normal chat message
 		messages = [...messages, {
 			id: `local-${Date.now()}`,
 			userId: currentUserId,
@@ -164,25 +239,35 @@
 					</div>
 					<div class="chat-messages" bind:this={chatEl}>
 						{#if messages.length === 0}
-							<p class="chat-empty text-muted">No messages yet…</p>
+							<p class="chat-empty text-muted">No messages yet…<br/><span style="font-size:0.78rem">Tip: type <code>/gm do something</code> to ask the GM</span></p>
 						{/if}
 						{#each messages as msg (msg.id)}
-							<div class="chat-msg" class:own={msg.userId === currentUserId}>
+							<div class="chat-msg" class:own={msg.userId === currentUserId} class:gm={msg.isGm} class:pending={msg.isPending}>
 								<span class="chat-name">{msg.username}</span>
-								<span class="chat-text">{msg.text}</span>
+								{#if msg.isPending}
+									<span class="chat-text gm-thinking">
+										<span class="thinking-dot"></span>
+										<span class="thinking-dot"></span>
+										<span class="thinking-dot"></span>
+									</span>
+								{:else}
+									<span class="chat-text">{msg.text}</span>
+								{/if}
 							</div>
 						{/each}
 					</div>
 					<form class="chat-form" onsubmit={sendChat}>
 						<input
 							class="chat-input"
+							class:gm-input={chatInput.startsWith('/gm ')}
 							type="text"
-							placeholder="Say something…"
+							placeholder="Chat… or /gm <action>"
 							bind:value={chatInput}
-							maxlength={280}
+							maxlength={500}
+							disabled={gmThinking}
 						/>
-						<button type="submit" class="btn btn-primary chat-send" disabled={!chatInput.trim()}>
-							↑
+						<button type="submit" class="btn chat-send" class:btn-primary={!chatInput.startsWith('/gm ')} class:btn-gm={chatInput.startsWith('/gm ')} disabled={!chatInput.trim() || gmThinking}>
+							{chatInput.startsWith('/gm ') ? '✨' : '↑'}
 						</button>
 					</form>
 				</div>
@@ -472,6 +557,59 @@
 	.chat-msg.own {
 		background: rgba(124, 156, 255, 0.1);
 		border: 1px solid rgba(124, 156, 255, 0.15);
+	}
+
+	/* GM messages */
+	.chat-msg.gm {
+		background: rgba(255, 200, 80, 0.07);
+		border: 1px solid rgba(255, 200, 80, 0.22);
+		border-radius: 12px;
+	}
+
+	.chat-msg.gm .chat-name {
+		color: #f5c842;
+	}
+
+	.chat-msg.gm .chat-text {
+		font-style: italic;
+		line-height: 1.55;
+	}
+
+	/* Thinking animation */
+	.gm-thinking {
+		display: flex;
+		gap: 4px;
+		align-items: center;
+		padding: 0.2rem 0;
+	}
+
+	.thinking-dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: #f5c842;
+		opacity: 0.4;
+		animation: thinking 1.2s ease-in-out infinite;
+	}
+
+	.thinking-dot:nth-child(2) { animation-delay: 0.2s; }
+	.thinking-dot:nth-child(3) { animation-delay: 0.4s; }
+
+	@keyframes thinking {
+		0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+		40% { opacity: 1; transform: scale(1.15); }
+	}
+
+	/* GM input highlight */
+	.chat-input.gm-input {
+		border-color: rgba(245, 200, 66, 0.5);
+		background: rgba(245, 200, 66, 0.05);
+	}
+
+	.btn-gm {
+		background: rgba(245, 200, 66, 0.18);
+		color: #f5c842;
+		border: 1px solid rgba(245, 200, 66, 0.35);
 	}
 
 	.chat-name {
