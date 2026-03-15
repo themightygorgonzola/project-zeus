@@ -1,0 +1,5 @@
+{
+  "name": "project-zeus",
+  "main": "party/server.ts",
+  "compatibilityDate": "2023-10-20"
+}
