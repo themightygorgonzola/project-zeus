@@ -26,6 +26,7 @@
 		ts: number;
 		isGm?: boolean;
 		isPending?: boolean;
+		isError?: boolean;
 	}
 
 	let messages = $state<ChatMessage[]>([]);
@@ -35,6 +36,30 @@
 	let connected = $state(false);
 	let gmPendingId = $state<string | null>(null);
 	let gmThinking = $state(false);
+
+	async function scrollChatToBottom() {
+		await tick();
+		chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' });
+	}
+
+	function ensurePendingGmMessage() {
+		if (gmPendingId) return gmPendingId;
+
+		const pendingId = `gm-pending-${Date.now()}`;
+		gmPendingId = pendingId;
+		gmThinking = true;
+		messages = [...messages, {
+			id: pendingId,
+			userId: 'gm',
+			username: 'Game Master',
+			text: '',
+			ts: Date.now(),
+			isGm: true,
+			isPending: true,
+		}];
+
+		return pendingId;
+	}
 
 	function connectPartyKit() {
 		socket = new PartySocket({ host: PUBLIC_PARTYKIT_HOST, room: adventureId });
@@ -52,25 +77,25 @@
 					text: String(msg.text ?? ''),
 					ts: Date.now(),
 				}];
-				await tick();
-				chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' });
+				await scrollChatToBottom();
 			}
 
 			if (msg.type === 'ai:turn:start') {
-				gmThinking = true;
-				const pendingId = `gm-pending-${Date.now()}`;
-				gmPendingId = pendingId;
-				messages = [...messages, {
-					id: pendingId,
-					userId: 'gm',
-					username: 'Game Master',
-					text: '',
-					ts: Date.now(),
-					isGm: true,
-					isPending: true,
-				}];
-				await tick();
-				chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' });
+				ensurePendingGmMessage();
+				await scrollChatToBottom();
+			}
+
+			if (msg.type === 'ai:turn:chunk') {
+				const chunk = String(msg.text ?? '');
+				if (!chunk) return;
+
+				const pendingId = ensurePendingGmMessage();
+				messages = messages.map((m) =>
+					m.id === pendingId
+						? { ...m, text: `${m.text}${chunk}`, isPending: false }
+						: m
+				);
+				await scrollChatToBottom();
 			}
 
 			if (msg.type === 'ai:turn:end') {
@@ -92,8 +117,31 @@
 						isGm: true,
 					}];
 				}
-				await tick();
-				chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' });
+				await scrollChatToBottom();
+			}
+
+			if (msg.type === 'ai:turn:error') {
+				gmThinking = false;
+				const message = String(msg.message ?? 'The GM failed to respond.');
+				if (gmPendingId) {
+					messages = messages.map((m) =>
+						m.id === gmPendingId
+							? { ...m, text: message, isPending: false, isError: true }
+							: m
+					);
+					gmPendingId = null;
+				} else {
+					messages = [...messages, {
+						id: `gm-error-${Date.now()}`,
+						userId: 'gm',
+						username: 'Game Master',
+						text: message,
+						ts: Date.now(),
+						isGm: true,
+						isError: true,
+					}];
+				}
+				await scrollChatToBottom();
 			}
 		});
 	}
@@ -129,12 +177,25 @@
 			}));
 			await tick();
 			chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' });
+			ensurePendingGmMessage();
+			await scrollChatToBottom();
 			// Trigger the AI turn
-			await fetch(`/api/adventure/${adventureId}/turn`, {
+			const res = await fetch(`/api/adventure/${adventureId}/turn`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ playerAction }),
 			});
+
+			if (!res.ok) {
+				const errorText = await res.text();
+				messages = messages.map((m) =>
+					m.id === gmPendingId
+						? { ...m, text: `GM request failed: ${errorText}`, isPending: false, isError: true }
+						: m
+				);
+				gmPendingId = null;
+				gmThinking = false;
+			}
 			return;
 		}
 
@@ -146,8 +207,7 @@
 			text,
 			ts: Date.now(),
 		}];
-		await tick();
-		chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' });
+		await scrollChatToBottom();
 		socket.send(JSON.stringify({
 			type: 'player:chat',
 			userId: currentUserId,
@@ -252,7 +312,7 @@
 									</p>
 								{/if}
 								{#each messages as msg (msg.id)}
-									<div class="chat-msg" class:own={msg.userId === currentUserId} class:gm={msg.isGm} class:pending={msg.isPending}>
+									<div class="chat-msg" class:own={msg.userId === currentUserId} class:gm={msg.isGm} class:pending={msg.isPending} class:error={msg.isError}>
 										<span class="chat-name">{msg.username}</span>
 										{#if msg.isPending}
 											<span class="chat-text gm-thinking">
@@ -635,6 +695,23 @@
 	.chat-msg.gm .chat-text {
 		font-style: italic;
 		line-height: 1.55;
+	}
+
+	.chat-msg.gm.pending {
+		opacity: 0.95;
+	}
+
+	.chat-msg.gm.pending .chat-text {
+		font-style: normal;
+	}
+
+	.chat-msg.gm .chat-text:empty::after {
+		content: '';
+	}
+
+	.chat-msg.gm.error {
+		background: rgba(255, 90, 90, 0.08);
+		border-color: rgba(255, 90, 90, 0.26);
 	}
 
 	/* Thinking animation */

@@ -1,8 +1,8 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { tasks } from '@trigger.dev/sdk';
 import { db } from '$server/db/client';
 import { adventureMembers } from '$server/db/schema';
+import { dispatchAdventureTurn, type AdventureTurnDispatchInput } from '$server/ai/adventure-turn';
 import { eq, and } from 'drizzle-orm';
 
 /**
@@ -29,25 +29,22 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 
 	if (membership.length === 0) error(403, 'Not a member');
 
-	const body = await request.json().catch(() => ({})) as { playerAction?: string };
+	const body = (await request.json().catch(() => ({}))) as {
+		playerAction?: string;
+		purpose?: AdventureTurnDispatchInput['purpose'];
+		mode?: AdventureTurnDispatchInput['mode'] | 'auto';
+		model?: string;
+	};
 	const playerAction = body.playerAction?.trim();
 	if (!playerAction) error(400, 'playerAction is required');
 
-	await tasks.trigger('adventure-turn', {
+	const result = await dispatchAdventureTurn({
 		adventureId,
 		playerAction,
-		history: [
-			{
-				role: 'system',
-				content:
-					'You are a Game Master running a text-based fantasy RPG adventure. ' +
-					'Respond in character as the GM: describe what happens as a result of ' +
-					"the player's action in 2–4 vivid sentences. Advance the story, add " +
-					'tension or wonder, and end with an implicit or explicit prompt for ' +
-					"the player's next move.",
-			},
-		],
+		purpose: body.purpose,
+		mode: body.mode,
+		model: body.model
 	});
 
-	return json({ ok: true });
+	return json({ ok: true, ...result });
 };

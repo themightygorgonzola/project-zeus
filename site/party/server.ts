@@ -22,6 +22,7 @@
  *   { type: "ai:turn:start" }
  *   { type: "ai:turn:chunk",  text: string }
  *   { type: "ai:turn:end",    text: string }
+ *   { type: "ai:turn:error",  message: string }
  */
 
 import type * as Party from "partykit/server";
@@ -139,7 +140,8 @@ export default class AdventureRoom implements Party.Server {
     if (
       body.type === "ai:turn:start" ||
       body.type === "ai:turn:chunk" ||
-      body.type === "ai:turn:end"
+      body.type === "ai:turn:end" ||
+      body.type === "ai:turn:error"
     ) {
       this.room.broadcast(JSON.stringify(body));
       return new Response("ok");
