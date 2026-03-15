@@ -1,7 +1,6 @@
 node_modules/
 .env
 dist/
-generated/
 
 # Trigger.dev local dev files
 .trigger

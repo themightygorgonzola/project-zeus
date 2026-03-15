@@ -11,7 +11,7 @@ It currently combines:
 - OpenAI for GM responses
 - Vercel for the main web deployment
 
-The actively served application lives in `site/`. The remaining root `src/` code only exists to support the world-generation and analysis scripts kept in `scripts/`.
+The actively served application lives in `site/`. Everything outside `site/` is now limited to repository automation and Windows-safe operator helpers.
 
 ---
 
@@ -34,8 +34,6 @@ The actively served application lives in `site/`. The remaining root `src/` code
   - model routing, OpenAI calls, PartyKit AI event fanout
 - `scripts/`
   - Windows-safe helper scripts for validation, local dev, and releases
-- `src/`
-  - retained world-generation / map-processing code used by root scripts
 
 ### Important current behavior
 
@@ -65,6 +63,15 @@ The safest default on this machine is:
 - let them use `npm.cmd` instead of `npm.ps1`
 
 This is important because PowerShell execution policy on this machine can block `npm` / `npx` script shims.
+
+### Final intended root layout
+
+The root of this repository should stay minimal:
+
+- `site/` — live app and runtime code
+- `.github/` — GitHub Actions automation
+- `scripts/` — checked-in operator helpers only
+- root config/docs files like `README.md`, `.gitignore`, `.gitattributes`
 
 ---
 
