@@ -22,7 +22,8 @@
 	/* ── initialise from server-rendered data ────────────── */
 	$effect(() => {
 		if (!initializedFromData) {
-			members = [...(data.members as LobbyMember[])];
+			// Reset isReady to false — PartyKit is the truth for ready state
+			members = (data.members as LobbyMember[]).map((m) => ({ ...m, isReady: false }));
 			adventureStatus = data.adventure.status;
 			initializedFromData = true;
 		}
@@ -48,13 +49,27 @@
 				goto(`/adventures/${adventureId}`);
 				return;
 			}
-			members = state.members;
-			adventureStatus = state.adventure.status;
+			// Only update membership list, not ready state (PartyKit owns that)
+			members = state.members.map((m) => ({
+				...m,
+				isReady: members.find((x) => x.userId === m.userId)?.isReady ?? false,
+			}));
 		} catch { /* network hiccup */ }
 	}
 
+	function applyReadySnapshot(snapshot: Record<string, boolean>) {
+		members = members.map((m) => ({
+			...m,
+			isReady: snapshot[m.userId] ?? false,
+		}));
+	}
+
 	function connectPartyKit() {
-		socket = new PartySocket({ host: PUBLIC_PARTYKIT_HOST, room: adventureId });
+		socket = new PartySocket({
+			host: PUBLIC_PARTYKIT_HOST,
+			room: adventureId,
+			query: { userId: currentUserId },
+		});
 
 		socket.addEventListener('open', () => { connected = true; });
 		socket.addEventListener('close', () => { connected = false; });
@@ -64,21 +79,29 @@
 			try { msg = JSON.parse(e.data); } catch { return; }
 
 			switch (msg.type) {
-				case 'player:joined':
-				case 'player:left':
-					// Re-fetch to get the new member list
-					fetchLobbyState();
+				case 'ready:snapshot':
+					// Server sends current ready state when we connect
+					applyReadySnapshot(msg.snapshot as Record<string, boolean>);
 					break;
+
 				case 'player:ready':
-					// Update directly — sender already wrote to Turso before broadcasting
+					// Direct update — no Turso fetch needed
 					members = members.map((m) =>
 						m.userId === String(msg.userId)
 							? { ...m, isReady: Boolean(msg.isReady) }
 							: m
 					);
 					break;
+
+				case 'player:joined':
+				case 'player:left':
+					// Re-fetch to sync the membership list from Turso
+					fetchLobbyState();
+					break;
+
 				case 'adventure:started':
-					goto(`/adventures/${adventureId}`);
+					// Write to Turso then redirect
+					startAdventure();
 					break;
 			}
 		});
@@ -93,45 +116,35 @@
 		if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 	}
 
+	let starting = $state(false);
+
+	async function startAdventure() {
+		if (starting) return;
+		starting = true;
+		try {
+			await fetch(`/api/lobby/${adventureId}/start`, { method: 'POST' });
+		} catch { /* best-effort — adventure page handles status check */ }
+		goto(`/adventures/${adventureId}`);
+	}
+
 	/* ── actions ─────────────────────────────────────────── */
 	let readyInflight = $state(false);
 
 	function toggleReady() {
-		if (readyInflight) return;
+		if (readyInflight || !socket) return;
 		readyInflight = true;
 
-		// Optimistic flip for self only
-		const prevReady = isReady;
-		const newReady = !prevReady;
+		const newReady = !isReady;
+
+		// Optimistic update for self — PartyKit echoes back to confirm
 		members = members.map((m) =>
 			m.userId === currentUserId ? { ...m, isReady: newReady } : m
 		);
 
-		fetch(`/api/lobby/${adventureId}/ready`, { method: 'POST' })
-			.then((res) => res.json())
-			.then((result) => {
-				if (result.started) {
-					// Tell all other players immediately, then redirect
-					socket?.send(JSON.stringify({ type: 'adventure:started' }));
-					goto(`/adventures/${adventureId}`);
-				} else {
-					// Turso is now updated — safe to broadcast the confirmed isReady
-					socket?.send(JSON.stringify({
-						type: 'player:ready',
-						userId: currentUserId,
-						isReady: result.ready,
-					}));
-				}
-			})
-			.catch(() => {
-				// Network error — revert the optimistic flip
-				members = members.map((m) =>
-					m.userId === currentUserId ? { ...m, isReady: prevReady } : m
-				);
-			})
-			.finally(() => {
-				readyInflight = false;
-			});
+		socket.send(JSON.stringify({ type: 'player:ready', isReady: newReady }));
+
+		// Clear inflight lock after a short debounce
+		setTimeout(() => { readyInflight = false; }, 300);
 	}
 
 	function copyLink() {
