@@ -53,6 +53,18 @@ function dispositionLabel(d: number): string {
 	return 'hateful';
 }
 
+function escapeProtocolText(value: string): string {
+	return value.replace(/[\[\]\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function formatNameIdRef(name: string, id: string): string {
+	return `[name: ${escapeProtocolText(name)}][id: ${escapeProtocolText(id)}]`;
+}
+
+function formatObjectiveRef(text: string, id: string, done: boolean): string {
+	return `objective(status: ${done ? 'done' : 'pending'}, text: ${escapeProtocolText(text)}, id: ${escapeProtocolText(id)})`;
+}
+
 /**
  * Build a one-line interaction summary for an NPC by cross-referencing
  * scene facts that mention the NPC by name.
@@ -188,7 +200,7 @@ function buildGameStateContextBlock(state: GameState, worldBrief: string): strin
 	const loc = state.locations.find((l) => l.id === state.partyLocationId);
 	if (loc) {
 		parts.push(`=== CURRENT LOCATION ===`);
-		parts.push(`${loc.name}[${loc.id}]`);
+		parts.push(`${formatNameIdRef(loc.name, loc.id)}`);
 		parts.push(`Type: ${loc.type}`);
 		parts.push(`Description: ${loc.description}`);
 		if (loc.features.length > 0) {
@@ -197,16 +209,16 @@ function buildGameStateContextBlock(state: GameState, worldBrief: string): strin
 		const connections = loc.connections
 			.map((cid) => state.locations.find((l) => l.id === cid))
 			.filter(Boolean)
-			.map((l) => `${l!.name}[${l!.id}]`);
+			.map((l) => formatNameIdRef(l!.name, l!.id));
 		if (connections.length > 0) {
 			parts.push(`Connections: ${connections.join(', ')}`);
 		}
 		const localNpcs = state.npcs.filter((n) => n.locationId === loc.id && n.alive && !n.archived);
 		if (localNpcs.length > 0) {
-			parts.push(`NPCs present: ${localNpcs.map((n) => `${n.name}[${n.id}] (${n.role}, ${dispositionLabel(n.disposition)})`).join(', ')}`);
+			parts.push(`NPCs present: ${localNpcs.map((n) => `${formatNameIdRef(n.name, n.id)} (${n.role}, ${dispositionLabel(n.disposition)})`).join(', ')}`);
 		}
 		if (loc.groundItems && loc.groundItems.length > 0) {
-			parts.push(`On the ground: ${loc.groundItems.map((i) => `${i.name}[${i.id}] (${i.category})`).join(', ')}`);
+			parts.push(`On the ground: ${loc.groundItems.map((i) => `${formatNameIdRef(i.name, i.id)} (${i.category})`).join(', ')}`);
 		}
 		parts.push('');
 	}
@@ -218,13 +230,13 @@ function buildGameStateContextBlock(state: GameState, worldBrief: string): strin
 	if (otherLocations.length > 0) {
 		parts.push(`=== KNOWN LOCATIONS ===`);
 		for (const l of otherLocations) {
-			const tag = l.visited ? '[visited]' : '[unvisited]';
+			const tag = `(visited: ${l.visited ? 'yes' : 'no'})`;
 			const conns = l.connections
 				.map((cid) => state.locations.find((x) => x.id === cid))
 				.filter(Boolean)
-				.map((x) => x!.name);
+				.map((x) => formatNameIdRef(x!.name, x!.id));
 			const connStr = conns.length > 0 ? ` → connects to: ${conns.join(', ')}` : '';
-			parts.push(`- ${l.name}[${l.id}] (${l.type}) ${tag}${connStr}`);
+			parts.push(`- ${formatNameIdRef(l.name, l.id)} (${l.type}) ${tag}${connStr}`);
 		}
 		parts.push('');
 	}
@@ -256,12 +268,12 @@ function buildGameStateContextBlock(state: GameState, worldBrief: string): strin
 
 		parts.push(`=== KNOWN NPCs (away from party) ===`);
 		for (const [locId, npcs] of byLocation) {
-			const locName = state.locations.find((l) => l.id === locId)?.name ?? locId;
-			parts.push(`At ${locName}:`);
+			const loc = state.locations.find((l) => l.id === locId);
+			parts.push(`At ${loc ? formatNameIdRef(loc.name, loc.id) : `locationId: ${locId}`}:`);
 			for (const n of npcs) {
 				const interactionSummary = buildNpcInteractionSummary(n, state.sceneFacts ?? []);
 				const summaryStr = interactionSummary ? ` — ${interactionSummary}` : '';
-				parts.push(`  - ${n.name}[${n.id}] (${n.role}, ${dispositionLabel(n.disposition)})${summaryStr}`);
+				parts.push(`  - ${formatNameIdRef(n.name, n.id)} (${n.role}, ${dispositionLabel(n.disposition)})${summaryStr}`);
 			}
 		}
 		parts.push('');
@@ -289,9 +301,9 @@ function buildGameStateContextBlock(state: GameState, worldBrief: string): strin
 			if (c.statBlock) {
 				const attacks = c.statBlock.attacks.map((a) => `${a.name} +${a.toHit} (${a.damage} ${a.damageType})`).join(', ');
 				const attackStr = attacks ? ` | Attacks: ${attacks}` : '';
-				parts.push(`- ${c.name}[${c.id}] (${c.role}, ${dispositionLabel(c.disposition)}) — ${c.statBlock.hp}/${c.statBlock.maxHp} HP, AC ${c.statBlock.ac}${attackStr}${summaryStr}`);
+				parts.push(`- ${formatNameIdRef(c.name, c.id)} (${c.role}, ${dispositionLabel(c.disposition)}) — ${c.statBlock.hp}/${c.statBlock.maxHp} HP, AC ${c.statBlock.ac}${attackStr}${summaryStr}`);
 			} else {
-				parts.push(`- ${c.name}[${c.id}] (${c.role}, ${dispositionLabel(c.disposition)})${summaryStr}`);
+				parts.push(`- ${formatNameIdRef(c.name, c.id)} (${c.role}, ${dispositionLabel(c.disposition)})${summaryStr}`);
 			}
 		}
 		parts.push('');
@@ -302,7 +314,7 @@ function buildGameStateContextBlock(state: GameState, worldBrief: string): strin
 		const enc = state.activeEncounter;
 		parts.push(`=== ACTIVE ENCOUNTER (Round ${enc.round}) ===`);
 		for (const cmb of enc.combatants) {
-			const tag = cmb.defeated ? ' [DEFEATED]' : '';
+			const tag = cmb.defeated ? ' (defeated: yes)' : '';
 			parts.push(`- ${cmb.name} (${cmb.type}): ${cmb.currentHp}/${cmb.maxHp} HP, AC ${cmb.ac}${tag}`);
 		}
 		parts.push(`Use encounterEnded in stateChanges when the encounter resolves.`);
@@ -316,9 +328,9 @@ function buildGameStateContextBlock(state: GameState, worldBrief: string): strin
 	if (visibleQuests.length > 0) {
 		parts.push(`=== QUESTS ===`);
 		for (const q of visibleQuests) {
-			const statusTag = `[${q.status}]`;
-			const objectives = q.objectives.map((o) => `${o.done ? '[x]' : '[ ]'} ${o.text}[${o.id}]`).join('; ');
-			parts.push(`- ${q.name}[${q.id}] ${statusTag}: ${q.description} | Objectives: ${objectives}`);
+			const statusTag = `(status: ${q.status})`;
+			const objectives = q.objectives.map((o) => formatObjectiveRef(o.text, o.id, o.done)).join('; ');
+			parts.push(`- ${formatNameIdRef(q.name, q.id)} ${statusTag}: ${q.description} | Objectives: ${objectives}`);
 		}
 		parts.push('');
 	}
@@ -393,17 +405,17 @@ function buildSystemPrompt(state: GameState, worldBrief: string): string {
 	parts.push(`{`);
 	parts.push(`  "narrativeText": "Your narration of what happens (shown to players)",`);
 	parts.push(`  "stateChanges": {`);
-	parts.push(`    "hpChanges": [{"characterId": "exact-id-from-PARTY-brackets", "oldHp": N, "newHp": N, "reason": "..."}] or omit,`);
-	parts.push(`    "itemsGained": [{"characterId": "exact-id-from-PARTY-brackets", "item": {"id": "new-ulid", "name": "...", "category": "weapon|armor|consumable|quest|misc", "description": "...", "value": N, "quantity": N}}] or omit,`);
-	parts.push(`    "itemsLost": [{"characterId": "exact-id-from-PARTY-brackets", "itemId": "exact-item-id-from-inventory", "quantity": N}] or omit,`);
-	parts.push(`    "itemsDropped": [{"characterId": "exact-id-from-PARTY-brackets", "itemId": "exact-item-id-from-inventory"}] or omit,`);
-	parts.push(`    "itemsPickedUp": [{"characterId": "exact-id-from-PARTY-brackets", "itemId": "exact-item-id-from-ON-THE-GROUND"}] or omit,`);
+	parts.push(`    "hpChanges": [{"characterId": "exact-id-from-PARTY-id-field", "oldHp": N, "newHp": N, "reason": "..."}] or omit,`);
+	parts.push(`    "itemsGained": [{"characterId": "exact-id-from-PARTY-id-field", "item": {"id": "new-ulid", "name": "...", "category": "weapon|armor|consumable|quest|misc", "description": "...", "value": N, "quantity": N}}] or omit,`);
+	parts.push(`    "itemsLost": [{"characterId": "exact-id-from-PARTY-id-field", "itemId": "exact-item-id-from-inventory", "quantity": N}] or omit,`);
+	parts.push(`    "itemsDropped": [{"characterId": "exact-id-from-PARTY-id-field", "itemId": "exact-item-id-from-inventory"}] or omit,`);
+	parts.push(`    "itemsPickedUp": [{"characterId": "exact-id-from-PARTY-id-field", "itemId": "exact-item-id-from-ON-THE-GROUND"}] or omit,`);
 	parts.push(`    "locationItemsAdded": [{"locationId": "...", "item": {"id": "item-<unique>", "name": "...", "category": "...", "description": "...", "value": N, "quantity": N}}] or omit,`);
-	parts.push(`    "locationChange": {"from": "id-or-null", "to": "location-id"} or omit,`);
-	parts.push(`    "npcChanges": [{"npcId": "...", "field": "disposition|alive|hp|notes", "oldValue": X, "newValue": Y}] or omit,`);
-	parts.push(`    "questUpdates": [{"questId": "...", "field": "status", "oldValue": "active", "newValue": "completed|failed"} or {"questId": "...", "field": "objective", "objectiveId": "obj-id", "oldValue": false, "newValue": true}] or omit,`);
-	parts.push(`    "conditionsApplied": [{"characterId": "exact-id-from-PARTY-brackets", "condition": "...", "applied": true|false}] or omit,`);
-	parts.push(`    "xpAwarded": [{"characterId": "exact-id-from-PARTY-brackets", "amount": N}] or omit,`);
+	parts.push(`    "locationChange": {"from": "exact-location-id-from-visible-[id:-field]-or-null", "to": "exact-location-id-from-visible-[id:-field]"} or omit,`);
+	parts.push(`    "npcChanges": [{"npcId": "exact-id-from-visible-[id:-field]", "field": "disposition|alive|hp|notes", "oldValue": X, "newValue": Y}] or omit,`);
+	parts.push(`    "questUpdates": [{"questId": "exact-id-from-visible-[id:-field]", "field": "status", "oldValue": "active", "newValue": "available|active|completed|failed"} or {"questId": "exact-id-from-visible-[id:-field]", "field": "objective", "objectiveId": "exact-objective-id-from-objective(..., id: ...)", "oldValue": false, "newValue": true}] or omit,`);
+	parts.push(`    "conditionsApplied": [{"characterId": "exact-id-from-PARTY-id-field", "condition": "...", "applied": true|false}] or omit,`);
+	parts.push(`    "xpAwarded": [{"characterId": "exact-id-from-PARTY-id-field", "amount": N}] or omit,`);
 	parts.push(`    "npcsAdded": [{"id": "npc-<unique>", "name": "...", "role": "merchant|quest-giver|hostile|neutral|ally|companion|boss", "locationId": "...", "disposition": 0, "description": "..."}] or omit,`);
 	parts.push(`    "locationsAdded": [{"id": "loc-<unique>", "name": "...", "type": "settlement|wilderness|dungeon|interior|road", "description": "...", "connections": ["existing-loc-id"], "features": ["..."], "groundItems": [{"id": "item-<unique>", "name": "...", "category": "...", "description": "...", "value": N, "quantity": N}]}] or omit,`);
 	parts.push(`    "questsAdded": [{"id": "quest-<unique>", "name": "...", "description": "...", "giverNpcId": "npc-id-or-null", "objectives": [{"id": "obj-<unique>", "text": "..."}], "recommendedLevel": N}] or omit,`);
@@ -416,7 +428,7 @@ function buildSystemPrompt(state: GameState, worldBrief: string): string {
 	parts.push(`}`);
 	parts.push('');
 	parts.push(`=== CRITICAL RULES ===`);
-	parts.push(`IMPORTANT: For every "characterId" field, output ONLY the bare ID string that appears inside the brackets in the PARTY section — e.g. if the party entry reads "Alice[01ABC123]" then characterId must be "01ABC123", NOT "Alice[01ABC123]" and NOT "Alice". Never use a character's name, a name+bracket token, or any invented string as a characterId.`);
+	parts.push(`IMPORTANT: For every "characterId" field, output ONLY the bare ID string from the [id: ...] field in the PARTY section — e.g. if the party entry reads "[name: Alice][id: 01ABC123]" then characterId must be "01ABC123", NOT "Alice" and NOT the full token string. Never use a character's name or any invented string as a characterId.`);
 	parts.push(`- Every NPC you mention by name for the FIRST TIME must be tracked via npcsAdded. Do not introduce named NPCs only in narrative.`);
 	parts.push(`- Every item gained or lost MUST appear in the correct stateChanges field(s). Do not mention acquiring or losing items only in narrative.`);
 	parts.push(`- ITEM DROP/PICKUP RULES: Use itemsDropped (with itemId from inventory) when a character sets an item down — it lands at the current location shown as "On the ground" next turn. Use itemsPickedUp (with the exact itemId shown in "On the ground") when recovering a dropped item — this restores the ORIGINAL item id intact. Use itemsLost only for consumed/sold/stolen/destroyed items. Use itemsGained only for truly new items (purchases, loot, rewards). Use locationItemsAdded to place new items at any location (chest unlocked, enemy killed, GM loot).`);
@@ -498,16 +510,16 @@ export function buildStateExtractionPrompt(state: GameState): string {
 	parts.push(`{`);
 	parts.push(`  "stateChanges": {`);
 	parts.push(`    "hpChanges": [{"characterId": "exact-id", "oldHp": N, "newHp": N, "reason": "..."}] or omit,`);
-	parts.push(`    "itemsGained": [{"characterId": "exact-id-from-CHARACTERS-brackets", "item": {"id": "item-<unique>", "name": "...", "category": "weapon|armor|consumable|quest|misc", "description": "...", "value": N, "quantity": N}}] or omit,`);
-	parts.push(`    "itemsLost": [{"characterId": "exact-id-from-CHARACTERS-brackets", "itemId": "exact-item-id", "quantity": N}] or omit,`);
-	parts.push(`    "itemsDropped": [{"characterId": "exact-id-from-CHARACTERS-brackets", "itemId": "exact-item-id-from-inventory"}] or omit,`);
-	parts.push(`    "itemsPickedUp": [{"characterId": "exact-id-from-CHARACTERS-brackets", "itemId": "exact-item-id-from-ground"}] or omit,`);
-	parts.push(`    "locationItemsAdded": [{"locationId": "...", "item": {"id": "item-<unique>", "name": "...", "category": "...", "description": "...", "value": N, "quantity": N}}] or omit,`);
-	parts.push(`    "locationChange": {"from": "current-loc-id-or-null", "to": "destination-loc-id"} or omit,`);
-	parts.push(`    "npcChanges": [{"npcId": "...", "field": "disposition|alive|hp|notes", "oldValue": X, "newValue": Y}] or omit,`);
-	parts.push(`    "questUpdates": [{"questId": "...", "field": "status|objective", ...}] or omit,`);
-	parts.push(`    "conditionsApplied": [{"characterId": "exact-id-from-CHARACTERS-brackets", "condition": "blinded|charmed|deafened|frightened|grappled|incapacitated|invisible|paralyzed|petrified|poisoned|prone|restrained|stunned|unconscious|exhaustion", "applied": true|false}] or omit,`);
-	parts.push(`    "xpAwarded": [{"characterId": "exact-id-from-CHARACTERS-brackets", "amount": N}] or omit,`);
+	parts.push(`    "itemsGained": [{"characterId": "exact-id-from-CHARACTERS-id-field", "item": {"id": "item-<unique>", "name": "...", "category": "weapon|armor|consumable|quest|misc", "description": "...", "value": N, "quantity": N}}] or omit,`);
+	parts.push(`    "itemsLost": [{"characterId": "exact-id-from-CHARACTERS-id-field", "itemId": "exact-item-id", "quantity": N}] or omit,`);
+	parts.push(`    "itemsDropped": [{"characterId": "exact-id-from-CHARACTERS-id-field", "itemId": "exact-item-id-from-inventory"}] or omit,`);
+	parts.push(`    "itemsPickedUp": [{"characterId": "exact-id-from-CHARACTERS-id-field", "itemId": "exact-item-id-from-ground"}] or omit,`);
+	parts.push(`    "locationItemsAdded": [{"locationId": "exact-location-id-from-visible-[id:-field]", "item": {"id": "item-<unique>", "name": "...", "category": "...", "description": "...", "value": N, "quantity": N}}] or omit,`);
+	parts.push(`    "locationChange": {"from": "exact-current-location-id-or-null", "to": "exact-destination-location-id"} or omit,`);
+	parts.push(`    "npcChanges": [{"npcId": "exact-id-from-visible-[id:-field]", "field": "disposition|alive|hp|notes", "oldValue": X, "newValue": Y}] or omit,`);
+	parts.push(`    "questUpdates": [{"questId": "exact-id-from-visible-[id:-field]", "field": "status|objective", ...}] or omit,`);
+	parts.push(`    "conditionsApplied": [{"characterId": "exact-id-from-CHARACTERS-id-field", "condition": "blinded|charmed|deafened|frightened|grappled|incapacitated|invisible|paralyzed|petrified|poisoned|prone|restrained|stunned|unconscious|exhaustion", "applied": true|false}] or omit,`);
+	parts.push(`    "xpAwarded": [{"characterId": "exact-id-from-CHARACTERS-id-field", "amount": N}] or omit,`);
 	parts.push(`    "npcsAdded": [{"id": "npc-<unique>", "name": "...", "role": "merchant|quest-giver|hostile|neutral|ally|companion|boss", "locationId": "...", "disposition": 0, "description": "..."}] or omit,`);
 	parts.push(`    "locationsAdded": [{"id": "loc-<unique>", "name": "...", "type": "settlement|wilderness|dungeon|interior|road", "description": "...", "connections": ["existing-loc-id"], "features": ["..."], "groundItems": [{"id": "item-<unique>", "name": "...", "category": "...", "description": "...", "value": N, "quantity": N}]}] or omit,`);
 	parts.push(`    "questsAdded": [{"id": "quest-<unique>", "name": "...", "description": "...", "giverNpcId": "npc-id-or-null", "objectives": [{"id": "obj-<unique>", "text": "..."}], "recommendedLevel": N}] or omit,`);
@@ -531,9 +543,9 @@ export function buildStateExtractionPrompt(state: GameState): string {
 	if (state.characters.length > 0) {
 		parts.push(`CHARACTERS:`);
 		for (const c of state.characters) {
-			const items = c.inventory.map((i) => `${i.name}[${i.id}]`).join(', ');
+			const items = c.inventory.map((i) => formatNameIdRef(i.name, i.id)).join(', ');
 			const itemStr = items ? ` | Inventory: ${items}` : '';
-			parts.push(`- ${c.name}[${c.id}]: Lv${c.level} ${c.race}, HP ${c.hp}/${c.maxHp}, AC ${c.ac}, XP ${c.xp}, Gold ${c.gold}${itemStr}`);
+			parts.push(`- ${formatNameIdRef(c.name, c.id)}: Lv${c.level} ${c.race}, HP ${c.hp}/${c.maxHp}, AC ${c.ac}, XP ${c.xp}, Gold ${c.gold}${itemStr}`);
 		}
 		parts.push('');
 	}
@@ -543,7 +555,9 @@ export function buildStateExtractionPrompt(state: GameState): string {
 		parts.push(`NPCs:`);
 		for (const n of state.npcs.filter((n) => n.alive && !n.archived)) {
 			const hp = n.statBlock ? ` HP ${n.statBlock.hp}/${n.statBlock.maxHp}` : '';
-			parts.push(`- ${n.name}[${n.id}] (${n.role}, disposition ${n.disposition})${hp} at ${n.locationId}`);
+			const loc = state.locations.find((l) => l.id === n.locationId);
+			const locStr = loc ? formatNameIdRef(loc.name, loc.id) : `locationId: ${n.locationId}`;
+			parts.push(`- ${formatNameIdRef(n.name, n.id)} (${n.role}, disposition ${n.disposition})${hp} at ${locStr}`);
 		}
 		parts.push('');
 	}
@@ -552,12 +566,16 @@ export function buildStateExtractionPrompt(state: GameState): string {
 	if (state.locations.length > 0) {
 		parts.push(`LOCATIONS:`);
 		for (const l of state.locations) {
-			const conns = l.connections.join(', ');
+			const conns = l.connections
+				.map((cid) => state.locations.find((x) => x.id === cid))
+				.filter(Boolean)
+				.map((x) => formatNameIdRef(x!.name, x!.id))
+				.join(', ');
 			const connStr = conns ? ` → ${conns}` : '';
 			const groundStr = l.groundItems && l.groundItems.length > 0
-				? ` | On ground: ${l.groundItems.map((i) => `${i.name}[${i.id}]`).join(', ')}`
+				? ` | On ground: ${l.groundItems.map((i) => formatNameIdRef(i.name, i.id)).join(', ')}`
 				: '';
-			parts.push(`- ${l.name}[${l.id}] (${l.type})${connStr}${groundStr}`);
+			parts.push(`- ${formatNameIdRef(l.name, l.id)} (${l.type})${connStr}${groundStr}`);
 		}
 		parts.push('');
 	}
@@ -566,8 +584,8 @@ export function buildStateExtractionPrompt(state: GameState): string {
 	if (state.quests.length > 0) {
 		parts.push(`QUESTS:`);
 		for (const q of state.quests) {
-			const objs = q.objectives.map((o) => `${o.done ? '[x]' : '[ ]'} ${o.text}[${o.id}]`).join('; ');
-			parts.push(`- ${q.name}[${q.id}] [${q.status}]: ${objs}`);
+			const objs = q.objectives.map((o) => formatObjectiveRef(o.text, o.id, o.done)).join('; ');
+			parts.push(`- ${formatNameIdRef(q.name, q.id)} (status: ${q.status}): ${objs}`);
 		}
 		parts.push('');
 	}
@@ -576,14 +594,15 @@ export function buildStateExtractionPrompt(state: GameState): string {
 	if (state.activeEncounter && state.activeEncounter.status === 'active') {
 		parts.push(`ACTIVE ENCOUNTER (Round ${state.activeEncounter.round}):`);
 		for (const cmb of state.activeEncounter.combatants) {
-			const tag = cmb.defeated ? ' [DEFEATED]' : '';
+			const tag = cmb.defeated ? ' (defeated: yes)' : '';
 			parts.push(`- ${cmb.name} (${cmb.type}): ${cmb.currentHp}/${cmb.maxHp} HP, AC ${cmb.ac}${tag}`);
 		}
 		parts.push('');
 	}
 
 	// Current location
-	parts.push(`PARTY LOCATION: ${state.partyLocationId ?? 'unknown'}`);
+	const partyLoc = state.locations.find((l) => l.id === state.partyLocationId);
+	parts.push(`PARTY LOCATION: ${partyLoc ? formatNameIdRef(partyLoc.name, partyLoc.id) : state.partyLocationId ?? 'unknown'}`);
 	parts.push(`TIME: Day ${state.clock.day}, ${state.clock.timeOfDay}, Weather: ${state.clock.weather}`);
 	parts.push('');
 
@@ -630,11 +649,11 @@ export function assembleStateExtractionContext(
 
 function formatCharacterBrief(c: PlayerCharacter): string {
 	const hpStr = `${c.hp}/${c.maxHp} HP`;
-	const conditions = c.conditions.length > 0 ? ` [${c.conditions.join(', ')}]` : '';
+	const conditions = c.conditions.length > 0 ? ` | Conditions: ${c.conditions.join(', ')}` : '';
 	const notableItems = c.inventory
 		.filter((i) => i.category === 'weapon' || i.category === 'armor' || i.category === 'quest' || i.category === 'consumable')
 		.slice(0, 8)
-		.map((i) => `${i.name}[${i.id}]`);
+		.map((i) => formatNameIdRef(i.name, i.id));
 	const itemStr = notableItems.length > 0 ? ` | Gear: ${notableItems.join(', ')}` : '';
 
 	const classDesc = c.classes.length > 1
@@ -660,7 +679,7 @@ function formatCharacterBrief(c: PlayerCharacter): string {
 		? ` | Pact: ${c.pactSlots.map((s) => `L${s.level}:${s.current}/${s.max}`).join(' ')}`
 		: '';
 
-	return `- ${c.name}[${c.id}] (Lv${c.level} ${c.race} ${classDesc}) — ${hpStr}${conditions} | AC ${c.ac}${itemStr}${spellStr}${slotStr}${pactStr}`;
+	return `- ${formatNameIdRef(c.name, c.id)} (Lv${c.level} ${c.race} ${classDesc}) — ${hpStr}${conditions} | AC ${c.ac}${itemStr}${spellStr}${slotStr}${pactStr}`;
 }
 
 // ---------------------------------------------------------------------------

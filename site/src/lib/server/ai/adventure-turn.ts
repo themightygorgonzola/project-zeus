@@ -1082,22 +1082,84 @@ export function parseStateExtractionResponse(raw: string): StateChange {
 // Schema validation — sanitize AI-produced stateChanges before application
 // ---------------------------------------------------------------------------
 
-/**
- * Strips a "Name[id]" display token to just the bare id.
- * The AI sometimes copies the full party-section token (e.g. "555[01KM...]") instead
- * of extracting only the bracketed ID portion.
- */
-function resolveCharacterId(raw: string, characters: GameState['characters']): string {
-	// Strip "name[id]" → "id"
-	const m = raw.match(/\[([^\]]+)\]$/);
-	const normalized = m ? m[1] : raw;
-	// If normalized is already a known character id, return it
-	if (characters.find((c) => c.id === normalized)) return normalized;
-	// Fallback: try to match by character name (AI sometimes emits bare name)
-	const byName = characters.find((c) => c.name === normalized || c.name === raw);
-	if (byName) {
-		console.warn(`[resolveCharacterId] resolved character name "${raw}" → id "${byName.id}"`);
-		return byName.id;
+type RefCandidate = { id: string; name?: string };
+
+function collectRefCandidates(values: unknown[] | undefined): RefCandidate[] {
+	if (!Array.isArray(values)) return [];
+	return values
+		.filter((value): value is { id: string; name?: string } => !!value && typeof value === 'object' && typeof (value as { id?: unknown }).id === 'string')
+		.map((value) => ({
+			id: value.id,
+			name: typeof value.name === 'string' ? value.name : undefined
+		}));
+}
+
+function extractProtocolId(raw: string): string {
+	const trimmed = raw.trim();
+	const labeledId = trimmed.match(/\[(?:[^:\]]+\s+)?id:\s*([^\]]+)\]/i);
+	if (labeledId) return labeledId[1].trim();
+	const inlineId = trimmed.match(/\b(?:[a-z]+)?id\s*[:=]\s*([A-Za-z0-9_-]+)/i);
+	if (inlineId) return inlineId[1].trim();
+	const legacyBracket = trimmed.match(/\[([^\]]+)\]$/);
+	if (legacyBracket) return legacyBracket[1].trim();
+	return trimmed;
+}
+
+function normalizeLookupValue(raw: string): string {
+	return raw
+		.toLowerCase()
+		.replace(/\[(?:[^:\]]+\s+)?id:\s*[^\]]+\]/gi, ' ')
+		.replace(/\[name:\s*([^\]]+)\]/gi, '$1')
+		.replace(/[\[\]\(\){}|,:"'`]/g, ' ')
+		.replace(/\s+/g, ' ')
+		.trim();
+}
+
+function resolveEntityId(
+	raw: string,
+	entities: RefCandidate[],
+	label: string,
+	allowNameFallback = true
+): string {
+	const normalized = extractProtocolId(raw);
+	if (entities.find((entity) => entity.id === normalized)) return normalized;
+	if (!allowNameFallback) return normalized;
+
+	const normalizedRaw = normalizeLookupValue(raw);
+	const normalizedToken = normalizeLookupValue(normalized);
+	const matches = entities.filter((entity) => {
+		if (!entity.name) return false;
+		const entityName = normalizeLookupValue(entity.name);
+		return entityName === normalizedRaw || entityName === normalizedToken;
+	});
+
+	if (matches.length === 1) {
+		console.warn(`[sanitize] resolved ${label} name/token "${raw}" → id "${matches[0].id}"`);
+		return matches[0].id;
+	}
+	if (matches.length > 1) {
+		console.warn(`[sanitize] ${label}="${raw}" matched multiple entities by name — left unresolved`);
+	}
+	return normalized;
+}
+
+function resolveObjectiveId(raw: string, objectives: Array<{ id: string; text: string }>, label: string): string {
+	const normalized = extractProtocolId(raw);
+	if (objectives.find((objective) => objective.id === normalized)) return normalized;
+
+	const normalizedRaw = normalizeLookupValue(raw);
+	const normalizedToken = normalizeLookupValue(normalized);
+	const matches = objectives.filter((objective) => {
+		const text = normalizeLookupValue(objective.text);
+		return text === normalizedRaw || text === normalizedToken;
+	});
+
+	if (matches.length === 1) {
+		console.warn(`[sanitize] resolved ${label} text/token "${raw}" → objectiveId "${matches[0].id}"`);
+		return matches[0].id;
+	}
+	if (matches.length > 1) {
+		console.warn(`[sanitize] ${label}="${raw}" matched multiple objectives by text — left unresolved`);
 	}
 	return normalized;
 }
@@ -1109,6 +1171,18 @@ function resolveCharacterId(raw: string, characters: GameState['characters']): s
  */
 export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativeText?: string): StateChange {
 	const clean: StateChange = {};
+	const locationRefs = [
+		...state.locations.map((location) => ({ id: location.id, name: location.name })),
+		...collectRefCandidates(sc.locationsAdded)
+	];
+	const npcRefs = [
+		...state.npcs.map((npc) => ({ id: npc.id, name: npc.name })),
+		...collectRefCandidates(sc.npcsAdded)
+	];
+	const questRefs = [
+		...state.quests.map((quest) => ({ id: quest.id, name: quest.name })),
+		...collectRefCandidates(sc.questsAdded)
+	];
 
 	// --- hpChanges ---
 	if (sc.hpChanges) {
@@ -1124,7 +1198,7 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] hpChanges[${i}].characterId is not a non-empty string — stripped`);
 					return false;
 				}
-				hc.characterId = resolveCharacterId(hc.characterId, state.characters);
+				hc.characterId = resolveEntityId(hc.characterId, state.characters, `hpChanges[${i}].characterId`);
 				if (typeof hc.newHp !== 'number' || !isFinite(hc.newHp)) {
 					console.warn(`[sanitize] hpChanges[${i}].newHp is not a finite number — stripped`);
 					return false;
@@ -1162,7 +1236,7 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] conditionsApplied[${i}].characterId is not a non-empty string — stripped`);
 					return false;
 				}
-				ca.characterId = resolveCharacterId(ca.characterId, state.characters);
+				ca.characterId = resolveEntityId(ca.characterId, state.characters, `conditionsApplied[${i}].characterId`);
 				if (!validConditions.has(ca.condition)) {
 					console.warn(`[sanitize] conditionsApplied[${i}].condition="${ca.condition}" is not a valid condition — stripped`);
 					return false;
@@ -1190,7 +1264,7 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] xpAwarded[${i}].characterId is not a non-empty string — stripped`);
 					return false;
 				}
-				xp.characterId = resolveCharacterId(xp.characterId, state.characters);
+				xp.characterId = resolveEntityId(xp.characterId, state.characters, `xpAwarded[${i}].characterId`);
 				if (typeof xp.amount !== 'number' || !isFinite(xp.amount) || xp.amount < 0) {
 					console.warn(`[sanitize] xpAwarded[${i}].amount=${xp.amount} is not a valid positive number — stripped`);
 					return false;
@@ -1208,6 +1282,10 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 		} else if (typeof sc.locationChange.to !== 'string' || !sc.locationChange.to) {
 			console.warn('[sanitize] locationChange.to is not a non-empty string — stripped');
 		} else {
+			sc.locationChange.to = resolveEntityId(sc.locationChange.to, locationRefs, 'locationChange.to');
+			if (typeof sc.locationChange.from === 'string' && sc.locationChange.from) {
+				sc.locationChange.from = resolveEntityId(sc.locationChange.from, locationRefs, 'locationChange.from');
+			}
 			clean.locationChange = sc.locationChange;
 		}
 	}
@@ -1217,6 +1295,8 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 		if (!Array.isArray(sc.questUpdates)) {
 			console.warn('[sanitize] questUpdates is not an array — stripped');
 		} else {
+			const validQuestFields = new Set(['status', 'objective']);
+			const validQuestStatuses = new Set(['available', 'active', 'completed', 'failed']);
 			clean.questUpdates = sc.questUpdates.filter((qu, i) => {
 				if (!qu || typeof qu !== 'object') {
 					console.warn(`[sanitize] questUpdates[${i}] is not an object — stripped`);
@@ -1226,9 +1306,40 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] questUpdates[${i}].questId is not a non-empty string — stripped`);
 					return false;
 				}
+				qu.questId = resolveEntityId(qu.questId, questRefs, `questUpdates[${i}].questId`);
 				if (typeof qu.field !== 'string' || !qu.field) {
 					console.warn(`[sanitize] questUpdates[${i}].field is not a non-empty string — stripped`);
 					return false;
+				}
+				if (!validQuestFields.has(qu.field)) {
+					console.warn(`[sanitize] questUpdates[${i}].field="${qu.field}" is invalid — stripped`);
+					return false;
+				}
+				const existingQuest = state.quests.find((q) => q.id === qu.questId);
+				const objectiveDefs = existingQuest?.objectives ?? sc.questsAdded?.find((q) => q.id === qu.questId)?.objectives ?? [];
+				if (qu.field === 'status') {
+					if (typeof qu.newValue !== 'string' || !validQuestStatuses.has(qu.newValue)) {
+						console.warn(`[sanitize] questUpdates[${i}].newValue="${String(qu.newValue)}" is not a valid quest status — stripped`);
+						return false;
+					}
+					if (typeof qu.oldValue !== 'string' && existingQuest) {
+						qu.oldValue = existingQuest.status;
+					}
+				}
+				if (qu.field === 'objective') {
+					if (typeof qu.objectiveId !== 'string' || !qu.objectiveId) {
+						console.warn(`[sanitize] questUpdates[${i}].objectiveId is not a non-empty string — stripped`);
+						return false;
+					}
+					qu.objectiveId = resolveObjectiveId(qu.objectiveId, objectiveDefs, `questUpdates[${i}].objectiveId`);
+					if (!objectiveDefs.find((objective) => objective.id === qu.objectiveId)) {
+						console.warn(`[sanitize] questUpdates[${i}].objectiveId="${qu.objectiveId}" is unknown for quest "${qu.questId}" — stripped`);
+						return false;
+					}
+					if (typeof qu.oldValue !== 'boolean') {
+						qu.oldValue = existingQuest?.objectives.find((objective) => objective.id === qu.objectiveId)?.done ?? false;
+					}
+					qu.newValue = !!qu.newValue;
 				}
 				return true;
 			});
@@ -1241,6 +1352,7 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 		if (!Array.isArray(sc.npcChanges)) {
 			console.warn('[sanitize] npcChanges is not an array — stripped');
 		} else {
+			const validNpcFields = new Set(['disposition', 'alive', 'hp', 'notes']);
 			clean.npcChanges = sc.npcChanges.filter((nc, i) => {
 				if (!nc || typeof nc !== 'object') {
 					console.warn(`[sanitize] npcChanges[${i}] is not an object — stripped`);
@@ -1250,9 +1362,33 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] npcChanges[${i}].npcId is not a non-empty string — stripped`);
 					return false;
 				}
+				nc.npcId = resolveEntityId(nc.npcId, npcRefs, `npcChanges[${i}].npcId`);
 				if (typeof nc.field !== 'string' || !nc.field) {
 					console.warn(`[sanitize] npcChanges[${i}].field is not a non-empty string — stripped`);
 					return false;
+				}
+				if (!validNpcFields.has(nc.field)) {
+					console.warn(`[sanitize] npcChanges[${i}].field="${nc.field}" is invalid — stripped`);
+					return false;
+				}
+				if (nc.field === 'disposition' && (typeof nc.newValue !== 'number' || !isFinite(nc.newValue))) {
+					console.warn(`[sanitize] npcChanges[${i}].newValue for disposition is invalid — stripped`);
+					return false;
+				}
+				if (nc.field === 'alive' && typeof nc.newValue !== 'boolean') {
+					console.warn(`[sanitize] npcChanges[${i}].newValue for alive must be boolean — stripped`);
+					return false;
+				}
+				if (nc.field === 'hp' && (typeof nc.newValue !== 'number' || !isFinite(nc.newValue))) {
+					console.warn(`[sanitize] npcChanges[${i}].newValue for hp must be a finite number — stripped`);
+					return false;
+				}
+				if (nc.field === 'notes') {
+					if (typeof nc.newValue !== 'string' || !nc.newValue.trim()) {
+						console.warn(`[sanitize] npcChanges[${i}].newValue for notes must be a non-empty string — stripped`);
+						return false;
+					}
+					nc.newValue = nc.newValue.trim();
 				}
 				return true;
 			});
@@ -1274,7 +1410,7 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] itemsGained[${i}].characterId is not a non-empty string — stripped`);
 					return false;
 				}
-				ig.characterId = resolveCharacterId(ig.characterId, state.characters);
+				ig.characterId = resolveEntityId(ig.characterId, state.characters, `itemsGained[${i}].characterId`);
 				if (!ig.item || typeof ig.item !== 'object') {
 					console.warn(`[sanitize] itemsGained[${i}].item is not an object — stripped`);
 					return false;
@@ -1313,10 +1449,14 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] itemsLost[${i}].characterId is not a non-empty string — stripped`);
 					return false;
 				}
-				il.characterId = resolveCharacterId(il.characterId, state.characters);
+				il.characterId = resolveEntityId(il.characterId, state.characters, `itemsLost[${i}].characterId`);
 				if (typeof il.itemId !== 'string' || !il.itemId) {
 					console.warn(`[sanitize] itemsLost[${i}].itemId is not a non-empty string — stripped`);
 					return false;
+				}
+				const char = state.characters.find((c) => c.id === il.characterId);
+				if (char) {
+					il.itemId = resolveEntityId(il.itemId, char.inventory.map((item) => ({ id: item.id, name: item.name })), `itemsLost[${i}].itemId`);
 				}
 				if (typeof il.quantity !== 'number' || il.quantity < 1) {
 					il.quantity = 1;
@@ -1341,10 +1481,17 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] itemsDropped[${i}].characterId is not a non-empty string — stripped`);
 					return false;
 				}
-				dr.characterId = resolveCharacterId(dr.characterId, state.characters);
+				dr.characterId = resolveEntityId(dr.characterId, state.characters, `itemsDropped[${i}].characterId`);
 				if (typeof dr.itemId !== 'string' || !dr.itemId) {
 					console.warn(`[sanitize] itemsDropped[${i}].itemId is not a non-empty string — stripped`);
 					return false;
+				}
+				const char = state.characters.find((c) => c.id === dr.characterId);
+				if (char) {
+					dr.itemId = resolveEntityId(dr.itemId, char.inventory.map((item) => ({ id: item.id, name: item.name })), `itemsDropped[${i}].itemId`);
+				}
+				if (typeof dr.locationId === 'string' && dr.locationId) {
+					dr.locationId = resolveEntityId(dr.locationId, locationRefs, `itemsDropped[${i}].locationId`);
 				}
 				return true;
 			});
@@ -1366,10 +1513,18 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] itemsPickedUp[${i}].characterId is not a non-empty string — stripped`);
 					return false;
 				}
-				pu.characterId = resolveCharacterId(pu.characterId, state.characters);
+				pu.characterId = resolveEntityId(pu.characterId, state.characters, `itemsPickedUp[${i}].characterId`);
 				if (typeof pu.itemId !== 'string' || !pu.itemId) {
 					console.warn(`[sanitize] itemsPickedUp[${i}].itemId is not a non-empty string — stripped`);
 					return false;
+				}
+				if (typeof pu.locationId === 'string' && pu.locationId) {
+					pu.locationId = resolveEntityId(pu.locationId, locationRefs, `itemsPickedUp[${i}].locationId`);
+				}
+				const targetLocId = pu.locationId ?? state.partyLocationId;
+				const targetLoc = state.locations.find((location) => location.id === targetLocId);
+				if (targetLoc?.groundItems) {
+					pu.itemId = resolveEntityId(pu.itemId, targetLoc.groundItems.map((item) => ({ id: item.id, name: item.name })), `itemsPickedUp[${i}].itemId`);
 				}
 				return true;
 			});
@@ -1391,6 +1546,7 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] locationItemsAdded[${i}].locationId is not a non-empty string — stripped`);
 					return false;
 				}
+				la.locationId = resolveEntityId(la.locationId, locationRefs, `locationItemsAdded[${i}].locationId`);
 				if (!la.item || typeof la.item !== 'object') {
 					console.warn(`[sanitize] locationItemsAdded[${i}].item is not an object — stripped`);
 					return false;
@@ -1497,6 +1653,8 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 				}
 				if (typeof npc.locationId !== 'string') {
 					npc.locationId = state.partyLocationId ?? '';
+				} else if (npc.locationId) {
+					npc.locationId = resolveEntityId(npc.locationId, locationRefs, `npcsAdded[${i}].locationId`);
 				}
 				if (typeof npc.disposition !== 'number') npc.disposition = 0;
 				if (typeof npc.description !== 'string') npc.description = npc.name;
@@ -1523,6 +1681,13 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					loc.type = 'interior' as LocationType;
 				}
 				if (typeof loc.description !== 'string') loc.description = loc.name;
+				if (!Array.isArray(loc.connections)) {
+					loc.connections = [];
+				} else {
+					loc.connections = loc.connections
+						.filter((connectionId): connectionId is string => typeof connectionId === 'string' && !!connectionId)
+						.map((connectionId) => resolveEntityId(connectionId, locationRefs, `locationsAdded[${i}].connections[]`));
+				}
 				return true;
 			});
 			if (clean.locationsAdded.length === 0) delete clean.locationsAdded;
@@ -1542,6 +1707,9 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					return false;
 				}
 				if (typeof q.description !== 'string') q.description = q.name;
+				if (typeof q.giverNpcId === 'string' && q.giverNpcId) {
+					q.giverNpcId = resolveEntityId(q.giverNpcId, npcRefs, `questsAdded[${i}].giverNpcId`);
+				}
 				if (!Array.isArray(q.objectives)) q.objectives = [];
 				return true;
 			});
