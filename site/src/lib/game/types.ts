@@ -382,13 +382,45 @@ export interface CharacterFeatureRef {
 	name: string;
 	level: number;
 	source?: 'class' | 'subclass' | 'race' | 'background' | 'feat' | 'other';
+	/** Which class granted this feature (for multiclass tracking). */
+	sourceClass?: ClassName;
 	description?: string;
+	/** Maximum uses before a rest, if limited. */
+	maxUses?: number;
+	/** Current remaining uses. */
+	currentUses?: number;
+	/** When this feature's uses recover. */
+	recoversOn?: 'short-rest' | 'long-rest' | 'dawn';
 }
 
 export interface SpellSlotPool {
 	level: number;
 	current: number;
 	max: number;
+}
+
+// ---------------------------------------------------------------------------
+// Multiclass structures
+// ---------------------------------------------------------------------------
+
+/** Per-class level entry. The canonical source of truth for class progression. */
+export interface ClassLevel {
+	name: ClassName;
+	level: number;
+	subclass?: string;
+	/** Hit dice remaining for this class's die size. */
+	hitDiceRemaining: number;
+}
+
+/** Spells owned by a specific class, with that class's casting ability. */
+export interface ClassSpellList {
+	className: ClassName;
+	spellcastingAbility: AbilityName;
+	cantrips: string[];
+	/** For known-casters (bard, sorcerer, warlock, ranger): fixed spell list. */
+	knownSpells: string[];
+	/** For prepared-casters (cleric, druid, wizard, paladin): currently prepared spells. */
+	preparedSpells: string[];
 }
 
 export interface DeathSaves {
@@ -409,11 +441,12 @@ export interface PlayerCharacter {
 
 	name: string;
 	race: RaceName;
-	class: ClassName;
+	/** All class levels. Primary class is classes[0]. Source of truth for per-class data. */
+	classes: ClassLevel[];
 	subrace?: string;
-	subclass?: string;
 	background?: string;
 	alignment?: Alignment;
+	/** Total character level. Always = sum of classes[].level. */
 	level: number;
 
 	abilities: AbilityScores;
@@ -427,6 +460,8 @@ export interface PlayerCharacter {
 	proficiencyBonus: number;
 	/** Skill proficiency list. */
 	skillProficiencies: SkillName[];
+	/** Skills with expertise (double proficiency bonus). */
+	expertiseSkills: SkillName[];
 	/** Saving-throw proficiency list (typically two abilities from class). */
 	saveProficiencies: AbilityName[];
 	languages: string[];
@@ -435,12 +470,14 @@ export interface PlayerCharacter {
 	toolProficiencies: string[];
 	classFeatures: CharacterFeatureRef[];
 	feats: string[];
-	spellcastingAbility?: AbilityName;
+	/** Standard (non-pact) spell slots. For multiclass, computed from effective caster level. */
 	spellSlots: SpellSlotPool[];
-	knownSpells: string[];
-	preparedSpells: string[];
-	cantrips: string[];
-	hitDiceRemaining: number;
+	/** Warlock pact magic slots (separate pool, refreshes on short rest). */
+	pactSlots: SpellSlotPool[];
+	/** Per-class spell ownership. */
+	classSpells: ClassSpellList[];
+	/** The spell the character is currently concentrating on, or null. */
+	concentratingOn: string | null;
 	deathSaves: DeathSaves;
 	inspiration: boolean;
 	passivePerception: number;
@@ -450,15 +487,97 @@ export interface PlayerCharacter {
 	xp: number;
 
 	conditions: Condition[];
+	/** Damage type resistances from race, class, or items (e.g. 'fire', 'poison'). */
+	resistances: string[];
+	/** 0 = none, 1-6 per the 5e exhaustion table. Level 6 = death. */
+	exhaustionLevel: number;
+	/** True when stabilized at 0 HP (3 death save successes). */
+	stable: boolean;
+	/** True when the character has died (3 death save failures, massive damage, or exhaustion 6). */
+	dead: boolean;
+	/** Runtime tracker for limited-use features (keyed by feature name). */
+	featureUses: Record<string, { current: number; max: number; recoversOn: 'short-rest' | 'long-rest' | 'dawn' }>;
+	/** Item IDs the character is attuned to (max 3 in 5e). */
+	attunedItems: GameId[];
 	/** Free-form backstory / notes. */
 	backstory: string;
+}
+
+// ---------------------------------------------------------------------------
+// Multiclass convenience helpers
+// ---------------------------------------------------------------------------
+
+/** Returns the primary (first) class name, or 'fighter' as fallback. */
+export function getPrimaryClass(pc: PlayerCharacter): ClassName {
+	return pc.classes[0]?.name ?? 'fighter';
+}
+
+/** Returns the primary class's subclass, if any. */
+export function getPrimarySubclass(pc: PlayerCharacter): string | undefined {
+	return pc.classes[0]?.subclass;
+}
+
+/** Whether the character has at least one level in the given class. */
+export function hasClass(pc: PlayerCharacter, className: ClassName): boolean {
+	return pc.classes.some((c) => c.name === className);
+}
+
+/** Returns the ClassLevel entry for a given class, or undefined if not present. */
+export function getClassEntry(pc: PlayerCharacter, className: ClassName): ClassLevel | undefined {
+	return pc.classes.find((c) => c.name === className);
+}
+
+/** Returns the level in a specific class, or 0 if no levels. */
+export function getClassLevelNum(pc: PlayerCharacter, className: ClassName): number {
+	return pc.classes.find((c) => c.name === className)?.level ?? 0;
+}
+
+/** All known spells across all class spell lists (de-duplicated). */
+export function getAllKnownSpells(pc: PlayerCharacter): string[] {
+	const all = pc.classSpells.flatMap((cs) => cs.knownSpells);
+	return [...new Set(all)];
+}
+
+/** All prepared spells across all class spell lists (de-duplicated). */
+export function getAllPreparedSpells(pc: PlayerCharacter): string[] {
+	const all = pc.classSpells.flatMap((cs) => cs.preparedSpells);
+	return [...new Set(all)];
+}
+
+/** All cantrips across all class spell lists (de-duplicated). */
+export function getAllCantrips(pc: PlayerCharacter): string[] {
+	const all = pc.classSpells.flatMap((cs) => cs.cantrips);
+	return [...new Set(all)];
+}
+
+/** Returns the primary class's spellcasting ability, or undefined for non-casters. */
+export function getPrimarySpellcastingAbility(pc: PlayerCharacter): AbilityName | undefined {
+	return pc.classSpells[0]?.spellcastingAbility;
+}
+
+/** Total hit dice remaining across all classes. */
+export function getTotalHitDiceRemaining(pc: PlayerCharacter): number {
+	return pc.classes.reduce((sum, c) => sum + c.hitDiceRemaining, 0);
+}
+
+/** Hit dice remaining for a specific class. */
+export function getHitDiceForClass(pc: PlayerCharacter, className: ClassName): number {
+	return pc.classes.find((c) => c.name === className)?.hitDiceRemaining ?? 0;
+}
+
+/**
+ * Build a ClassSpellList for a class if it has spellcasting.
+ * Returns null for non-casters.
+ */
+export function getClassSpellEntry(pc: PlayerCharacter, className: ClassName): ClassSpellList | undefined {
+	return pc.classSpells.find((cs) => cs.className === className);
 }
 
 // ---------------------------------------------------------------------------
 // NPCs
 // ---------------------------------------------------------------------------
 
-export type NpcRole = 'merchant' | 'quest-giver' | 'hostile' | 'neutral' | 'ally' | 'boss';
+export type NpcRole = 'merchant' | 'quest-giver' | 'hostile' | 'neutral' | 'ally' | 'companion' | 'boss';
 
 export interface CreatureAttack {
 	name: string;
@@ -509,6 +628,11 @@ export interface CreatureStatBlock {
 	legendaryActions: CreatureAction[];
 }
 
+export interface NpcInteractionNote {
+	turn: number;
+	note: string;
+}
+
 export interface NPC {
 	id: GameId;
 	name: string;
@@ -521,6 +645,12 @@ export interface NPC {
 	notes: string;
 	alive: boolean;
 	statBlock?: CreatureStatBlock;
+	/** Turn number of the most recent interaction (state change, narrative mention, or creation). */
+	lastInteractionTurn?: number;
+	/** Timestamped interaction history — auto-routed from scene facts + explicit GM notes. */
+	interactionNotes?: NpcInteractionNote[];
+	/** When true, NPC is excluded from prompt context but preserved in state for history. */
+	archived?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -606,9 +736,12 @@ export type IntentType =
 	| 'attack'
 	| 'talk'
 	| 'use-item'
+	| 'equip-item'
+	| 'drop-item'
 	| 'cast-spell'
 	| 'examine'
 	| 'rest'
+	| 'death-save'
 	| 'free-narration'
 	| 'out-of-character'
 	| 'unknown';
@@ -627,6 +760,64 @@ export interface MechanicResult {
 	success?: boolean;
 }
 
+// ---------------------------------------------------------------------------
+// Pending Check / Roll Request  (Phase B — tabletop adjudication)
+// ---------------------------------------------------------------------------
+
+/**
+ * The kind of dice check the engine can request a player to resolve.
+ * Maps directly to existing mechanics.ts primitives.
+ */
+export type CheckKind = 'skill' | 'save' | 'tool' | 'contested' | 'ability' | 'attack';
+
+/**
+ * A typed request for a pending dice check.
+ *
+ * Created by `resolveTurn()` when the engine determines that a non-trivial
+ * action requires a roll before the narrative can proceed.  Persisted
+ * durably so the UI can render a "Make a Perception check" prompt and
+ * wait for the player to click-to-roll.
+ *
+ * After the player resolves, the engine converts this into a
+ * `MechanicResult` and the turn pipeline resumes with narrator mode.
+ */
+export interface PendingCheck {
+	/** Unique id for this check (ULID). */
+	id: GameId;
+
+	/** What kind of check this is. */
+	kind: CheckKind;
+
+	/** Which character must resolve this check. */
+	characterId: GameId;
+
+	/** The ability score used (e.g. 'wis' for Perception). */
+	ability: AbilityName;
+
+	/** Skill name if this is a skill check (e.g. 'perception'). */
+	skill?: SkillName;
+
+	/** DC to beat, if known to the engine. */
+	dc?: number;
+
+	/** Whether the check has advantage, disadvantage, or neither. */
+	advantageState: 'advantage' | 'disadvantage' | 'normal';
+
+	/** Human-readable reason shown in the UI and fed to the narrator.
+	 *  e.g. "Make a Perception check to notice the hidden trap."
+	 */
+	reason: string;
+
+	/** If this check is part of a combat encounter (vs exploration/dialogue). */
+	combatBound: boolean;
+
+	/** Optional opposing actor (for contested checks). */
+	opposingActorId?: GameId;
+
+	/** The resolved result, once the player rolls. Undefined while pending. */
+	result?: MechanicResult;
+}
+
 export type EncounterOutcome = 'victory' | 'defeat' | 'flee' | 'negotiated';
 
 export interface StateChange {
@@ -642,9 +833,52 @@ export interface StateChange {
 	spellSlotUsed?: { characterId: GameId; level: number; spellName: string };
 	hitDiceUsed?: { characterId: GameId; amount: number };
 	deathSaveResult?: { characterId: GameId; result: 'success' | 'failure' | 'critical-success' | 'critical-failure' };
+	deathSaveOutcome?: { characterId: GameId; outcome: 'stable' | 'dead' };
 	featureUsed?: { characterId: GameId; feature: string };
-	encounterStarted?: { creatures: NPC[] };
+	encounterStarted?: { creatures: (NPC & { tier?: string })[] };
 	encounterEnded?: { outcome: EncounterOutcome };
+
+	/** @deprecated Audit-trail only — the engine resolves combat authoritatively via MechanicResult[].
+	 *  Retained for backward-compatible deserialization of old TurnRecords. Not consumed by gameplay code. */
+	combatAction?: { targetId: GameId; type: 'attack' | 'spell' | 'other' };
+	/** @deprecated Audit-trail only — the engine resolves enemy actions via PendingCombatAction[].
+	 *  Retained for backward-compatible deserialization of old TurnRecords. Not consumed by gameplay code. */
+	enemyCombatActions?: Array<{ npcId: GameId; targetId: GameId; attackIndex?: number }>;
+
+	/** Promote an existing NPC to companion status (travels + fights with the party). */
+	companionPromoted?: { npcId: GameId; statBlock: CreatureStatBlock };
+
+	// --- World-building additions (Step 7) ---
+	/** NPCs the GM introduced into the world this turn. */
+	npcsAdded?: Array<{
+		id: GameId;
+		name: string;
+		role: NpcRole;
+		locationId: GameId;
+		disposition: number;
+		description: string;
+		notes?: string;
+	}>;
+	/** Locations the GM created or revealed this turn. */
+	locationsAdded?: Array<{
+		id: GameId;
+		name: string;
+		type: LocationType;
+		description: string;
+		connections?: GameId[];
+		features?: string[];
+	}>;
+	/** Quests the GM introduced this turn. */
+	questsAdded?: Array<{
+		id: GameId;
+		name: string;
+		description: string;
+		giverNpcId?: GameId | null;
+		objectives: Array<{ id: GameId; text: string }>;
+		recommendedLevel?: number;
+	}>;
+	/** Free-form scene facts the GM established (non-mechanical). */
+	sceneFactsAdded?: string[];
 }
 
 export interface TurnRecord {
@@ -656,6 +890,14 @@ export interface TurnRecord {
 	action: string;
 	/** Parsed intent classification. */
 	intent: IntentType;
+	/**
+	 * 'completed'    — fully resolved turn.
+	 * 'clarification' — engine needs the player to clarify intent.
+	 * 'awaiting-roll' — engine produced a PendingCheck; waiting for dice.
+	 */
+	status: 'completed' | 'clarification' | 'awaiting-roll';
+	/** Canonical summary of the engine resolution, e.g. "Cast Cure Wounds (level 1 slot) on self". */
+	resolvedActionSummary: string;
 	/** Dice rolls and checks resolved this turn. */
 	mechanicResults: MechanicResult[];
 	/** Structured description of what changed. */
@@ -663,6 +905,8 @@ export interface TurnRecord {
 	/** The GM's narrative prose. */
 	narrativeText: string;
 	timestamp: number;
+	/** If status === 'awaiting-roll', the pending check metadata. */
+	pendingCheck?: PendingCheck;
 }
 
 // ---------------------------------------------------------------------------
@@ -682,8 +926,29 @@ export interface Combatant {
 	tempHp: number;
 	ac: number;
 	conditions: Condition[];
+	resistances: string[];
+	immunities: string[];
+	vulnerabilities: string[];
 	concentration: boolean;
 	defeated: boolean;
+}
+
+/**
+ * A single actor's resolved action within a combat round.
+ * Accumulated in encounter.roundActions until the round is narrated.
+ */
+export interface PendingCombatAction {
+	/** The combatant who acted. */
+	combatantId: GameId;
+	/** Which human player submitted this action (undefined = auto-resolved by engine for NPCs). */
+	actorUserId?: string;
+	/** The raw text the player typed, or a generated description for engine-auto actions. */
+	rawAction: string;
+	/** Resolved dice/mechanic results from this action. */
+	mechanicResults: MechanicResult[];
+	/** HP + condition changes caused by this action (merged into final state at round end). */
+	stateChanges: StateChange;
+	timestamp: number;
 }
 
 export interface ActiveEncounter {
@@ -696,6 +961,16 @@ export interface ActiveEncounter {
 	startedAt: number;
 	endedAt?: number;
 	outcome?: EncounterOutcome;
+	/**
+	 * The combatant ID whose action is currently being solicited.
+	 * Set after each actor resolves so the next human knows it's their cue.
+	 * Null when all actors have gone and the round is being narrated.
+	 */
+	awaitingActorId?: GameId | null;
+	/**
+	 * Accumulates all resolved actions this round. Cleared after round-end narration.
+	 */
+	roundActions?: PendingCombatAction[];
 }
 
 // ---------------------------------------------------------------------------
@@ -703,7 +978,7 @@ export interface ActiveEncounter {
 // ---------------------------------------------------------------------------
 
 /** Version tag so we can migrate old state blobs forward. */
-export const GAME_STATE_VERSION = 2;
+export const GAME_STATE_VERSION = 3;
 
 export interface GameState {
 	version: typeof GAME_STATE_VERSION;
@@ -721,6 +996,8 @@ export interface GameState {
 	worldSeed: string;
 	/** Monotonically increasing counter for turn numbering. */
 	nextTurnNumber: number;
+	/** Accumulated scene facts the GM established — surfaced in future prompts. */
+	sceneFacts: string[];
 	/** When the game state was first created. */
 	createdAt: number;
 	/** Last mutation timestamp. */
@@ -780,4 +1057,6 @@ export interface CharacterCreateInput {
 	/** Variant human feat selection. */
 	variantHumanFeat?: string;
 	backstory?: string;
+	/** Optional: import a multiclass character with predefined class levels. */
+	importClasses?: ClassLevel[];
 }

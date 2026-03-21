@@ -1,0 +1,462 @@
+## Implementation Status — 12 of 15 Steps Complete
+
+### Slice 1 — Foundation (Complete)
+
+- Added a new turn executor foundation in [site/src/lib/server/ai/turn-executor.ts](site/src/lib/server/ai/turn-executor.ts)
+- Added typed parsing + clarification handling for ambiguous healing, potion, and poison actions
+- Wired [site/src/lib/server/ai/adventure-turn.ts](site/src/lib/server/ai/adventure-turn.ts) to short-circuit mechanically ambiguous turns before AI narration
+- Clarification turns now persist and broadcast back through the GM chat flow
+- Added tests in [site/src/lib/server/ai/turn-executor.test.ts](site/src/lib/server/ai/turn-executor.test.ts) and expanded [site/src/lib/server/ai/adventure-turn.test.ts](site/src/lib/server/ai/adventure-turn.test.ts)
+- Verification: `866/866` tests passing, `npm run check` with `0` errors
+
+### Slice 2 — Authoritative Resolvers (Complete)
+
+Implemented four authoritative resolver paths that call real engine functions before AI narration:
+
+**use-item resolver** (step 4 — inventory)
+- Matches item name from action text against inventory
+- Calls `useConsumable()` from inventory engine
+- Produces `MechanicResult` (healing dice) and `StateChange` (HP changes, items lost)
+- Falls back to clarification if multiple consumables match ambiguously
+- Single consumable used implicitly when no name match but only one option
+
+**rest/wait resolver** (step 4 — rest + clock)
+- Detects long vs short rest from natural language
+- `shortRest()`: auto-spends up to half available hit dice, advances clock 2 periods
+- `longRest()`: heals entire party, restores spell slots, conditions, death saves, advances clock 8 periods
+- `wait`: parses "until nightfall/morning" or "N hours", advances clock appropriately
+- Uses actual 5-period TIME_CYCLE: dawn → morning → afternoon → dusk → night
+
+**travel resolver** (step 4 — travel)
+- Matches destination from action text against connected location names
+- Calls `travelBetween()` from travel engine
+- Produces location change, clock advance, weather generation, random encounter check
+- Falls back to clarification if multiple destinations match
+- Falls through to AI if no location name matches (AI may create new locations)
+
+**cast-spell resolver** (step 4 — spellcasting)
+- Identifies spell from action text by matching against character's known/prepared/cantrip lists
+- Validates via `canCastSpell()`, then calls `castSpell()` on a cloned character
+- Produces damage/healing dice, slot usage, concentration tracking
+- Falls through to AI if spell can't be identified or can't be cast
+
+**Pipeline wiring** (step 1)
+- `resolveTurn()` now dispatches to resolvers via `switch(intent.primaryIntent)`
+- `ResolvedTurn` now carries `updatedCharacters?: PlayerCharacter[]` for engine mutations
+- `persistResolvedTurnAndState()` applies `updatedCharacters` to state before saving
+- Attack, talk, examine, free-narration intents still pass through to AI (no engine resolution yet)
+
+**Tests**: 27 tests in turn-executor.test.ts covering:
+- Intent parsing (6): healing, rest, move, use-item, cast-spell, wait detection
+- Clarification (4): heal resource, heal target, potions, clear healing
+- Use-item (3): single item implicit, named item, ambiguous items
+- Rest (4): short rest healing, long rest party-wide, wait until nightfall, wait N hours
+- Travel (3): named destination, ambiguous destinations, no match fallthrough
+- Cast-spell (4): cure wounds with slot, cantrip without slot, unknown spell, no slots
+- Fallthrough (3): attack, talk, examine pass to AI
+
+**Verification**: `888/888` tests passing, `npm run check` with `0` errors
+
+### Slice 3 — Narrator Role Separation & Typed Event Broadcasting (Complete)
+
+Split the AI pipeline into bounded roles: narrator-only mode for engine-resolved turns,
+full GM mode for unresolved intents. Added typed game event broadcasting through PartyKit.
+
+**Narrator prompt builder** (step 3 — AI role separation)
+- Added `buildNarratorSystemPrompt()` in gm-context.ts: narrator-only prompt that tells AI
+  mechanic results are FACTS. No JSON format instructions. Plain prose output only.
+- Added `assembleNarratorContext()`: builds full message array for narrator mode including
+  conversation history, world/location/party context, and mechanic summary as user message.
+- Added `formatMechanicSummaryForNarrator()`: renders ResolvedTurn's mechanic results,
+  HP changes, clock advances, spell slots, items consumed into a structured text block.
+
+**Pipeline branching** (step 9 — narration/resolution separation)
+- `executeAdventureTurn()` now checks `resolvedTurn.mechanicResults.length > 0` to determine mode.
+- **Narrator mode** (engine-resolved): rebuilds context via `assembleNarratorContext()`, sends to AI,
+  raw response IS the narrative — no JSON parsing. Engine stateChanges are authoritative.
+- **Full GM mode** (unresolved): uses existing `payload.history + playerAction`, AI returns JSON,
+  stateChanges merged via `mergeStateChanges()` (engine takes precedence for conflicts).
+- Added `mergeStateChanges(engine, gm)`: combines all StateChange fields, engine wins for
+  locationChange, clockAdvance, spellSlotUsed, hitDiceUsed, featureUsed; arrays concatenate.
+
+**Typed event broadcasting** (step 10 — event model wired)
+- Added `broadcastGameEvent()` helper: sends typed GameEvent shapes through PartyKit.
+- Dice rolls broadcast BEFORE narration starts (for client-side dice animation).
+- `narrative:start` and `narrative:end` typed events emitted alongside legacy `ai:turn:*` events.
+- `game:state-update` event broadcast after turn persistence with full StateChange payload.
+- `game:clock-advance` event broadcast when clock changes.
+- `narrative:error` typed event broadcast on AI failure.
+- Legacy `ai:turn:start/chunk/end/error` events preserved for backward compatibility.
+
+**Tests**: 19 new tests across two files:
+- gm-context.test.ts: 9 new tests — formatMechanicSummaryForNarrator (5: intent/action,
+  HP changes, clock advance, spell slot, items consumed), assembleNarratorContext (4: message
+  structure, narrator prompt content, mechanic facts in user message, conversation history)
+- adventure-turn.test.ts: 8 new tests — narrator context for use-item, dice-roll ordering,
+  narrative:start/end events, state-update events, full GM mode for attack, narrative:error,
+  mergeStateChanges (3: combine, engine precedence, GM fallback)
+
+**Verification**: `907/907` tests passing, `npm run check` with `0` errors
+
+### Slice 4 — Decision Rubric & World-Building Schemas (Complete)
+
+Encoded AI discretion boundaries into the GM prompt and expanded the state pipeline
+to let the AI create world content (NPCs, locations, quests) through validated typed schemas.
+
+**Decision rubric** (step 6 — AI discretion boundaries)
+- Added `=== DISCRETION RULES ===` section to GM system prompt in gm-context.ts.
+- YOU MAY: infer nearest enemy, default weapon, movement path, environmental details,
+  advance NPC dialogue, reference world lore, add scene-setting descriptions.
+- YOU MUST NOT: silently choose among multiple resource expenditures, violate action economy,
+  bypass visibility/range, modify HP/slots/inventory outside StateChange, create encounters
+  without mechanical state, override engine-resolved results.
+- WHEN AMBIGUOUS: default to the least costly interpretation and narrate the choice.
+- Narrator prompt explicitly does NOT include these rules (narrator has no discretion).
+
+**World-building StateChange expansion** (step 7 — typed world creation)
+- Expanded `StateChange` in types.ts with 4 new fields:
+  - `npcsAdded`: Array with id, name, role (NpcRole), locationId, disposition, description, notes
+  - `locationsAdded`: Array with id, name, type (LocationType), description, connections, features
+  - `questsAdded`: Array with id, name, description, giverNpcId, objectives, recommendedLevel
+  - `sceneFactsAdded`: string[] for narrative-only scene facts (stored in TurnRecord, not state)
+- Updated `mergeStateChanges()` to concatenate all new array fields from engine + GM.
+- Expanded `applyGMStateChanges()` in adventure-turn.ts:
+  - NPCs: creates NPC objects with `alive: true`, clamps disposition [-100,100], skips duplicate IDs
+  - Locations: creates Location objects with `visited: false`, wires bidirectional connections
+  - Quests: creates Quest objects with `status: 'available'`, default empty rewards, marks objectives undone
+  - Scene facts: narrative-only, not applied to persistent state
+
+**Event model extension** (step 10 continuation — discovery events)
+- Added 3 new event types to events.ts:
+  - `NpcDiscoveredEvent` (type: 'game:npc-discovered')
+  - `LocationDiscoveredEvent` (type: 'game:location-discovered', uses `locationType` field to avoid
+    discriminant clash with BaseGameEvent.type)
+  - `QuestDiscoveredEvent` (type: 'game:quest-discovered')
+- Extended `broadcastTurnEvents()` to emit discovery events through PartyKit for each new entity.
+- Updated `GameEvent` union to include the 3 new types.
+
+**JSON response format** (step 7 — AI instructions)
+- Expanded response format in GM system prompt to document `npcsAdded`, `locationsAdded`,
+  `questsAdded`, `sceneFactsAdded` with ID prefix instructions (`npc-`, `loc-`, `quest-`).
+
+**Tests**: 11 new tests across two files:
+- gm-context.test.ts: 5 new tests — discretion rules in system prompt, rubric allows/forbids
+  correct behaviors, response format includes world-building fields, unique ID prefixes documented,
+  narrator prompt does NOT include discretion rules or JSON format
+- adventure-turn.test.ts: 6 new tests — merges world-building additions from GM, applies
+  npcsAdded to state, applies locationsAdded with bidirectional connections, applies questsAdded,
+  broadcasts discovery events, skips duplicate NPC IDs (idempotent)
+
+**Verification**: `918/918` tests passing, `svelte-check` with `0` errors
+
+### Slice 5 — Pipeline Hardening (Complete)
+
+Enriched the ResolvedTurn data model flowing through the pipeline and hardened
+persistence for reliability, transactional safety, and multiplayer readiness.
+
+**ResolvedTurn enrichment** (step 2 — rich turn model)
+- Added `TurnTarget` interface: `{ id, type: character|npc|location|item|spell, name }`.
+- Added `ConsumedResource` interface: `{ type: spell-slot|item|hit-dice|feature-use|gold, label, amount }`.
+- Expanded `ResolvedTurn` with 4 new fields:
+  - `actorId: string` — character performing the action, resolved from game state
+  - `targets: TurnTarget[]` — structured target references (items, locations, spells)
+  - `resourcesConsumed: ConsumedResource[]` — what the engine spent (slots, items, hit dice)
+  - `resolvedActionSummary: string` — canonical one-line summary for persistence + narrator
+- Updated all 6 resolver paths:
+  - `resolveTurn()` base: populates actorId from state character lookup
+  - `executeUseConsumable()`: adds item target + item consumed resource + summary
+  - `executeShortRest()`: adds hit-dice consumed resource + summary
+  - `executeLongRest()`: adds summary
+  - `resolveWait()`: adds summary
+  - Travel resolver: adds location target + summary
+  - `resolveCastSpell()`: adds spell target + spell-slot consumed resource + summary
+
+**Persistence hardening** (step 13 — transactional turn + state saves)
+- Fixed `loadRecentTurns()` ordering bug: was `orderBy(turnNumber)` ASC which returned
+  the OLDEST N turns. Changed to `orderBy(desc(turnNumber))` + `rows.reverse()` to get
+  the MOST RECENT N turns in chronological order.
+- Expanded `TurnRecord` in types.ts with 2 new fields:
+  - `status: 'completed' | 'clarification'` — distinguishes turn types
+  - `resolvedActionSummary: string` — canonical action summary from engine
+- Added `status` and `resolved_summary` columns to adventureTurns DB schema.
+- Added idempotent ALTER TABLE migration in bootstrap.ts for existing databases.
+- Created `persistTurnAndSaveState()` — atomic batch persistence using `db.batch()` from
+  drizzle-orm/libsql. Inserts turn AND updates state in a single transaction, ensuring
+  turn records and game state are never out of sync.
+- Updated `persistResolvedTurnAndState()` in adventure-turn.ts to use atomic batch,
+  marks clarification turns with `status: 'clarification'`.
+- Updated `loadRecentTurns()` mapping to reconstruct `status` and `resolvedActionSummary`
+  from DB rows (with backward-compatible defaults for old data).
+
+**Tests**: 9 new tests across two files:
+- turn-executor.test.ts: 7 new tests — actorId from state, null state defaults, use-item
+  targets/resources, short rest summary, wait summary, cast-spell targets/resources, travel targets
+- adventure-turn.test.ts: 2 new tests — completed turns have status + resolvedActionSummary,
+  atomic persistTurnAndSaveState called instead of separate persist calls
+
+**Verification**: `927/927` tests passing, `svelte-check` with `0` errors
+
+### Slice 6 — Backend Completion (Complete)
+
+Built self-contained server-side action helpers and an AI-driven background content
+pipeline. These are the last two backend-only steps, completing the server-side runtime.
+
+**Dedicated API/action helpers** (step 12 — server-side action layer)
+- Created `site/src/lib/server/actions.ts` with 5 self-contained action functions:
+  - `executeRestAction(adventureId, actorUserId, 'short'|'long')` — short rest auto-spends
+    up to half available hit dice; long rest heals entire party + restores slots + advances clock 8
+  - `executeTravelAction(adventureId, actorUserId, destinationId)` — validates connection,
+    calls `travelBetween()`, advances clock, persists
+  - `executeUseItemAction(adventureId, actorUserId, itemId)` — calls `useConsumable()`,
+    tracks healing, items lost, persists
+  - `executeWaitAction(adventureId, actorUserId, { until?, hours? })` — advances clock to
+    a target time of day or by N hours
+  - `executeEquipAction(adventureId, actorUserId, itemId)` — calls `equipItem()`, persists
+- Each helper: loads state → validates → calls engine → builds TurnRecord → persists
+  atomically via `persistTurnAndSaveState()` → returns `ActionResult`
+- `ActionResult` interface: `{ success, narrativeSummary, mechanicResults, stateChanges, error? }`
+- Internal `persistAction()` helper builds TurnRecord and manages turnLog trimming
+- Can be called from chat executor, API endpoints, or background tasks
+
+**Background content pipeline** (step 8 — AI world enrichment)
+- Created `site/src/lib/server/ai/world-enrichment.ts` with 3 enrichment functions + parser:
+  - `expandSettlement(state, locationId, options)` — AI generates 2-3 new NPCs and 1-2 scene
+    facts for an existing settlement location. Prompt includes existing NPCs to avoid duplicates.
+  - `extendQuestArc(state, questId, options)` — AI generates a follow-up quest building on a
+    completed quest, optionally with a new NPC. Includes quest giver and party context.
+  - `reactToPartyHistory(state, recentTurns, options)` — AI analyzes last 10 turns and generates
+    NPC disposition changes, new rumors/quests, or emerging threats.
+  - `parseEnrichmentResponse(raw)` — validates and normalizes AI JSON output:
+    - Assigns correct ID prefixes (`npc-`, `loc-`, `quest-`) when AI omits them
+    - Clamps NPC disposition to [-100, 100]
+    - Defaults invalid roles to 'neutral', invalid location types to 'wilderness'
+    - Handles markdown-wrapped JSON
+    - Falls back gracefully on malformed output
+- All functions return `EnrichmentResult { success, stateChanges, summary, error? }`
+- AI output goes through the same `StateChange` pipeline used by the live turn executor
+- Created `site/src/trigger/world-enrichment.ts` with 3 Trigger.dev task wrappers:
+  - `expandSettlementTask` (id: 'world-expand-settlement') — for post-visit settlement enrichment
+  - `extendQuestArcTask` (id: 'world-extend-quest-arc') — for completed quest follow-ups
+  - `reactToPartyHistoryTask` (id: 'world-react-to-party') — for periodic world reactions
+- Each task: loads state → calls enrichment function → applies changes via `applyEnrichmentChanges()`
+  → saves state. Uses background model from `OPENAI_MODEL_BACKGROUND` env var.
+
+**Tests**: 33 new tests across two files:
+- actions.test.ts: 13 tests — rest (no state, no char, short rest persists, long rest heals),
+  travel (no destination, no connection, connected travel persists), use-item (not found, healing
+  potion persists), wait (until time, hours, default period), equip (not found)
+- world-enrichment.test.ts: 20 tests — parseEnrichmentResponse (11: NPCs, locations, quests,
+  scene facts, NPC changes, disposition clamping, ID prefix assignment, role defaults, location
+  type defaults, markdown-wrapped JSON, malformed JSON, filtered entries), expandSettlement (3:
+  valid settlement, not found, AI error), extendQuestArc (2: follow-up quest, not found),
+  reactToPartyHistory (3: world reactions, no turns, empty reaction)
+
+**Verification**: `960/960` tests passing, `svelte-check` with `0` errors
+
+### Next Steps
+
+Steps completed so far: **1** (staged executor), **2** (rich ResolvedTurn model),
+**3** (split AI roles), **4** (engine resolution), **5** (clarification policy),
+**6** (decision rubric), **7** (world-building StateChange expansion),
+**8** (background content pipeline), **9** (narration/resolution separation),
+**10** (event model wired), **12** (API/action helpers), **13** (persistence hardening)
+
+Remaining steps:
+- **Step 11**: Upgrade adventure frontend to chat-first play surface
+- **Step 14**: Multiplayer/world bootstrap fixes
+- **Step 15**: Integration-first tests
+
+Need a few design decisions before drafting the executor plan.
+
+Asked 4 questions (AI control, Heals/items, World edits, Turn model)
+
+Yes — this clarifies the target.
+
+What this means mechanically:
+
+- The game should be **chat-primary**, not button-primary.
+- UI should be **reference and inspection**, not the main control surface.
+- The turn executor should accept **natural command turns**, not rigid action forms.
+- The AI can have **broad discretion** when interpreting intent.
+- But for **resource-spending ambiguity** like heals/items, the system should **ask follow-up** instead of silently guessing.
+- AI world updates should be **creative but bounded by typed state schemas**.
+
+That is a very specific design, and it changes the executor architecture in an important way:
+
+The AI should **not** be the final rules authority. It should be:
+1. an **intent interpreter**,
+2. a **bounded world-authoring agent**,
+3. and a **narrator**,
+
+while the server-side executor remains the authoritative source of:
+- legality,
+- costs,
+- dice,
+- targets,
+- conditions,
+- inventory changes,
+- encounter state,
+- quest state,
+- travel/rest timing,
+- and persistence.
+
+There are a few concrete constraints already visible in the codebase:
+- current live turns still go straight from chat text to LLM output in adventure-turn.ts
+- current client streaming shows raw AI chunks, which conflicts with structured JSON-style GM responses in [site/src/routes/adventures/[id]/+page.svelte](site/src/routes/adventures/[id]/+page.svelte) and gm-context.ts
+- state updates are only partially applied in adventure-turn.ts
+- the mechanics engine already exists and is ready to be wired in via combat.ts, spellcasting.ts, rest.ts, inventory.ts, travel.ts, and leveling.ts
+
+So the right next move is not “more engine work.” It is **turn architecture**.
+
+## Plan: Chat-First DM Runtime
+
+Build an authoritative, chat-forward runtime where players act through natural language, the server resolves mechanics and state, and AI interprets and narrates within bounded authority. Based on your decisions, the first playable version should use a **natural-command turn model**, allow **broad AI discretion for general interpretation**, require **follow-up clarification for ambiguous healing/item/resource choices**, and allow **bounded AI world creation** through typed schemas only. The key shift is to replace the current LLM-first turn path with a staged pipeline: intent parse → authoritative resolution → bounded world mutation → narration → realtime state/event broadcast.
+
+**Steps**
+1. Replace the current LLM-first turn path in adventure-turn.ts with a staged `executeTurn()` architecture:
+   - `parseTurnIntent()`
+   - `resolveTurnActions()`
+   - `applyResolvedStateChanges()`
+   - `narrateResolvedOutcome()`
+   - `broadcastTurnEvents()`
+   This keeps AI involved, but only inside explicit stages.
+
+2. Introduce a typed `ResolvedTurn` model in types.ts or a new game-runtime file to represent:
+   - parsed intent
+   - chosen action(s)
+   - actor
+   - target(s)
+   - consumed resources
+   - mechanic results
+   - authoritative state changes
+   - clarification-needed status
+   This becomes the canonical handoff between parser, executor, and narrator.
+
+3. Split AI responsibility into three bounded roles:
+   - `Intent Interpreter`: converts fuzzy chat into structured candidate intents
+   - `Narrator`: converts resolved outcomes into prose
+   - `World Builder`: background-only typed proposals for quests/NPCs/locations/buildings
+   The first two belong in the live turn loop; the third belongs in Trigger/background jobs via adventure-turn.ts and new task files under trigger.
+
+4. Build a new authoritative intent-resolution layer over the existing game engine:
+   - combat actions call `createEncounter()`, `resolveAttack()`, `resolveNpcAttack()`, `resolveEncounter()` from combat.ts
+   - spells call `canCastSpell()`, `castSpell()`, `expendSpellSlot()` from spellcasting.ts
+   - item/equipment actions call inventory functions in inventory.ts
+   - rest/wait actions call short/long rest + clock advance in rest.ts and travel.ts
+   - travel/discovery actions call `travelBetween()` and `discoverLocation()` in travel.ts
+   - level-up actions call `applyLevelUp()` in leveling.ts
+
+5. Add a clarification policy layer for ambiguous resource use:
+   - if one valid spell/item/target exists, resolve automatically
+   - if multiple reasonable heals, potions, poisons, or consumables exist, mark the turn as `needsClarification`
+   - return a short in-world follow-up prompt instead of consuming anything
+   This directly implements your “ask follow-up” preference.
+
+6. Keep “broad AI discretion” but constrain it with a decision rubric:
+   - AI may infer missing low-risk intent details like nearest enemy, closest ally, default equipped weapon, or obvious movement path
+   - AI may not silently choose among multiple materially different resource expenditures when the player owns several valid options
+   - AI may not violate action economy, visibility, spell legality, slot availability, inventory, or encounter state
+   Put this rubric into the parser/narrator prompt policy in gm-context.ts and the new executor layer.
+
+7. Expand `StateChange` in types.ts so bounded AI/world-builder tasks can create stable world data, not just mutate existing records:
+   - `npcsAdded`
+   - `locationsAdded`
+   - `questsAdded`
+   - `relationshipsAdded` or equivalent lineage/family/group additions
+   - optional `sceneFactsAdded`
+   Then update `applyGMStateChanges()` or replace it with a stronger state applier in adventure-turn.ts.
+
+8. Create a dedicated background content pipeline for AI-authored but typed world enrichment:
+   - `expandSettlement()`
+   - `generateNpcHouseholds()`
+   - `extendQuestArc()`
+   - `reactToPartyHistory()`
+   These should run as Trigger tasks and write only validated structured additions into state. The natural place to anchor them is the world/bootstrap seam in world-bridge.ts plus new Trigger tasks.
+
+9. Separate narration streaming from structured resolution:
+   - do not stream raw structured JSON to players
+   - resolve the turn first
+   - then stream only finalized narration text
+   - broadcast structured state/event messages separately
+   This fixes the current JSON-vs-chat conflict between adventure-turn.ts and [site/src/routes/adventures/[id]/+page.svelte](site/src/routes/adventures/[id]/+page.svelte).
+
+10. Start using the event model already present in events.ts as the realtime contract:
+   - `DiceRollEvent`
+   - `StateUpdateEvent`
+   - `CombatStartEvent`
+   - `TurnCompleteEvent`
+   - `LocationChangeEvent`
+   - `QuestUpdateEvent`
+   Emit these from the executor and broadcast them through server.ts so clients receive structured updates, not just text.
+
+11. Upgrade the adventure frontend in [site/src/routes/adventures/[id]/+page.svelte](site/src/routes/adventures/[id]/+page.svelte) into a chat-first play surface:
+   - keep chat input as the primary action entry
+   - keep character/inventory/spellbook panes as reference panes
+   - add context panels for encounter, party status, visible targets, active quest, current location, and available exits
+   - add action history and mechanic roll summaries
+   - hydrate durable turn history on page load from server instead of starting with an empty transcript
+   This preserves your intended UX while making the game understandable.
+
+12. Add dedicated API/actions beyond raw `/turn`:
+   - chat turn submission stays primary at [site/src/routes/api/adventure/[id]/turn/+server.ts](site/src/routes/api/adventure/[id]/turn/+server.ts)
+   - add internal server helpers, not necessarily visible UI endpoints, for:
+     - encounter resolution
+     - rest
+     - travel
+     - inventory use/equip
+     - level up
+   The chat executor can call these server-side helpers directly.
+
+13. Harden persistence and ordering in state.ts:
+   - fix turn-history loading to guarantee most-recent turns are used in context
+   - make turn persistence/state save transactional or serialized per adventure
+   - store both player command and resolved authoritative outcome
+   - persist clarification prompts distinctly from completed turns
+   This is required for multiplayer stability and replayability.
+
+14. Fix multiplayer/world bootstrap gaps before expanding live play:
+   - ensure multiplayer adventures receive the same world-content bootstrap path as solo adventures in +page.server.ts
+   - ensure PartyKit rooms can rebroadcast current authoritative state to reconnecting clients
+   - ensure reconnect/hydration does not lose the play transcript or encounter state
+
+15. Add integration-first tests for the new runtime:
+   - chat command → parsed intent → authoritative resolution → narrative
+   - ambiguous heal/item → clarification turn
+   - exploration command → travel/wait/discovery update
+   - social-to-violence pivot like “I hit him with my mace” creates encounter state
+   - background worker adds new structured town/NPC/quest content safely
+   These should supplement the existing unit-heavy suite.
+
+**Verification**
+- `npm run check`
+- `npx vitest run`
+- Add integration tests for:
+  - “I cast my fireball at the closest imp.”
+  - “I heal my nearest companion.” with multiple healing options and clarification behavior
+  - “I’m done talking to him, I hit him with my mace.”
+  - “We make a short camp and wait for nightfall.”
+  - “I drink my potion.”
+  - “I force my companion to drink a potion.”
+  - “I apply poison to my weapon.”
+- Manual smoke flow:
+  - create character
+  - enter town
+  - talk to NPC
+  - start combat from dialogue
+  - cast spell
+  - use item
+  - rest
+  - travel
+  - reload page and confirm transcript/state hydration
+- Confirm PartyKit broadcasts structured events plus final narration, not raw partial JSON.
+
+**Decisions**
+- Primary interaction mode is chat, not buttons.
+- UI is reference-first, not command-first.
+- Turn model is natural-language intent, not strictly atomic action selection.
+- AI gets broad discretion for general interpretation.
+- Ambiguous heal/item/resource choices require follow-up clarification.
+- AI may create bounded world content only through typed schemas and validated state application.
+- AI narration comes after mechanics, not instead of mechanics.
+
+The practical summary is this: the next milestone is not “make AI smarter.” It is “make the executor authoritative, then let AI sit on top of that.” Once that exists, the project becomes genuinely close to playable.

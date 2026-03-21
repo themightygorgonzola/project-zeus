@@ -1,6 +1,6 @@
 import type { PageServerLoad, Actions } from './$types';
 import { db } from '$server/db/client';
-import { users, sessions, adventures, adventureMembers, adventureState, adventureTurns } from '$server/db/schema';
+import { users, sessions, adventures, adventureMembers, adventureState, adventureTurns, adventureChat } from '$server/db/schema';
 import { eq, lt, inArray } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 
@@ -104,6 +104,7 @@ export const load: PageServerLoad = async () => {
 // ─── Helper: delete an adventure and all its dependent rows ───────────────────
 async function deleteAdventureCascade(adventureId: string) {
 	await db.delete(adventureTurns).where(eq(adventureTurns.adventureId, adventureId)).catch(() => {});
+	await db.delete(adventureChat).where(eq(adventureChat.adventureId, adventureId)).catch(() => {});
 	await db.delete(adventureState).where(eq(adventureState.adventureId, adventureId));
 	await db.delete(adventureMembers).where(eq(adventureMembers.adventureId, adventureId));
 	await db.delete(adventures).where(eq(adventures.id, adventureId));

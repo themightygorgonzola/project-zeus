@@ -13,10 +13,14 @@ dbClient.execute('SELECT 1').catch(() => {});
 bootstrapDatabase().catch((e) => console.error('[bootstrap] DB init failed:', e));
 
 function getClientIP(event: Parameters<Handle>[0]['event']): string {
-	return (
-		event.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-		event.getClientAddress()
-	);
+	const forwarded = event.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+	if (forwarded) return forwarded;
+	try {
+		return event.getClientAddress();
+	} catch {
+		// In local dev without a reverse proxy, getClientAddress() throws.
+		return '127.0.0.1';
+	}
 }
 
 export const handle: Handle = async ({ event, resolve }) => {

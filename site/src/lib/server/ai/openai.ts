@@ -30,6 +30,38 @@ export async function completeChat({ apiKey, model, messages }: BaseChatOptions)
 	return completion.choices[0]?.message.content ?? '';
 }
 
+/**
+ * Send a chat completion request with `response_format: { type: "json_object" }`.
+ * This instructs the model to ALWAYS return valid JSON, eliminating the need
+ * for fallback parsing strategies (markdown wrapping, double-nesting, etc.).
+ *
+ * The system prompt MUST mention "JSON" somewhere for json_object mode to work.
+ */
+export async function completeChatJSON({ apiKey, model, messages }: BaseChatOptions): Promise<string> {
+	const response = await fetch('https://api.openai.com/v1/chat/completions', {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${apiKey}`
+		},
+		body: JSON.stringify({
+			model,
+			messages,
+			response_format: { type: 'json_object' }
+		})
+	});
+
+	if (!response.ok) {
+		throw new Error(`OpenAI API error ${response.status}: ${await response.text()}`);
+	}
+
+	const completion = (await response.json()) as {
+		choices: Array<{ message: { content: string } }>;
+	};
+
+	return completion.choices[0]?.message.content ?? '';
+}
+
 export async function streamChat(
 	{ apiKey, model, messages }: BaseChatOptions,
 	onChunk: (chunk: string) => Promise<void> | void

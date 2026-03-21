@@ -199,6 +199,7 @@
 							<td>{adv.memberCount}</td>
 							<td class="muted">{formatDate(adv.createdAt)}</td>
 							<td class="action-cell">
+								<a href="/admin/adventure/{adv.id}" class="action-btn info">Debug</a>
 								{#if adv.status !== 'lobby'}
 									<form method="POST" action="?/resetAdventure" use:enhance>
 										<input type="hidden" name="id" value={adv.id} />
@@ -726,6 +727,17 @@
 
 	.action-btn.warn:hover {
 		background: rgba(255, 211, 107, 0.22);
+	}
+
+	.action-btn.info {
+		background: rgba(124, 156, 255, 0.1);
+		border-color: rgba(124, 156, 255, 0.25);
+		color: #7c9cff;
+		text-decoration: none;
+	}
+
+	.action-btn.info:hover {
+		background: rgba(124, 156, 255, 0.2);
 	}
 
 	.action-btn.full-width {

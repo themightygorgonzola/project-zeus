@@ -3,7 +3,7 @@ import type { PageServerLoad } from './$types';
 import { db } from '$server/db/client';
 import { adventures, adventureMembers, adventureState, users } from '$server/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { createInitialGameState, migrateState } from '$lib/game/state';
+import { createInitialGameState, migrateState, loadRecentTurns, loadRecentChat } from '$lib/game/state';
 
 export const load: PageServerLoad = async ({ params, locals, url }) => {
 	if (!locals.user) {
@@ -73,11 +73,19 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 		}
 	}
 
+	// Load durable transcript: recent turns + chat messages
+	const [recentTurns, recentChat] = await Promise.all([
+		loadRecentTurns(params.id, 30),
+		loadRecentChat(params.id, 100)
+	]);
+
 	return {
 		adventure: adventure[0],
 		members,
 		state: parsedState,
 		gameState,
-		currentUserId: locals.user.id
+		currentUserId: locals.user.id,
+		recentTurns,
+		recentChat
 	};
 };

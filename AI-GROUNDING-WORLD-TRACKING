@@ -1,0 +1,401 @@
+
+
+  
+
+Research game AI system
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/types.ts#1-1), lines 1 to 300
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/state.ts#1-1), lines 1 to 300
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/gm-context.ts#1-1), lines 1 to 300
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/events.ts)
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/mechanics.ts#1-1), lines 1 to 300
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/index.ts#1-1), lines 1 to 300
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/types.ts#300-300), lines 300 to 947
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/state.ts#300-300), lines 300 to 859
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/gm-context.ts#300-300), lines 300 to 568
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/mechanics.ts#300-300), lines 300 to 953
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/index.ts#300-300), lines 300 to 357
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/world-bridge.ts#1-1), lines 1 to 300
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/worldgen/prototype.ts#1-1), lines 1 to 300
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/party/server.ts)
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/character-creation.ts#1-1), lines 1 to 300
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/scripts/diag/lib.js)
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/scripts/diag/issues.js)
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/world-bridge.ts#300-300), lines 300 to 419
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/worldgen/prototype.ts#300-300), lines 300 to 327
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/character-creation.ts#300-300), lines 300 to 600
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/server/ai)
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/context.txt)
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/README.md#1-1), lines 1 to 100
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/server/ai/openai.ts)
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/server/ai/adventure-turn.ts#1-1), lines 1 to 300
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/server/ai/turn-executor.ts#1-1), lines 1 to 300
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/server/ai/world-enrichment.ts#1-1), lines 1 to 300
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/server/ai/party.ts)
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/README.md#100-100), lines 100 to 200
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/server/ai/adventure-turn.ts#300-300), lines 300 to 600
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/server/ai/turn-executor.ts#300-300), lines 300 to 600
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/server/ai/world-enrichment.ts#300-300), lines 300 to 369
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/README.md#200-200), lines 200 to 500
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/server/ai/adventure-turn.ts#600-600), lines 600 to 997
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/server/ai/turn-executor.ts#600-600), lines 600 to 778
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/README.md#500-500), lines 500 to 700
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/trigger/adventure-turn.ts)
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/trigger/world-enrichment.ts#1-1), lines 1 to 100
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/data)
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/server/actions.ts#1-1), lines 1 to 100
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/data/index.ts)
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/data/races.ts#1-1), lines 1 to 100
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/data/classes.ts#1-1), lines 1 to 100
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#1-1), lines 1 to 60
+
+Searched for regex `companions|companion|follower|recruit|party member` (`**/site/src/lib/game/**`), 2 results
+
+Read [](file:///c%3A/Users/dawso/AppData/Roaming/Code/User/workspaceStorage/89e6fd124969d465ac09bc6a5075591e/GitHub.copilot-chat/chat-session-resources/a54f25d6-effc-4449-962a-8fa85c8c4ad7/toolu_vrtx_01EvxYGa9sc7kWLd7jv6rPr3__vscode-1773450360661/content.txt)
+
+Excellent — very thorough research. Now let me look at the actual story.json data to see the AI's behavior patterns in practice. 
+
+Analyze story.json AI patterns
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#1-1), lines 1 to 300
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#301-301), lines 301 to 600
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#601-601), lines 601 to 900
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#901-901), lines 901 to 1200
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#1201-1201), lines 1201 to 1500
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#1501-1501), lines 1501 to 1800
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#1801-1801), lines 1801 to 2100
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#2101-2101), lines 2101 to 2400
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#2401-2401), lines 2401 to 2700
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#2701-2701), lines 2701 to 3000
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#3001-3001), lines 3001 to 3300
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#3301-3301), lines 3301 to 3600
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#3601-3601), lines 3601 to 3900
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#3901-3901), lines 3901 to 4200
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#4201-4201), lines 4201 to 4500
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#4501-4501), lines 4501 to 4800
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#4801-4801), lines 4801 to 5100
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#5101-5101), lines 5101 to 5500
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#5501-5501), lines 5501 to 5900
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#5901-5901), lines 5901 to 6300
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#6301-6301), lines 6301 to 6700
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#6701-6701), lines 6701 to 7200
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#7201-7201), lines 7201 to 7700
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#7701-7701), lines 7701 to 8200
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/story.json#8201-8201), lines 8201 to 8483
+
+Read [](file:///c%3A/Users/dawso/AppData/Roaming/Code/User/workspaceStorage/89e6fd124969d465ac09bc6a5075591e/GitHub.copilot-chat/chat-session-resources/a54f25d6-effc-4449-962a-8fa85c8c4ad7/toolu_vrtx_01EMRuew19wVeBm5UVHs98NW__vscode-1773450360708/content.txt)
+
+Now let me check on two critical things the subagent flagged — the location never updating in the system prompt, and the world enrichment trigger system: 
+
+Check location prompt bug
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/gm-context.ts#1-1), lines 1 to 200
+
+Searched for regex `expandSettlement|extendQuestArc|reactToPartyHistory`, 20 results
+
+Searched for text `sceneFact`, 20 results
+
+Searched for text `visited`, 20 results
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/gm-context.ts#200-200), lines 200 to 400
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/gm-context.ts#400-400), lines 400 to 568
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/server/ai/world-enrichment.ts#1-1), lines 1 to 250
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/trigger/world-enrichment.ts)
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/server/ai/world-enrichment.ts#250-250), lines 250 to 369
+
+Searched for text `applyGMStateChanges`, 7 results
+
+Searched for regex `sceneFacts` (`**/site/src/**/*.ts`), 20 results
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/server/ai/adventure-turn.ts#640-640), lines 640 to 780
+
+Searched for regex `sceneFacts|sceneFactsAdded` (`**/site/src/lib/game/types.ts`), 1 result
+
+Searched for regex `sceneFact|scene` (`**/site/src/lib/game/gm-context.ts`), 2 results
+
+Searched for regex `sceneFact` (`**/site/src/lib/game/state.ts`), no results
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/server/ai/adventure-turn.ts#780-780), lines 780 to 900
+
+Searched for regex `GameState|sceneFacts|partyLocationId` (`**/site/src/lib/game/types.ts`), 3 results
+
+Searched for regex `sceneFacts[^A]`, no results
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/types.ts#860-860), lines 860 to 910
+
+Searched for regex `world-expand-settlement|world-extend-quest|world-react-to-party|expandSettlementTask|extendQuestArcTask|reactToPartyHistoryTask`, 12 results
+
+Searched for regex `\.trigger\(|tasks\.trigger|expandSettlement\.trigger|enrichment` (`**/site/src/**/*.ts`), 20 results
+
+Searched for regex `\.trigger\(\{|tasks\.trigger`, 1 result
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/travel.ts#490-490), lines 490 to 510
+
+Searched for text `visited` (`**/site/src/lib/game/gm-context.ts`), no results
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/types.ts#650-650), lines 650 to 680
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/server/ai/adventure-turn.ts#720-720), lines 720 to 740
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/server/ai/adventure-turn.ts#790-790), lines 790 to 820
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/server/ai/adventure-turn.ts#490-490), lines 490 to 515
+
+Now let me read the key files for the specifics I need:    
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/gm-context.ts#1-1), lines 1 to 100
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/server/ai/adventure-turn.ts#690-690), lines 690 to 830
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/types.ts#620-620), lines 620 to 740
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/gm-context.ts#100-100), lines 100 to 170
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/types.ts#740-740), lines 740 to 900
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/gm-context.ts#170-170), lines 170 to 375
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/gm-context.ts#375-375), lines 375 to 568
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/server/ai/world-enrichment.ts#1-1), lines 1 to 200
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/trigger/world-enrichment.ts)
+
+Now I have comprehensive understanding of the entire system. Let me draft the plan. 
+
+Asked 2 questions (Scope, Companions)
+
+## Plan: AI Grounding, Reliability & World Tracking Overhaul
+
+**DRAFT — Full Phased Roadmap**
+
+This plan addresses 15 concrete improvements uncovered by the diagnostic suite + code analysis. The story.json data shows the AI produced **13 issues across 43 turns** — prose-only responses, hallucinated IDs, phantom NPCs, narrative-only items/companions, a frozen location prompt, and entirely dormant world enrichment. The fixes span from critical engine bugs to new systems (companions, NPC memory, scene facts) to activating the background AI.
+
+---
+
+**Steps**
+
+### Phase 0 — Critical Engine Bugs (3 fixes) ✅ COMPLETE
+
+These were blocking issues that undermined everything else. All three fixed, tested, and verified.
+
+1. ✅ **Fix location ordering bug in `applyGMStateChanges()`** — Reordered `applyGMStateChanges()` into Phase A (world-building additions: `npcsAdded`, `locationsAdded`, `questsAdded`) → Phase B (validated mutations: `locationChange`, `npcChanges`, `questUpdates`, etc.). This fixed the critical "party forever at Old Warehouse" bug where the AI creates a location and moves there in the same turn but the move was silently dropped.
+   - **Files changed:** `adventure-turn.ts` (lines 668-895)
+   - **Tests:** `moves party to a location created in the same turn`, `modifies an NPC created in the same turn`, `updates a quest created in the same turn`
+
+2. ✅ **Add ID validation to state change application** — Added `console.warn()` + skip for all ID references: `hpChanges[].characterId`, `conditionsApplied[].characterId`, `xpAwarded[].characterId`, `npcChanges[].npcId`, `questUpdates[].questId`, `itemsGained[].characterId`, `itemsLost[].characterId` + `itemId`, and `locationChange.to`. Invalid entries are logged and skipped instead of silently corrupting state.
+   - **Files changed:** `adventure-turn.ts` (throughout Phase B blocks)
+   - **Tests:** 9 validation tests covering unknown characterId, npcId, questId, itemId, and locationChange across all state change types
+
+3. ✅ **Persist and surface scene facts** — Added `sceneFacts: string[]` to `GameState`. In `applyGMStateChanges()`, `sceneFactsAdded` entries are now appended to `state.sceneFacts` with deduplication and a 50-entry FIFO cap. In `buildSystemPrompt()`, added `=== ESTABLISHED FACTS ===` section showing the last 20 facts. Migration backfills `sceneFacts: []` for old states.
+   - **Files changed:** `types.ts` (GameState interface), `adventure-turn.ts` (application logic), `gm-context.ts` (prompt section), `state.ts` (createInitialGameState + migrateV1toV2)
+   - **Tests:** `accumulates sceneFactsAdded`, `deduplicates scene facts`, `applies FIFO cap at 50`, `includes scene facts in system prompt`, `does NOT include section when empty`, `shows at most last 20 facts`, `backfills sceneFacts for legacy states`, `preserves existing sceneFacts`, `createInitialGameState includes sceneFacts`
+
+**Test count: 985 → 1006 (21 new tests, all passing)**
+
+### Phase 1 — Prompt Grounding Overhaul (6 improvements to gm-context.ts) ✅ COMPLETE
+
+The system prompt is the primary lever for AI reliability. These changes give the AI better situational awareness.
+
+4. ✅ **Add `=== KNOWN NPCs (away from party) ===` section** — Shows all alive NPCs at non-current locations, grouped by location name, sorted by role priority (ally > quest-giver > merchant > neutral > hostile > boss, then by disposition desc). Capped at `MAX_KNOWN_NPCS = 25`. Each line includes NPC ID in brackets, role, and disposition label. Interaction summary from scene facts appended when relevant.
+   - **Files changed:** `gm-context.ts` (new section in `buildSystemPrompt()`, new `dispositionLabel()` helper, new `MAX_KNOWN_NPCS` constant)
+   - **Tests:** 10 tests — remote NPC grouping by location, dead NPC exclusion, local NPCs excluded from section, ID tags + disposition in current location, role-priority sorting, 25-NPC cap, section absent when no remote NPCs, disposition labels (adoring/friendly/warm/neutral/unfriendly/hostile/hateful), multi-location grouping
+
+5. ✅ **Add `=== COMPANIONS ===` section** — After the PARTY block, shows alive NPCs with `role === 'ally'` at the party's current location. Includes stat block summary (HP/maxHP, AC, attack names with to-hit and damage) when `statBlock` is present. Intro text tells AI these NPCs participate in combat. Interaction summary from scene facts appended.
+   - **Files changed:** `gm-context.ts` (new section in `buildSystemPrompt()`)
+   - **Tests:** 7 tests — ally at party location shown, section absent when no local allies, stat block details (HP/AC/attacks), graceful rendering without stat block, dead allies excluded, non-ally roles excluded, section ordering after PARTY
+
+6. ✅ **Add `=== KNOWN LOCATIONS ===` section** — Shows all non-current locations with `[visited]`/`[unvisited]` tags, location type in parentheses, and connection names resolved from IDs. Capped at `MAX_KNOWN_LOCATIONS = 15`. Appears between CURRENT LOCATION and KNOWN NPCs sections.
+   - **Files changed:** `gm-context.ts` (new section in `buildSystemPrompt()`, new `MAX_KNOWN_LOCATIONS` constant)
+   - **Tests:** 7 tests — visited/unvisited tags, connection name resolution, current location excluded, section absent when only one location, 15-location cap, location type shown, section ordering between CURRENT LOCATION and PARTY
+
+7. ✅ **Show all quest statuses with tags** — Changed quest filter from `status === 'active'` to all statuses (active, available, completed, failed). Section header renamed from `=== ACTIVE QUESTS ===` to `=== QUESTS ===`. Each quest line now includes `[status]` tag.
+   - **Files changed:** `gm-context.ts` (quest filter + header in `buildSystemPrompt()`)
+   - **Tests:** 8 tests — active/available/completed/failed quests shown with tags, all statuses together, section absent when empty, objective checkboxes, section name verification
+
+8. ✅ **Harden response format with CRITICAL RULES section** — Added `=== CRITICAL RULES ===` section after the JSON schema with 7 explicit rules: NPCs must use npcsAdded, items must use itemsGained/itemsLost, companion combat actions + npcChanges, separate creatures entries for each enemy, no instant combat (multi-turn encounters), only reference existing IDs, record facts via sceneFactsAdded. Moved `characterId` instruction to this section with reference to PARTY brackets. Updated JSON schema to use `"exact-id-from-PARTY-brackets"` placeholder.
+   - **Files changed:** `gm-context.ts` (response format section restructured in `buildSystemPrompt()`)
+   - **Tests:** 10 tests — CRITICAL RULES section exists, npcsAdded rule, itemsGained/itemsLost rule, companion combat rule, no instant encounter rule, separate creature entries rule, existing IDs only rule, sceneFactsAdded persistence rule, characterId references PARTY, schema placeholder label
+
+9. ✅ **NPC interaction summaries via scene facts** — Added `buildNpcInteractionSummary(npc, sceneFacts)` helper that cross-references NPC name (full name + first name if ≥3 chars) against scene facts, returning the last 3 matches joined by "; ". Summary is appended to NPC lines in both KNOWN NPCs and COMPANIONS sections with " — " separator.
+   - **Files changed:** `gm-context.ts` (new `buildNpcInteractionSummary()` helper, integrated into NPC listing lines)
+   - **Tests:** 7 tests — facts shown in KNOWN NPCs, facts shown in COMPANIONS, first-name matching for multi-word names, 3-fact cap (checks NPC line specifically), no summary when no matching facts, short first names (<3 chars) not matched, empty sceneFacts handled gracefully
+
+**Test count: 1006 → 1056 (50 new tests, all passing)**
+
+### Phase 2 — Companion System (5 changes) ✅ COMPLETE
+
+Full party-member companions that persist, fight, and travel with the party.
+
+10. ✅ **Add `'companion'` to `NpcRole`** — Extended the union type in types.ts to include `'companion'`. Updated COMPANIONS filter in gm-context.ts from `role === 'ally'` to `role === 'ally' || role === 'companion'`. Added `'companion': 0` to npcRolePriority map (same priority as ally). Updated npcsAdded role list in response format to include `companion`.
+   - **Files changed:** `types.ts` (NpcRole union), `gm-context.ts` (COMPANIONS filter, role priority, response format)
+   - **Tests:** Companion NPCs shown in COMPANIONS section, both ally and companion roles shown together, companion role gets same sort priority as ally in KNOWN NPCs
+
+11. ✅ **Add `companionPromoted` state change** — New field on `StateChange`: `companionPromoted?: { npcId: GameId; statBlock: CreatureStatBlock }`. When applied, sets the NPC's role to `'companion'`, attaches a copy of the stat block, and syncs `locationId` to `partyLocationId`. Added to `mergeStateChanges()` with engine-takes-precedence semantics. Added to response format instructions in gm-context.ts. Added companion recruitment instruction to CRITICAL RULES.
+   - **Files changed:** `types.ts` (StateChange interface), `adventure-turn.ts` (applyGMStateChanges + mergeStateChanges), `gm-context.ts` (response format + CRITICAL RULES)
+   - **Tests:** Promotes existing NPC to companion with stat block, moves promoted companion to party location, skips unknown npcId with console.warn, promotes NPC created via npcsAdded in same turn
+
+12. ✅ **Auto-move companions on `locationChange`** — In `applyGMStateChanges()`, after processing `locationChange` and setting `loc.visited = true`, loops through all NPCs and updates `locationId` for alive companions (`npc.alive && npc.role === 'companion'`). Dead companions stay where they fell; non-companion NPCs (ally, merchant, etc.) are not moved.
+   - **Files changed:** `adventure-turn.ts` (locationChange block in applyGMStateChanges)
+   - **Tests:** Companion moves on location change, non-companion NPCs stay behind, dead companions not moved, multiple companions move simultaneously
+
+13. ✅ **Include companions in `encounterStarted` combatants** — When `applyGMStateChanges()` processes `encounterStarted`, filters alive companion NPCs at the party location with stat blocks and maps them to `Combatant` objects (using statBlock HP/maxHP/AC/resistances/immunities/vulnerabilities). Companion combatants get `type: 'npc'`, `referenceId` matching NPC id, and `id` prefixed with `cmb-`.
+   - **Files changed:** `adventure-turn.ts` (encounterStarted block in applyGMStateChanges)
+   - **Tests:** Companion appears as combatant with correct stat block values, companions without stat block excluded, dead companions excluded, companions at different locations excluded
+
+14. ✅ **Track companion HP via `npcChanges`** — Extended `npcChanges` to support `field: 'hp'`. When `nc.field === 'hp'` and the NPC has a statBlock, applies the value clamped to `[0, maxHp]`. Updated response format to show `"disposition|alive|hp"` field options. Added CRITICAL RULES instruction about using `field: "hp"` for companion HP changes.
+   - **Files changed:** `adventure-turn.ts` (npcChanges block in applyGMStateChanges), `gm-context.ts` (response format + CRITICAL RULES)
+   - **Tests:** HP damage applied to statBlock, HP clamped to 0 (no negatives), HP clamped to maxHp (no over-healing), HP change on NPC without statBlock has no effect, HP change combined with alive=false in same turn
+
+**Test count: 1056 → 1082 (26 new tests, all passing)**
+
+### Phase 3 — NPC Memory & Lifecycle (3 changes) ✅ COMPLETE
+
+NPC memory, interaction tracking, and automatic lifecycle management.
+
+15. ✅ **Add `lastInteractionTurn` to the `NPC` type** — New optional `lastInteractionTurn?: number` field tracks the most recent turn where this NPC was referenced. Updated in `applyGMStateChanges()` for: `npcsAdded` (set on creation), `npcChanges` (set on any field change), `companionPromoted` (set on promotion), `encounterStarted` (set on new and existing creature NPCs). In `persistResolvedTurnAndState()`, after `applyGMStateChanges`, scans `narrativeText` for NPC name matches (full name case-insensitive, first name if ≥3 chars) and updates `lastInteractionTurn`. KNOWN NPCs section in gm-context now uses `lastInteractionTurn` as secondary sort criterion (most recent first, after role priority, before disposition). NPCs without `lastInteractionTurn` sort after those with it.
+   - **Files changed:** `types.ts` (NPC interface), `adventure-turn.ts` (applyGMStateChanges + persistResolvedTurnAndState), `gm-context.ts` (KNOWN NPCs sort), `state.ts` (normalizeNpc)
+   - **Tests:** npcsAdded sets lastInteractionTurn, npcChanges updates it, companionPromoted updates it, encounterStarted sets on new/existing creatures, narrative full-name mention updates it, narrative first-name mention (≥3 chars) updates it, KNOWN NPCs sort by lastInteractionTurn, NPCs without lastInteractionTurn sort last
+
+16. ✅ **Add `interactionNotes` to the `NPC` type** — New `NpcInteractionNote` interface: `{ turn: number; note: string }`. New optional `interactionNotes?: NpcInteractionNote[]` on NPC. Auto-routing: when `sceneFactsAdded` mentions an NPC by name (full or first name ≥3 chars), the fact is auto-pushed to that NPC's `interactionNotes` with `lastInteractionTurn` updated. Explicit AI control: `npcChanges` with `field: "notes"` pushes `{ turn: turnNumber, note: newValue.trim() }` to `interactionNotes`. Both paths cap at `MAX_NPC_NOTES = 10` per NPC (FIFO eviction). `buildNpcInteractionSummary()` in gm-context now prefers `interactionNotes` (last 3 notes joined by "; ") over scene fact cross-referencing when available, falling back to the original cross-ref for NPCs without notes. Response format updated to show `"disposition|alive|hp|notes"` field options. CRITICAL RULES updated with instruction to use `field: "notes"` for recording NPC interaction details.
+   - **Files changed:** `types.ts` (NpcInteractionNote interface, NPC interactionNotes field), `adventure-turn.ts` (sceneFactsAdded auto-routing, npcChanges notes support), `gm-context.ts` (buildNpcInteractionSummary preference, response format, CRITICAL RULES), `state.ts` (normalizeNpc)
+   - **Tests:** npcChanges "notes" creates interactionNote entry, notes cap at 10 (FIFO), sceneFactsAdded auto-routes to NPC, facts not routed to unmentioned NPCs, multiple NPCs receive same fact, interactionNotes preferred over scene facts in companion summary, interactionNotes shown for remote NPCs, 3-note display cap, fallback to scene facts when no interactionNotes, response format includes "notes", CRITICAL RULES mentions notes usage
+
+17. ✅ **NPC archival** — New optional `archived?: boolean` field on NPC. At the end of `applyGMStateChanges()`, dead NPCs with `lastInteractionTurn` defined and `turnNumber - lastInteractionTurn > ARCHIVE_AFTER_TURNS` (20) are set to `archived = true`. Archived NPCs are filtered from all prompt sections: CURRENT LOCATION local NPCs, COMPANIONS section, and KNOWN NPCs section. Living NPCs are never archived regardless of lastInteractionTurn. Dead NPCs without `lastInteractionTurn` are not archived (legacy safety). Already-archived NPCs remain archived (idempotent — the `!npc.archived` guard prevents double-processing).
+   - **Files changed:** `types.ts` (NPC archived field), `adventure-turn.ts` (auto-archive block at end of applyGMStateChanges), `gm-context.ts` (archived filter in 3 sections), `state.ts` (normalizeNpc)
+   - **Tests:** Dead NPC archived after 20+ turns, living NPC NOT archived, dead NPC with recent interaction NOT archived, dead NPC without lastInteractionTurn NOT archived, already archived stays archived, archived excluded from COMPANIONS, archived excluded from KNOWN NPCs, archived excluded from local NPCs
+
+**Test count: 1082 → 1110 (28 new tests, all passing)**
+
+### Phase 4 — Activate World Enrichment Background AI (4 changes) ✅ COMPLETE
+
+The enrichment system was **fully built** but **never triggered**. Three tasks existed in trigger/world-enrichment.ts — `expandSettlementTask`, `extendQuestArcTask`, `reactToPartyHistoryTask` — but nothing called `.trigger()`. Now all three are wired and broadcasting events.
+
+18. ✅ **Wire `expandSettlement` on first location visit** — In `applyGMStateChanges()`, after setting `loc.visited = true` on a `locationChange`, checks if the location is a settlement type and has fewer than 3 alive NPCs at that location. If so, returns an `EnrichmentIntent` of type `'expand-settlement'` with the `locationId`. The intent is dispatched as `tasks.trigger('world-expand-settlement', { adventureId, locationId })` in `persistResolvedTurnAndState()` after atomic persistence completes. Dead NPCs and NPCs at other locations are not counted toward the threshold.
+   - **Files changed:** `adventure-turn.ts` (locationChange block + EnrichmentIntent type + dispatch loop)
+   - **Tests:** settlement with 0 NPCs triggers, settlement with 1 alive NPC triggers, settlement with 3+ alive NPCs does NOT trigger, non-settlement locations do NOT trigger, dead NPCs do not count toward threshold, only destination-location NPCs counted, GM-added NPCs in same response still trigger (enrichment deduplicates server-side), correct adventureId and locationId passed
+
+19. ✅ **Wire `extendQuestArc` on quest completion** — In `applyGMStateChanges()`, after the auto-completion check for quests (when all objectives are done and status is set to `'completed'`), returns an `EnrichmentIntent` of type `'extend-quest-arc'` with the `questId`. Dispatched via `tasks.trigger('world-extend-quest-arc', { adventureId, questId })`. Only triggers on objective-based auto-complete, NOT when the GM manually sets quest status to 'completed'.
+   - **Files changed:** `adventure-turn.ts` (questUpdates auto-complete block)
+   - **Tests:** last objective completion triggers arc extension, partial objectives do NOT trigger, manual status='completed' does NOT trigger, both objectives completing simultaneously triggers, correct adventureId and questId passed
+
+20. ✅ **Wire `reactToPartyHistory` on a turn cadence** — In `persistResolvedTurnAndState()`, after applying state changes, checks `turnNumber > 0 && turnNumber % 5 === 0`. If so, adds a `'react-to-party'` intent to the enrichment queue. Dispatched via `tasks.trigger('world-react-to-party', { adventureId })`.
+   - **Files changed:** `adventure-turn.ts` (persistResolvedTurnAndState cadence check)
+   - **Tests:** fires on turn 5, fires on turn 10, fires on turn 25, does NOT fire on turn 3, does NOT fire on turn 7, does NOT fire on turn 0
+
+21. ✅ **Broadcast enrichment events** — Added `broadcastEnrichmentEvents()` helper to `trigger/world-enrichment.ts`. After each enrichment task applies changes and saves state, broadcasts per-entity discovery events (`game:npc-discovered`, `game:location-discovered`, `game:quest-discovered`) and a summary `enrichment:complete` event through the PartyKit bus. Added `EnrichmentCompleteEvent` to the `GameEvent` union in `events.ts`. Silently skips broadcasting when `PARTYKIT_HOST` is not configured. All three tasks (`expandSettlementTask`, `extendQuestArcTask`, `reactToPartyHistoryTask`) now call `broadcastEnrichmentEvents()` after successful enrichment.
+   - **Files changed:** `events.ts` (EnrichmentCompleteEvent type + union), `trigger/world-enrichment.ts` (broadcastEnrichmentEvents helper, notifyRoom import, all 3 tasks updated)
+   - **Tests:** NPC discovery events broadcast for settlement expansion, quest discovery events broadcast for arc extension, enrichment:complete summary event broadcast with taskType/summary/changes, no broadcast when PARTYKIT_HOST unset, no broadcast when enrichment fails, NPC+quest discovery events for combined output, location discovery events for party reaction, state mutations verified (NPCs added, quests added, disposition changes), updatedAt timestamp refreshed
+
+**Design:** `applyGMStateChanges()` remains a pure synchronous function — it now returns `EnrichmentIntent[]` instead of `void`. The async caller (`persistResolvedTurnAndState`) captures the returned intents and dispatches them as Trigger.dev tasks after atomic persistence completes. Dispatch failures are caught silently with `console.error` so they never break turn persistence.
+
+**Test count: 1110 → 1145 (35 new tests, all passing)**
+
+### Phase 5 — Validation & Safety Hardening (3 changes) ✅ COMPLETE
+
+22. ✅ **Schema-validate AI `stateChanges` shape** — New exported function `sanitizeStateChanges(sc, state)` runs every field of `stateChanges` through type-checking validators after `parseGMResponse()` and before `mergeStateChanges()`. Validates: `hpChanges` (string characterId, finite newHp, auto-fills oldHp from state), `xpAwarded` (positive number amount), `conditionsApplied` (valid 5e condition names, defaults applied=true), `locationChange` (non-empty string `to`), `questUpdates` (non-empty questId + field), `npcChanges` (non-empty npcId + field), `itemsGained` (backfills weight=0, rarity='common', attunement=false, category='misc'), `itemsLost` (defaults quantity=1), `encounterStarted` (validates creature names, backfills role/disposition/description), `encounterEnded` (blocks instant combat when encounterStarted is present), `npcsAdded` (backfills invalid role to 'neutral', missing locationId to partyLocationId), `locationsAdded` (backfills invalid type to 'interior'), `questsAdded` (defaults missing objectives=[]), `sceneFactsAdded` (strips non-strings/empties). All invalid entries are stripped with `console.warn` rather than corrupting state. Pass-through fields (clockAdvance, spellSlotUsed, companionPromoted, deathSaveResult, deathSaveOutcome) are forwarded unchanged.
+   - **Files changed:** `adventure-turn.ts` (~300-line sanitizeStateChanges function + wiring in executeAdventureTurn)
+   - **Tests:** strips non-string characterId, strips empty characterId, strips non-number newHp, strips NaN newHp, strips Infinity newHp, auto-fills oldHp from state, auto-fills empty reason, keeps valid + strips invalid entries, strips non-array hpChanges, strips negative xp amount, strips non-number xp amount, strips empty xp characterId, keeps valid xp entries, strips invalid condition names, keeps valid 5e conditions, defaults applied to true, strips empty locationChange to, strips non-string to, keeps valid locationChange, backfills item weight/rarity/attunement, strips items with no name, strips missing characterId on itemsGained, strips missing item object, backfills missing item category, strips empty itemId on itemsLost, defaults itemsLost quantity to 1, strips encounterEnded when encounterStarted present, keeps encounterEnded when encounterStarted absent, backfills missing creature fields, strips NPC with no name, defaults invalid NPC role to neutral, defaults missing locationId to partyLocationId, strips location with no name, defaults invalid location type, strips quest with no name, defaults missing objectives, strips non-string scene facts, strips non-array sceneFactsAdded, strips npcChanges with no npcId, strips npcChanges with no field, strips questUpdates with no questId, keeps valid npcChanges/questUpdates, passes through clockAdvance/spellSlotUsed/companionPromoted, returns empty object when all entries invalid, integration: malformed hpChanges stripped before state application, integration: instant combat blocked (encounter starts but does not immediately end)
+
+23. ✅ **Quest reward auto-distribution** — New helper `distributeQuestRewards(state, quest)` distributes quest.rewards to living party members on quest completion. XP and gold are awarded to each living character. Items go to the first living character (party leader). Reputation changes adjust NPC dispositions (clamped to [-100, 100]). Wired into `applyGMStateChanges()` at both quest completion paths: manual `status='completed'` via questUpdates, and automatic completion when all objectives are done.
+   - **Files changed:** `adventure-turn.ts` (distributeQuestRewards helper + wiring in both completion paths)
+   - **Tests:** XP distributed on objective-based completion, gold distributed on completion, reward items to first living character, reputation changes apply to NPC dispositions, rewards on manual status=completed path, zero rewards don't error, dead characters excluded, reputation clamped to [-100, 100]
+
+24. ✅ **Auto-level-up check** — After all state changes are applied in `applyGMStateChanges()`, iterates through all characters and calls `canLevelUp()` + `applyLevelUp()` from `leveling.ts`. Supports multiple level-ups in a single turn for large XP awards. Runs after both direct XP awards and quest reward XP distribution.
+   - **Files changed:** `adventure-turn.ts` (auto-level-up loop at end of applyGMStateChanges, imports for canLevelUp/applyLevelUp)
+   - **Tests:** XP award pushes past threshold → auto-levels, massive XP award → multi-level, insufficient XP → no level-up, quest reward XP triggers level-up, level 5 upgrade increases proficiency bonus
+
+**Test count: 1145 → 1204 (59 new tests, all passing)**
+
+---
+
+**Verification**
+
+- **Phase 0**: Run `node scripts/diag/location.js` on a new story export — should show `partyLocationId` updating correctly. Run `issues.js` — phantom NPC kills should be caught. Export and verify scene facts appear in prompt messages.
+- **Phase 1**: Export a new adventure with `Copy Adventure JSON` and inspect `promptMessages[0].content` — verify KNOWN NPCs, COMPANIONS, KNOWN LOCATIONS, and ESTABLISHED FACTS sections appear.
+- **Phase 2**: Start an adventure, recruit an NPC as companion, verify they appear in the COMPANIONS prompt section, auto-move on travel, and appear in encounter combatants.
+- **Phase 3**: Play 30+ turns, verify dead NPCs auto-archive, interaction notes accumulate, prompt shows recently-active NPCs first.
+- **Phase 4**: Visit a new settlement, wait 10 seconds, verify `expandSettlementTask` ran and new NPCs appeared. Complete a quest, verify follow-up quest was auto-generated. Check PartyKit for `game:npc-discovered` and `enrichment:complete` events. Verify `reactToPartyHistory` fires every 5th turn. Run test suite — 1145 tests all pass.
+- **Phase 5**: ✅ 1204 tests all passing. Schema validation strips malformed AI stateChanges before state application. Quest rewards auto-distributed on completion. Auto-level-up triggers after XP awards. Instant combat blocked.
+- **Overall**: Play a 50+ turn adventure, export, run the full diagnostic suite (`summary`, `state-drift`, `combat`, `xp`, `location`, `quests`, `items`, `prompt-growth`, `issues`). Issues count should drop from 13 to ≤3.
+
+---
+
+**Decisions**
+- Chose ordering fix over dual-pass for the location bug: simplest correct solution
+- Companions are full party members with stat blocks, not narrative-only: per user preference
+- Scene facts capped at 50 with FIFO: balances memory vs context window size
+- World enrichment triggered automatically (not manual): the user wants the "world alive" effect
+- NPC archival at 20-turn threshold: long enough to not lose recently-relevant NPCs, short enough to prevent bloat
+- `reactToPartyHistory` every 5 turns: frequent enough to feel reactive, infrequent enough to not be costly

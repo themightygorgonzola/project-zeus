@@ -74,6 +74,8 @@ export async function bootstrapDatabase() {
 			actor_id TEXT NOT NULL,
 			action TEXT NOT NULL DEFAULT '',
 			intent TEXT NOT NULL DEFAULT 'unknown',
+			status TEXT NOT NULL DEFAULT 'completed',
+			resolved_summary TEXT NOT NULL DEFAULT '',
 			mechanics_json TEXT NOT NULL DEFAULT '[]',
 			state_changes_json TEXT NOT NULL DEFAULT '{}',
 			narrative_text TEXT NOT NULL DEFAULT '',
@@ -81,6 +83,20 @@ export async function bootstrapDatabase() {
 			FOREIGN KEY (adventure_id) REFERENCES adventures(id)
 		)
 	`);
+
+	// ─── Schema migrations for existing databases ────────────
+	// These are idempotent — safe to run repeatedly.
+	try {
+		await dbClient.execute(`ALTER TABLE adventure_turns ADD COLUMN status TEXT NOT NULL DEFAULT 'completed'`);
+	} catch { /* column already exists */ }
+
+	try {
+		await dbClient.execute(`ALTER TABLE adventure_turns ADD COLUMN resolved_summary TEXT NOT NULL DEFAULT ''`);
+	} catch { /* column already exists */ }
+
+	try {
+		await dbClient.execute(`ALTER TABLE adventure_turns ADD COLUMN debug_json TEXT`);
+	} catch { /* column already exists */ }
 
 	// ─── Indexes for common query paths ──────────────────────
 	await dbClient.execute(

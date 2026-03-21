@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { abilityModifier } from '$lib/game';
+	import { abilityModifier, getAllCantrips, getAllKnownSpells, getAllPreparedSpells, getTotalHitDiceRemaining } from '$lib/game';
 	import type { AbilityName, PlayerCharacter } from '$lib/game';
 
 	interface Props {
@@ -31,7 +31,7 @@
 	<div class="sheet-header">
 		<div>
 			<h2>{character.name}</h2>
-			<p>{format(character.race)} {format(character.subrace)} · {format(character.class)} {character.subclass ? `(${format(character.subclass)})` : ''}</p>
+			<p>{format(character.race)} {format(character.subrace)} · {character.classes.length > 1 ? character.classes.map((cl) => `${format(cl.name)} ${cl.level}`).join(' / ') : format(character.classes[0]?.name ?? 'unknown')} {character.classes[0]?.subclass ? `(${format(character.classes[0].subclass)})` : ''}</p>
 			<p class="muted">{character.background ? format(character.background) : 'No background'} · {character.alignment ? format(character.alignment) : 'Unaligned'}</p>
 		</div>
 		<div class="core-stats">
@@ -57,7 +57,7 @@
 			<ul>
 				<li>Speed: {character.speed} ft</li>
 				<li>Passive Perception: {character.passivePerception}</li>
-				<li>Hit Dice Remaining: {character.hitDiceRemaining}</li>
+				<li>Hit Dice Remaining: {getTotalHitDiceRemaining(character)}</li>
 				<li>Conditions: {character.conditions.length ? character.conditions.map(format).join(', ') : 'None'}</li>
 			</ul>
 		</section>
@@ -75,10 +75,13 @@
 		<section>
 			<h3>Spells</h3>
 			<ul>
-				<li>Cantrips: {character.cantrips.length ? character.cantrips.map(format).join(', ') : 'None'}</li>
-				<li>Known: {character.knownSpells.length ? character.knownSpells.map(format).join(', ') : 'None'}</li>
-				<li>Prepared: {character.preparedSpells.length ? character.preparedSpells.map(format).join(', ') : 'None'}</li>
+				<li>Cantrips: {getAllCantrips(character).length ? getAllCantrips(character).map(format).join(', ') : 'None'}</li>
+				<li>Known: {getAllKnownSpells(character).length ? getAllKnownSpells(character).map(format).join(', ') : 'None'}</li>
+				<li>Prepared: {getAllPreparedSpells(character).length ? getAllPreparedSpells(character).map(format).join(', ') : 'None'}</li>
 				<li>Slots: {character.spellSlots.length ? character.spellSlots.map((slot) => `L${slot.level} ${slot.current}/${slot.max}`).join(', ') : 'None'}</li>
+				{#if character.pactSlots.length}
+					<li>Pact Slots: {character.pactSlots.map((slot) => `L${slot.level} ${slot.current}/${slot.max}`).join(', ')}</li>
+				{/if}
 			</ul>
 		</section>
 		<section>

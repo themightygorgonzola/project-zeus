@@ -10,7 +10,10 @@ import type {
 	AbilityName,
 	AbilityScores,
 	CharacterCreateInput,
+	CharacterFeatureRef,
+	ClassLevel,
 	ClassName,
+	ClassSpellList,
 	PlayerCharacter,
 	SkillName
 } from './types';
@@ -435,6 +438,49 @@ function validateEquipment(input: CharacterCreateInput, errors: ValidationError[
 }
 
 // ---------------------------------------------------------------------------
+// Feature-use map (limited-use features → max uses, recovery)
+// ---------------------------------------------------------------------------
+
+/** Known limited-use features and their per-level max use counts / recovery type. */
+const FEATURE_USE_DEFS: Record<string, { maxUsesAtLevel: (level: number, chaMod?: number) => number; recoversOn: 'short-rest' | 'long-rest' | 'dawn' }> = {
+	'Second Wind':        { maxUsesAtLevel: () => 1, recoversOn: 'short-rest' },
+	'Action Surge':       { maxUsesAtLevel: (l) => (l >= 17 ? 2 : 1), recoversOn: 'short-rest' },
+	'Indomitable':        { maxUsesAtLevel: (l) => (l >= 17 ? 3 : l >= 13 ? 2 : 1), recoversOn: 'long-rest' },
+	'Arcane Recovery':    { maxUsesAtLevel: () => 1, recoversOn: 'short-rest' },
+	'Channel Divinity':   { maxUsesAtLevel: (l) => (l >= 18 ? 3 : l >= 6 ? 2 : 1), recoversOn: 'short-rest' },
+	'Wild Shape':         { maxUsesAtLevel: () => 2, recoversOn: 'short-rest' },
+	'Bardic Inspiration': { maxUsesAtLevel: (_l, chaMod) => Math.max(1, chaMod ?? 0), recoversOn: 'short-rest' },
+	'Rage':               { maxUsesAtLevel: (l) => (l >= 20 ? Infinity : l >= 17 ? 6 : l >= 12 ? 5 : l >= 6 ? 4 : l >= 3 ? 3 : 2), recoversOn: 'long-rest' },
+	'Lay on Hands':       { maxUsesAtLevel: (l) => l * 5, recoversOn: 'long-rest' },
+	'Font of Magic':      { maxUsesAtLevel: (l) => l, recoversOn: 'long-rest' },
+	'Sorcery Points':     { maxUsesAtLevel: (l) => l, recoversOn: 'long-rest' },
+	'Ki':                 { maxUsesAtLevel: (l) => l, recoversOn: 'short-rest' },
+	'Stroke of Luck':     { maxUsesAtLevel: () => 1, recoversOn: 'short-rest' },
+	'Sorcerous Restoration': { maxUsesAtLevel: () => 4, recoversOn: 'short-rest' },
+	'Signature Spells':   { maxUsesAtLevel: () => 1, recoversOn: 'short-rest' }
+};
+
+/**
+ * Build the runtime `featureUses` record from the character's class features.
+ */
+export function buildFeatureUses(
+	classFeatures: { name: string }[],
+	level: number,
+	abilities?: { cha?: number }
+): PlayerCharacter['featureUses'] {
+	const chaMod = abilities ? abilityModifier(abilities.cha ?? 10) : 0;
+	const result: PlayerCharacter['featureUses'] = {};
+	for (const feat of classFeatures) {
+		const def = FEATURE_USE_DEFS[feat.name];
+		if (def) {
+			const max = def.maxUsesAtLevel(level, chaMod);
+			result[feat.name] = { current: max, max, recoversOn: def.recoversOn };
+		}
+	}
+	return result;
+}
+
+// ---------------------------------------------------------------------------
 // Character Creation
 // ---------------------------------------------------------------------------
 
@@ -485,18 +531,43 @@ export function createCharacter(
 	const preparedSpells = resolvePreparedSpells(input);
 	const passivePerception = 10 + abilityModifier(abilities.wis) + (skillProficiencies.includes('perception') ? profBonus : 0);
 
+	// Build multiclass structures
+	const subclass = classDef && classDef.subclassLevel <= level ? (input.subclass ?? classDef.subclass.name) : undefined;
+	const classes = input.importClasses && input.importClasses.length > 0
+		? input.importClasses.map((c) => ({ ...c }))
+		: [{ name: input.class, level, subclass, hitDiceRemaining: level }];
+	const totalLevel = classes.reduce((sum, c) => sum + c.level, 0);
+
+	// When importing multiclass, build features from each class at their class level
+	const importedClassFeatures = (input.importClasses && input.importClasses.length > 0)
+		? buildImportedClassFeatures(input.importClasses)
+		: [];
+
+	// Merge imported features with primary class features (race/background come from primary)
+	const allClassFeatures = importedClassFeatures.length > 0
+		? [...classFeatures.filter((f) => f.source === 'race' || f.source === 'background'), ...importedClassFeatures]
+		: classFeatures;
+
+	// Build class spell lists
+	const classSpells = buildImportedClassSpells(classes, input, spellcastingAbility, cantrips, knownSpells, preparedSpells);
+	const pactSlots = classDef?.spellcasting?.style === 'pact'
+		? spellSlots.map((s) => ({ ...s }))  // For warlock, initial slots go into pactSlots
+		: [];
+	const standardSlots = classDef?.spellcasting?.style === 'pact'
+		? []  // Warlock doesn't use standard slots at level 1
+		: spellSlots;
+
 	return {
 		id: ulid(),
 		userId,
 		adventureId,
 		name: input.name.trim(),
 		race: input.race,
-		class: input.class,
+		classes,
 		subrace: input.subrace,
-		subclass: classDef && classDef.subclassLevel <= level ? (input.subclass ?? classDef.subclass.name) : undefined,
 		background: backgroundDef?.name,
 		alignment: input.alignment,
-		level,
+		level: totalLevel,
 		abilities,
 		hp: maxHp,
 		maxHp,
@@ -506,6 +577,7 @@ export function createCharacter(
 		size: raceDef?.size ?? 'Medium',
 		proficiencyBonus: profBonus,
 		skillProficiencies,
+		expertiseSkills: [],
 		saveProficiencies,
 		languages,
 		armorProficiencies: Array.from(
@@ -531,14 +603,12 @@ export function createCharacter(
 				...(backgroundDef?.toolProficiencies ?? [])
 			])
 		),
-		classFeatures,
+		classFeatures: allClassFeatures,
 		feats: input.variantHumanFeat ? [normalizeFeatName(input.variantHumanFeat)] : [],
-		spellcastingAbility,
-		spellSlots,
-		knownSpells,
-		preparedSpells,
-		cantrips,
-		hitDiceRemaining: level,
+		spellSlots: standardSlots,
+		pactSlots,
+		classSpells,
+		concentratingOn: null,
 		deathSaves: { successes: 0, failures: 0 },
 		inspiration: false,
 		passivePerception,
@@ -546,6 +616,12 @@ export function createCharacter(
 		gold: 15,
 		xp: 0,
 		conditions: [],
+		resistances: getRacialResistances(input.race, input.subrace),
+		exhaustionLevel: 0,
+		stable: false,
+		dead: false,
+		featureUses: buildFeatureUses(allClassFeatures, totalLevel, abilities),
+		attunedItems: [],
 		backstory: input.backstory?.trim() ?? ''
 	};
 }
@@ -710,6 +786,22 @@ function getSpeedBonus(raceName: CharacterCreateInput['race'], subraceName?: str
 	return bonus;
 }
 
+/**
+ * Extract racial damage resistances from race/subrace traits.
+ * E.g., Tiefling → ['fire'], Dwarf → ['poison'], Dragonborn → varies by ancestry.
+ */
+function getRacialResistances(raceName: CharacterCreateInput['race'], subraceName?: string): string[] {
+	const resistances: string[] = [];
+	for (const trait of collectRacialTraits(raceName, subraceName)) {
+		for (const effect of trait.effects) {
+			if (effect.tag === 'resistance') {
+				resistances.push(effect.damageType);
+			}
+		}
+	}
+	return Array.from(new Set(resistances));
+}
+
 function getPreparedSpellAllowance(className: ClassName, abilities: AbilityScores): number {
 	const classDef = getClass(className);
 	const ability = classDef?.spellcasting?.ability;
@@ -740,6 +832,7 @@ function buildFeatureList(
 		name: feature.name,
 		level: feature.level,
 		source: feature.level >= (classDef?.subclassLevel ?? 99) && includeSubclass ? 'subclass' as const : 'class' as const,
+		sourceClass: input.class,
 		description: feature.description
 	}));
 	const racialFeatures = collectRacialTraits(input.race, input.subrace).map((trait) => ({
@@ -753,6 +846,78 @@ function buildFeatureList(
 		: [];
 
 	return [...racialFeatures, ...backgroundFeatures, ...features];
+}
+
+/**
+ * Build class/subclass features for all imported classes at their respective levels.
+ * Used when creating a character from an imported multiclass sheet.
+ */
+function buildImportedClassFeatures(
+	importClasses: ClassLevel[]
+): CharacterFeatureRef[] {
+	const allFeatures: CharacterFeatureRef[] = [];
+	for (const cl of importClasses) {
+		const cDef = getClass(cl.name);
+		const includeSubclass = (cDef?.subclassLevel ?? 99) <= cl.level;
+		const features = getFeaturesAtLevel(cl.name, cl.level, includeSubclass);
+		for (const feature of features) {
+			allFeatures.push({
+				name: feature.name,
+				level: feature.level,
+				source: feature.level >= (cDef?.subclassLevel ?? 99) && includeSubclass ? 'subclass' as const : 'class' as const,
+				sourceClass: cl.name,
+				description: feature.description
+			});
+		}
+	}
+	return allFeatures;
+}
+
+/**
+ * Build classSpells entries for all caster classes.
+ * For a standard (non-import) creation, returns a single entry for the primary class.
+ * For imported multiclass, returns an entry per caster class.
+ */
+function buildImportedClassSpells(
+	classes: ClassLevel[],
+	input: CharacterCreateInput,
+	primarySpellcastingAbility: AbilityName | undefined,
+	cantrips: string[],
+	knownSpells: string[],
+	preparedSpells: string[]
+): ClassSpellList[] {
+	if (input.importClasses && input.importClasses.length > 0) {
+		// Imported multiclass: build spell entry per caster class
+		const result: ClassSpellList[] = [];
+		for (const cl of classes) {
+			const cDef = getClass(cl.name);
+			if (cDef?.spellcasting?.ability) {
+				// For import, primary class gets the creation-input spells; others start empty
+				if (cl.name === input.class) {
+					result.push({
+						className: cl.name,
+						spellcastingAbility: cDef.spellcasting.ability,
+						cantrips,
+						knownSpells,
+						preparedSpells
+					});
+				} else {
+					result.push({
+						className: cl.name,
+						spellcastingAbility: cDef.spellcasting.ability,
+						cantrips: [],
+						knownSpells: [],
+						preparedSpells: []
+					});
+				}
+			}
+		}
+		return result;
+	}
+	// Standard single-class creation
+	return primarySpellcastingAbility
+		? [{ className: input.class, spellcastingAbility: primarySpellcastingAbility, cantrips, knownSpells, preparedSpells }]
+		: [];
 }
 
 function normalizeSpellName(name: string): string {

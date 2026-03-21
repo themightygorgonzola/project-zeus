@@ -4,7 +4,7 @@ import { db } from '$server/db/client';
 import { adventures, adventureMembers, adventureState } from '$server/db/schema';
 import { createWorldSeed, generatePrototypeWorld, toWorldSnapshot } from '$lib/worldgen/prototype';
 import { ulid } from 'ulid';
-import { createInitialGameState } from '$lib/game/state';
+import { createInitialGameState, createOpeningGmTurn, persistTurnAndSaveState } from '$lib/game/state';
 import { bootstrapAdventureContent } from '$lib/game/world-bridge';
 import type { PrototypeWorld } from '$lib/worldgen/prototype';
 
@@ -63,6 +63,7 @@ export const actions: Actions = {
 		const savedWorldSeed = worldSeed || ((world as { seed?: string }).seed ?? String(now));
 
 		const isSolo = mode === 'solo';
+		const initialState = buildInitialState(isSolo, world as PrototypeWorld, savedWorldSeed);
 
 		// Create adventure + member + state atomically
 		await db.transaction(async (tx) => {
@@ -87,10 +88,17 @@ export const actions: Actions = {
 
 			await tx.insert(adventureState).values({
 				adventureId,
-				stateJson: JSON.stringify(buildInitialState(isSolo, world as PrototypeWorld, savedWorldSeed)),
+				stateJson: JSON.stringify(initialState),
 				updatedAt: now
 			});
 		});
+
+		if (isSolo) {
+			const openingTurn = createOpeningGmTurn(initialState);
+			if (openingTurn) {
+				await persistTurnAndSaveState(adventureId, openingTurn, initialState);
+			}
+		}
 
 		// Route based on mode
 		if (isSolo) {

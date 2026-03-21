@@ -16,6 +16,7 @@ import type {
 	GameId,
 	Item,
 	MechanicResult,
+	PendingCheck,
 	PlayerCharacter,
 	Quest,
 	NPC,
@@ -80,6 +81,11 @@ export interface DiceRollEvent extends BaseGameEvent<'game:dice-roll'> {
 	characterName: string | null;
 	label: string;
 	result: MechanicResult;
+}
+
+/** Engine requests a roll from the player before narration can proceed (Phase B3). */
+export interface RollRequestEvent extends BaseGameEvent<'game:roll-request'> {
+	pendingCheck: PendingCheck;
 }
 
 /** A full turn record was persisted (sent after the turn is fully resolved). */
@@ -147,6 +153,25 @@ export interface CombatEndEvent extends BaseGameEvent<'game:combat-end'> {
 	xpAwarded: number;
 }
 
+/**
+ * Emitted after each actor in a combat round resolves their action.
+ * Signals to clients which combatant acts next and whether a human can fill the slot.
+ */
+export interface CombatTurnEvent extends BaseGameEvent<'game:combat-turn'> {
+	/** Combatant whose turn just finished (null at the very start of combat). */
+	previousCombatantId: GameId | null;
+	/** Combatant whose turn is next (null when the round just ended). */
+	nextCombatantId: GameId | null;
+	nextCombatantName: string | null;
+	/** 'character' = specific PC, 'companion' = any player can fill, 'npc' = auto-resolved */
+	nextCombatantType: 'character' | 'companion' | 'npc' | null;
+	/** If nextCombatantType === 'character', the userId of the player whose turn it is. */
+	awaitingUserId?: string | null;
+	/** True when all actors have gone and round-end narration is about to be generated. */
+	roundComplete: boolean;
+	round: number;
+}
+
 // ---------------------------------------------------------------------------
 // Clock events
 // ---------------------------------------------------------------------------
@@ -154,6 +179,47 @@ export interface CombatEndEvent extends BaseGameEvent<'game:combat-end'> {
 export interface ClockAdvanceEvent extends BaseGameEvent<'game:clock-advance'> {
 	from: GameClock;
 	to: GameClock;
+}
+
+// ---------------------------------------------------------------------------
+// World-building events
+// ---------------------------------------------------------------------------
+
+/** New NPC(s) were introduced to the world. */
+export interface NpcDiscoveredEvent extends BaseGameEvent<'game:npc-discovered'> {
+	npcId: GameId;
+	name: string;
+	role: string;
+	locationId: GameId;
+}
+
+/** A new location was revealed or created. */
+export interface LocationDiscoveredEvent extends BaseGameEvent<'game:location-discovered'> {
+	locationId: GameId;
+	name: string;
+	locationType: string;
+	description: string;
+}
+
+/** A new quest was introduced. */
+export interface QuestDiscoveredEvent extends BaseGameEvent<'game:quest-discovered'> {
+	questId: GameId;
+	name: string;
+	description: string;
+}
+
+// ---------------------------------------------------------------------------
+// Enrichment events
+// ---------------------------------------------------------------------------
+
+/** Background enrichment task completed. */
+export interface EnrichmentCompleteEvent extends BaseGameEvent<'enrichment:complete'> {
+	/** Which enrichment task ran. */
+	taskType: 'expand-settlement' | 'extend-quest-arc' | 'react-to-party';
+	/** Human-readable summary of what was generated. */
+	summary: string;
+	/** The state changes that were applied. */
+	changes: StateChange;
 }
 
 // ---------------------------------------------------------------------------
@@ -167,6 +233,7 @@ export type GameEvent =
 	| NarrativeErrorEvent
 	| StateUpdateEvent
 	| DiceRollEvent
+	| RollRequestEvent
 	| TurnCompleteEvent
 	| CharacterUpdateEvent
 	| CharacterDownEvent
@@ -175,7 +242,12 @@ export type GameEvent =
 	| QuestUpdateEvent
 	| CombatStartEvent
 	| CombatEndEvent
-	| ClockAdvanceEvent;
+	| CombatTurnEvent
+	| ClockAdvanceEvent
+	| NpcDiscoveredEvent
+	| LocationDiscoveredEvent
+	| QuestDiscoveredEvent
+	| EnrichmentCompleteEvent;
 
 /**
  * Type guard for narrowing by event type.

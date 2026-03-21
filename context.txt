@@ -1,0 +1,10 @@
+C:/MySoftwareFolder/project-zeus/site/src/routes/admin/adventure/[id]/+page.svelte:291:10 Unexpected block closing tag
+https://svelte.dev/e/block_unexpected_close
+C:/MySoftwareFolder/project-zeus/site/src/routes/admin/adventure/[id]/+page.svelte:291:10
+289 |                        {/each}
+ 290 |                      </div>
+ 291 |                    {/if}
+                           ^
+ 292 |                  {/if}
+ 293 |
+Click outside, press Esc key, or fix the code to dismiss.

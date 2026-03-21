@@ -118,6 +118,19 @@ export default class AdventureRoom implements Party.Server {
         );
         break;
 
+      case "game:character-created":
+        // Relay character creation to all OTHER players in the room
+        // (the creating player already updated their local state)
+        this.room.broadcast(
+          JSON.stringify({
+            type: "game:character-created",
+            userId,
+            character: data.character,
+          }),
+          [sender.id]
+        );
+        break;
+
       default:
         console.warn("unknown message type", data.type);
     }
@@ -141,7 +154,10 @@ export default class AdventureRoom implements Party.Server {
       body.type === "ai:turn:start" ||
       body.type === "ai:turn:chunk" ||
       body.type === "ai:turn:end" ||
-      body.type === "ai:turn:error"
+      body.type === "ai:turn:error" ||
+      body.type.startsWith("game:") ||
+      body.type.startsWith("narrative:") ||
+      body.type.startsWith("enrichment:")
     ) {
       this.room.broadcast(JSON.stringify(body));
       return new Response("ok");

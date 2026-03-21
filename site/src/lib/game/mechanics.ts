@@ -13,13 +13,130 @@ import type {
 	AbilityScores,
 	ClassName,
 	Condition,
+	ConditionEffect,
 	DiceResult,
 	Item,
 	MechanicResult,
 	PlayerCharacter,
 	SkillName
 } from './types';
-import { CLASS_HIT_DIE, SKILL_ABILITY_MAP } from './types';
+import { CLASS_HIT_DIE, DEFAULT_CONDITION_EFFECTS, SKILL_ABILITY_MAP } from './types';
+
+// ---------------------------------------------------------------------------
+// Advantage / Disadvantage
+// ---------------------------------------------------------------------------
+
+/** The three possible advantage states for a d20 roll. */
+export type AdvantageState = 'advantage' | 'disadvantage' | 'normal';
+
+/**
+ * The kind of d20 roll being attempted, used to look up condition effects.
+ */
+export type RollType = 'attack' | 'ability-check' | 'skill-check' | 'saving-throw';
+
+/**
+ * Result of inspecting a character's conditions for a specific roll type.
+ * - `advantage` / `disadvantage`: whether the character's conditions impose them.
+ * - `autoFail`: the roll should fail without rolling (e.g. paralyzed + STR save).
+ * - `resolvedAdvantage`: the final state after cancellation rules.
+ *   If both advantage AND disadvantage apply they cancel to 'normal'.
+ */
+export interface RollModifiers {
+	advantage: boolean;
+	disadvantage: boolean;
+	autoFail: boolean;
+	resolvedAdvantage: AdvantageState;
+}
+
+/**
+ * Inspect a character's active conditions and determine what advantage,
+ * disadvantage, or auto-fail applies to a given roll type.
+ *
+ * @param conditions   The character's active condition list.
+ * @param rollType     The kind of d20 roll.
+ * @param ability      The ability being used (relevant for auto-fail saves).
+ */
+export function resolveRollModifiers(
+	conditions: Condition[],
+	rollType: RollType,
+	ability?: AbilityName
+): RollModifiers {
+	let advantage = false;
+	let disadvantage = false;
+	let autoFail = false;
+
+	for (const condition of conditions) {
+		const effect: ConditionEffect = DEFAULT_CONDITION_EFFECTS[condition];
+		if (!effect) continue;
+
+		// --- Auto-fail saves ---
+		if (rollType === 'saving-throw' && ability && effect.autoFailSaves.includes(ability)) {
+			autoFail = true;
+		}
+
+		// --- Advantage ---
+		if (rollType === 'attack' && effect.advantageOn.includes('attack-rolls')) {
+			advantage = true;
+		}
+
+		// --- Disadvantage ---
+		if (rollType === 'attack' && effect.disadvantageOn.includes('attack-rolls')) {
+			disadvantage = true;
+		}
+		if (
+			(rollType === 'ability-check' || rollType === 'skill-check') &&
+			(effect.disadvantageOn.includes('ability-checks') ||
+				effect.disadvantageOn.includes('sight-based-ability-checks'))
+		) {
+			disadvantage = true;
+		}
+		if (rollType === 'attack' && effect.disadvantageOn.includes('attack-rolls-while-source-visible')) {
+			// Frightened: disadvantage while source is visible.
+			// We conservatively apply it (the AI can override with explicit advantage param).
+			disadvantage = true;
+		}
+		if (
+			(rollType === 'ability-check' || rollType === 'skill-check') &&
+			effect.disadvantageOn.includes('ability-checks-while-source-visible')
+		) {
+			disadvantage = true;
+		}
+	}
+
+	// 5e rule: if you have both advantage AND disadvantage, they cancel to normal.
+	let resolvedAdvantage: AdvantageState = 'normal';
+	if (advantage && !disadvantage) resolvedAdvantage = 'advantage';
+	else if (disadvantage && !advantage) resolvedAdvantage = 'disadvantage';
+	// else both or neither → 'normal'
+
+	return { advantage, disadvantage, autoFail, resolvedAdvantage };
+}
+
+/**
+ * Roll a d20 with advantage or disadvantage.
+ * - `'advantage'`:    roll 2d20, take higher.
+ * - `'disadvantage'`: roll 2d20, take lower.
+ * - `'normal'`:       roll 1d20.
+ *
+ * Returns the chosen die value and the full DiceResult.
+ */
+export function rollD20(advState: AdvantageState = 'normal'): { chosen: number; result: DiceResult } {
+	if (advState === 'normal') {
+		const result = roll('1d20');
+		return { chosen: result.rolls[0], result };
+	}
+	const die1 = rollDie(20);
+	const die2 = rollDie(20);
+	const chosen = advState === 'advantage' ? Math.max(die1, die2) : Math.min(die1, die2);
+	return {
+		chosen,
+		result: {
+			notation: advState === 'advantage' ? '2d20kh1' : '2d20kl1',
+			rolls: [die1, die2],
+			total: chosen
+		}
+	};
+}
 
 // ---------------------------------------------------------------------------
 // PRNG (Mulberry32) — matches worldgen, seedable for tests
@@ -202,41 +319,65 @@ export interface CheckResult {
 	roll: DiceResult;
 	abilityMod: number;
 	proficient: boolean;
+	expertise: boolean;
 	bonus: number;
 	total: number;
 	dc: number;
 	success: boolean;
 	nat1: boolean;
 	nat20: boolean;
+	advantageState: AdvantageState;
+	autoFailed: boolean;
 }
 
 /**
  * Perform a skill check for a character.
+ *
+ * Conditions are automatically inspected to determine advantage/disadvantage
+ * and auto-fail. An explicit `overrideAdvantage` merges with the condition-
+ * derived state (if both advantage + disadvantage, they cancel to normal).
  */
 export function skillCheck(
 	character: PlayerCharacter,
 	skill: SkillName,
-	dc: number
+	dc: number,
+	overrideAdvantage?: AdvantageState
 ): CheckResult {
 	const ability = SKILL_ABILITY_MAP[skill];
 	const abilityMod = abilityModifier(character.abilities[ability]);
 	const proficient = character.skillProficiencies.includes(skill);
-	const bonus = abilityMod + (proficient ? character.proficiencyBonus : 0);
+	const expertise = Array.isArray(character.expertiseSkills) && character.expertiseSkills.includes(skill);
+	const profBonus = proficient
+		? (expertise ? character.proficiencyBonus * 2 : character.proficiencyBonus)
+		: 0;
+	const bonus = abilityMod + profBonus;
 
-	const diceResult = roll('1d20');
-	const rawRoll = diceResult.rolls[0];
-	const total = rawRoll + bonus;
+	// Resolve conditions
+	const mods = resolveRollModifiers(character.conditions, 'skill-check', ability);
+
+	if (mods.autoFail) {
+		return autoFailResult(dc, abilityMod, proficient, expertise, bonus);
+	}
+
+	// Merge explicit override with condition-derived advantage
+	const finalAdv = mergeAdvantage(mods.resolvedAdvantage, overrideAdvantage);
+
+	const { chosen, result: diceResult } = rollD20(finalAdv);
+	const total = chosen + bonus;
 
 	return {
 		roll: diceResult,
 		abilityMod,
 		proficient,
+		expertise,
 		bonus,
 		total,
 		dc,
 		success: total >= dc,
-		nat1: rawRoll === 1,
-		nat20: rawRoll === 20
+		nat1: chosen === 1,
+		nat20: chosen === 20,
+		advantageState: finalAdv,
+		autoFailed: false
 	};
 }
 
@@ -246,23 +387,35 @@ export function skillCheck(
 export function abilityCheck(
 	character: PlayerCharacter,
 	ability: AbilityName,
-	dc: number
+	dc: number,
+	overrideAdvantage?: AdvantageState
 ): CheckResult {
 	const abilityMod = abilityModifier(character.abilities[ability]);
-	const diceResult = roll('1d20');
-	const rawRoll = diceResult.rolls[0];
-	const total = rawRoll + abilityMod;
+
+	const mods = resolveRollModifiers(character.conditions, 'ability-check', ability);
+
+	if (mods.autoFail) {
+		return autoFailResult(dc, abilityMod, false, false, abilityMod);
+	}
+
+	const finalAdv = mergeAdvantage(mods.resolvedAdvantage, overrideAdvantage);
+
+	const { chosen, result: diceResult } = rollD20(finalAdv);
+	const total = chosen + abilityMod;
 
 	return {
 		roll: diceResult,
 		abilityMod,
 		proficient: false,
+		expertise: false,
 		bonus: abilityMod,
 		total,
 		dc,
 		success: total >= dc,
-		nat1: rawRoll === 1,
-		nat20: rawRoll === 20
+		nat1: chosen === 1,
+		nat20: chosen === 20,
+		advantageState: finalAdv,
+		autoFailed: false
 	};
 }
 
@@ -273,26 +426,37 @@ export function abilityCheck(
 export function savingThrow(
 	character: PlayerCharacter,
 	ability: AbilityName,
-	dc: number
+	dc: number,
+	overrideAdvantage?: AdvantageState
 ): CheckResult {
 	const abilityMod = abilityModifier(character.abilities[ability]);
 	const proficient = character.saveProficiencies.includes(ability);
 	const bonus = abilityMod + (proficient ? character.proficiencyBonus : 0);
 
-	const diceResult = roll('1d20');
-	const rawRoll = diceResult.rolls[0];
-	const total = rawRoll + bonus;
+	const mods = resolveRollModifiers(character.conditions, 'saving-throw', ability);
+
+	if (mods.autoFail) {
+		return autoFailResult(dc, abilityMod, proficient, false, bonus);
+	}
+
+	const finalAdv = mergeAdvantage(mods.resolvedAdvantage, overrideAdvantage);
+
+	const { chosen, result: diceResult } = rollD20(finalAdv);
+	const total = chosen + bonus;
 
 	return {
 		roll: diceResult,
 		abilityMod,
 		proficient,
+		expertise: false,
 		bonus,
 		total,
 		dc,
 		success: total >= dc,
-		nat1: rawRoll === 1,
-		nat20: rawRoll === 20
+		nat1: chosen === 1,
+		nat20: chosen === 20,
+		advantageState: finalAdv,
+		autoFailed: false
 	};
 }
 
@@ -310,29 +474,62 @@ export interface AttackResult {
 	fumble: boolean;
 	damage: DiceResult | null;
 	totalDamage: number;
+	advantageState: AdvantageState;
+}
+
+/**
+ * Parse damage notation into dice portion and modifier portion.
+ * E.g. "2d8+3" → { count: 2, sides: 8, modifier: 3 }
+ *      "1d6"   → { count: 1, sides: 6, modifier: 0 }
+ */
+function parseDamageDice(notation: string): { count: number; sides: number; modifier: number } {
+	const cleaned = notation.toLowerCase().replace(/\s/g, '');
+	const match = cleaned.match(/^(\d+)d(\d+)([+-]\d+)?$/);
+	if (!match) return { count: 1, sides: 4, modifier: 0 };
+	return {
+		count: parseInt(match[1], 10),
+		sides: parseInt(match[2], 10),
+		modifier: match[3] ? parseInt(match[3], 10) : 0
+	};
+}
+
+/**
+ * Build critical hit damage notation: double the dice count, keep modifier once.
+ * "2d8+3" crit → "4d8+3"
+ */
+function criticalDamageNotation(notation: string): string {
+	const { count, sides, modifier } = parseDamageDice(notation);
+	const doubled = count * 2;
+	const modStr = modifier > 0 ? `+${modifier}` : modifier < 0 ? `${modifier}` : '';
+	return `${doubled}d${sides}${modStr}`;
 }
 
 /**
  * Resolve an attack roll.
  *
- * @param attacker      The attacking character.
- * @param targetAc      The target's armor class.
- * @param damageDice    Damage dice notation (e.g. "1d8+3").
- * @param useAbility    Which ability governs the attack (defaults to 'str').
- * @param proficient    Whether the attacker is proficient with the weapon (default true).
+ * @param attacker          The attacking character.
+ * @param targetAc          The target's armor class.
+ * @param damageDice        Damage dice notation (e.g. "1d8+3").
+ * @param useAbility        Which ability governs the attack (defaults to 'str').
+ * @param proficient        Whether the attacker is proficient with the weapon (default true).
+ * @param overrideAdvantage Explicit advantage override (merged with condition-derived state).
  */
 export function attackRoll(
 	attacker: PlayerCharacter,
 	targetAc: number,
 	damageDice: string,
 	useAbility: AbilityName = 'str',
-	proficient = true
+	proficient = true,
+	overrideAdvantage?: AdvantageState
 ): AttackResult {
 	const abilityMod = abilityModifier(attacker.abilities[useAbility]);
 	const attackBonus = abilityMod + (proficient ? attacker.proficiencyBonus : 0);
 
-	const atkRoll = roll('1d20');
-	const rawRoll = atkRoll.rolls[0];
+	// Resolve conditions
+	const mods = resolveRollModifiers(attacker.conditions, 'attack', useAbility);
+	const finalAdv = mergeAdvantage(mods.resolvedAdvantage, overrideAdvantage);
+
+	const { chosen: rawRoll, result: atkRoll } = rollD20(finalAdv);
 	const total = rawRoll + attackBonus;
 
 	const critical = rawRoll === 20;
@@ -343,16 +540,14 @@ export function attackRoll(
 	let totalDamage = 0;
 
 	if (hits) {
-		damage = roll(damageDice);
-		totalDamage = damage.total;
-
-		// Critical hit: roll damage dice twice (simplified: double dice total, keep modifier once)
 		if (critical) {
-			const extraDamage = roll(damageDice);
-			// Only double the dice portion — modifier is in both rolls, subtract it once.
-			// Simplification: just sum both rolls (close enough for prototype).
-			totalDamage = damage.total + extraDamage.total;
+			// Critical hit: double only the dice count, keep modifier once.
+			const critNotation = criticalDamageNotation(damageDice);
+			damage = roll(critNotation);
+		} else {
+			damage = roll(damageDice);
 		}
+		totalDamage = damage.total;
 	}
 
 	return {
@@ -364,7 +559,8 @@ export function attackRoll(
 		critical,
 		fumble,
 		damage,
-		totalDamage
+		totalDamage,
+		advantageState: finalAdv
 	};
 }
 
@@ -378,17 +574,67 @@ export interface DamageApplicationResult {
 	tempHpAbsorbed: number;
 	unconscious: boolean;
 	dead: boolean;
+	/** Effective damage after resistance/immunity/vulnerability. */
+	effectiveDamage: number;
+	/** Whether damage was modified by resistance/immunity/vulnerability. */
+	damageModified: 'normal' | 'resistant' | 'immune' | 'vulnerable';
+}
+
+/**
+ * Compute effective damage after applying resistance, immunity, or vulnerability.
+ *
+ * @param amount           Raw damage.
+ * @param damageType       Damage type (e.g. 'fire', 'slashing'). If omitted, no modification.
+ * @param resistances      Damage types the target resists (half, floor).
+ * @param immunities       Damage types the target is immune to (0).
+ * @param vulnerabilities  Damage types the target is vulnerable to (double).
+ */
+export function applyDamageTypeModifiers(
+	amount: number,
+	damageType?: string,
+	resistances: string[] = [],
+	immunities: string[] = [],
+	vulnerabilities: string[] = []
+): { effective: number; modifier: DamageApplicationResult['damageModified'] } {
+	if (!damageType) return { effective: amount, modifier: 'normal' };
+
+	const dt = damageType.toLowerCase();
+	if (immunities.map(s => s.toLowerCase()).includes(dt)) {
+		return { effective: 0, modifier: 'immune' };
+	}
+	if (resistances.map(s => s.toLowerCase()).includes(dt)) {
+		return { effective: Math.floor(amount / 2), modifier: 'resistant' };
+	}
+	if (vulnerabilities.map(s => s.toLowerCase()).includes(dt)) {
+		return { effective: amount * 2, modifier: 'vulnerable' };
+	}
+	return { effective: amount, modifier: 'normal' };
 }
 
 /**
  * Apply damage to a character. Temp HP absorbs first.
  * Returns the result; does NOT mutate the character (pure function).
+ *
+ * @param character        The target.
+ * @param amount           Raw damage amount.
+ * @param damageType       Optional damage type for resistance/immunity/vulnerability.
+ * @param resistances      Target's damage resistances.
+ * @param immunities       Target's damage immunities.
+ * @param vulnerabilities  Target's damage vulnerabilities.
  */
 export function applyDamage(
-	character: PlayerCharacter,
-	amount: number
+	character: Pick<PlayerCharacter, 'hp' | 'maxHp' | 'tempHp'>,
+	amount: number,
+	damageType?: string,
+	resistances: string[] = [],
+	immunities: string[] = [],
+	vulnerabilities: string[] = []
 ): DamageApplicationResult {
-	let remaining = amount;
+	const { effective, modifier } = applyDamageTypeModifiers(
+		amount, damageType, resistances, immunities, vulnerabilities
+	);
+
+	let remaining = effective;
 	let tempHp = character.tempHp;
 	let hp = character.hp;
 
@@ -410,7 +656,9 @@ export function applyDamage(
 		currentHp: hp,
 		tempHpAbsorbed,
 		unconscious,
-		dead
+		dead,
+		effectiveDamage: effective,
+		damageModified: modifier
 	};
 }
 
@@ -424,6 +672,53 @@ export function applyHealing(
 	const previousHp = character.hp;
 	const currentHp = Math.min(character.hp + amount, character.maxHp);
 	return { previousHp, currentHp };
+}
+
+// ---------------------------------------------------------------------------
+// Death Saves
+// ---------------------------------------------------------------------------
+
+/**
+ * The result of a single death saving throw roll.
+ */
+export type DeathSaveRollResult = 'success' | 'failure' | 'critical-success' | 'critical-failure';
+
+/**
+ * Full result returned by rollDeathSave.
+ */
+export interface DeathSaveResult {
+	roll: DiceResult;
+	natural: number;
+	result: DeathSaveRollResult;
+}
+
+/**
+ * Roll a death saving throw (1d20, unmodified).
+ *
+ * - Natural 20 → critical-success (character regains 1 HP, saves reset)
+ * - Natural 1 → critical-failure (counts as 2 failures)
+ * - 10+ → success
+ * - <10 → failure
+ *
+ * This is a pure roll — it does NOT mutate the character.
+ * Use the functions in conditions.ts to apply the result.
+ */
+export function rollDeathSave(): DeathSaveResult {
+	const diceResult = roll('1d20');
+	const natural = diceResult.rolls[0];
+
+	let result: DeathSaveRollResult;
+	if (natural === 20) {
+		result = 'critical-success';
+	} else if (natural === 1) {
+		result = 'critical-failure';
+	} else if (natural >= 10) {
+		result = 'success';
+	} else {
+		result = 'failure';
+	}
+
+	return { roll: diceResult, natural, result };
 }
 
 // ---------------------------------------------------------------------------
@@ -453,6 +748,179 @@ export function level1Hp(className: ClassName, conScore: number): number {
  */
 export function baseAc(dexScore: number): number {
 	return 10 + abilityModifier(dexScore);
+}
+
+// ---------------------------------------------------------------------------
+// Passive Scores
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute a passive score for any skill or ability.
+ *
+ * Passive = 10 + ability mod + proficiency (if proficient)
+ *         + 5 (if advantage) − 5 (if disadvantage)
+ *
+ * With expertise, proficiency is doubled (as in active checks).
+ */
+export function passiveScore(
+	character: PlayerCharacter,
+	skill: SkillName,
+	overrideAdvantage?: AdvantageState
+): number {
+	const ability = SKILL_ABILITY_MAP[skill];
+	const abilityMod = abilityModifier(character.abilities[ability]);
+	const proficient = character.skillProficiencies.includes(skill);
+	const expertise = Array.isArray(character.expertiseSkills) && character.expertiseSkills.includes(skill);
+	const profBonus = proficient
+		? (expertise ? character.proficiencyBonus * 2 : character.proficiencyBonus)
+		: 0;
+
+	// Check conditions for advantage/disadvantage on skill checks
+	const mods = resolveRollModifiers(character.conditions, 'skill-check', ability);
+	const finalAdv = mergeAdvantage(mods.resolvedAdvantage, overrideAdvantage);
+
+	let advBonus = 0;
+	if (finalAdv === 'advantage') advBonus = 5;
+	else if (finalAdv === 'disadvantage') advBonus = -5;
+
+	return 10 + abilityMod + profBonus + advBonus;
+}
+
+// ---------------------------------------------------------------------------
+// Contested Checks
+// ---------------------------------------------------------------------------
+
+export interface ContestedCheckResult {
+	actor: CheckResult;
+	opponent: CheckResult;
+	winner: 'actor' | 'opponent' | 'tie';
+	margin: number;
+}
+
+/**
+ * Resolve a contested check between two characters.
+ *
+ * Each side rolls their respective skill (or ability, if `skillOrAbility`
+ * is an `AbilityName`). The higher total wins. Ties go to the defender
+ * (opponent), per common 5e convention.
+ */
+export function contestedCheck(
+	actor: PlayerCharacter,
+	actorSkill: SkillName,
+	opponent: PlayerCharacter,
+	opponentSkill: SkillName,
+	overrideActorAdv?: AdvantageState,
+	overrideOpponentAdv?: AdvantageState
+): ContestedCheckResult {
+	// We use DC 0 because there's no fixed DC — the opponent's roll IS the DC.
+	const actorResult = skillCheck(actor, actorSkill, 0, overrideActorAdv);
+	const opponentResult = skillCheck(opponent, opponentSkill, 0, overrideOpponentAdv);
+
+	const margin = actorResult.total - opponentResult.total;
+
+	// Tie goes to the opponent (defender) per 5e convention
+	let winner: 'actor' | 'opponent' | 'tie';
+	if (margin > 0) winner = 'actor';
+	else if (margin < 0) winner = 'opponent';
+	else winner = 'tie';
+
+	return {
+		actor: { ...actorResult, dc: opponentResult.total, success: margin > 0 },
+		opponent: { ...opponentResult, dc: actorResult.total, success: margin <= 0 },
+		winner,
+		margin
+	};
+}
+
+// ---------------------------------------------------------------------------
+// Tool Checks
+// ---------------------------------------------------------------------------
+
+/**
+ * Perform a tool proficiency check.
+ *
+ * This is an ability check where proficiency bonus is added if the character
+ * has the named tool in their `toolProficiencies` list.
+ */
+export function toolCheck(
+	character: PlayerCharacter,
+	ability: AbilityName,
+	toolName: string,
+	dc: number,
+	overrideAdvantage?: AdvantageState
+): CheckResult {
+	const abilityMod = abilityModifier(character.abilities[ability]);
+	const proficient = character.toolProficiencies.includes(toolName);
+	const bonus = abilityMod + (proficient ? character.proficiencyBonus : 0);
+
+	const mods = resolveRollModifiers(character.conditions, 'ability-check', ability);
+
+	if (mods.autoFail) {
+		return autoFailResult(dc, abilityMod, proficient, false, bonus);
+	}
+
+	const finalAdv = mergeAdvantage(mods.resolvedAdvantage, overrideAdvantage);
+
+	const { chosen, result: diceResult } = rollD20(finalAdv);
+	const total = chosen + bonus;
+
+	return {
+		roll: diceResult,
+		abilityMod,
+		proficient,
+		expertise: false,
+		bonus,
+		total,
+		dc,
+		success: total >= dc,
+		nat1: chosen === 1,
+		nat20: chosen === 20,
+		advantageState: finalAdv,
+		autoFailed: false
+	};
+}
+
+// ---------------------------------------------------------------------------
+// Internal Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Merge a condition-derived advantage state with an explicit override.
+ * If both advantage and disadvantage are present, they cancel to 'normal'.
+ */
+function mergeAdvantage(conditionAdv: AdvantageState, override?: AdvantageState): AdvantageState {
+	if (!override || override === 'normal') return conditionAdv;
+	if (conditionAdv === 'normal') return override;
+	// Both provided and they agree → use it
+	if (conditionAdv === override) return conditionAdv;
+	// They disagree (one is advantage, other is disadvantage) → cancel
+	return 'normal';
+}
+
+/**
+ * Build a CheckResult for an auto-failed check.
+ */
+function autoFailResult(
+	dc: number,
+	abilityMod: number,
+	proficient: boolean,
+	expertise: boolean,
+	bonus: number
+): CheckResult {
+	return {
+		roll: { notation: '0d20', rolls: [0], total: 0 },
+		abilityMod,
+		proficient,
+		expertise,
+		bonus,
+		total: 0,
+		dc,
+		success: false,
+		nat1: false,
+		nat20: false,
+		advantageState: 'normal',
+		autoFailed: true
+	};
 }
 
 // ---------------------------------------------------------------------------

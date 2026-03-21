@@ -7,7 +7,7 @@
  * Sources: 5e SRD (CC-BY-4.0)
  */
 
-import type { AbilityName, SkillName, ClassName } from '../types';
+import type { AbilityName, SkillName, ClassName, ClassLevel } from '../types';
 import type { ArmorProficiency, WeaponProficiency, ToolProficiency } from './races';
 
 // ---------------------------------------------------------------------------
@@ -89,7 +89,7 @@ export interface ClassDefinition {
 // ---------------------------------------------------------------------------
 
 /** Full caster slots per level: rows = class levels 1–20, columns = spell levels 1–9 */
-const FULL_CASTER_SLOTS: number[][] = [
+export const FULL_CASTER_SLOTS: number[][] = [
 	[2,0,0,0,0,0,0,0,0], // 1
 	[3,0,0,0,0,0,0,0,0], // 2
 	[4,2,0,0,0,0,0,0,0], // 3
@@ -161,7 +161,7 @@ const THIRD_CASTER_SLOTS: number[][] = [
 ];
 
 /** Warlock Pact Magic slots (all slots are the same level) */
-const PACT_SLOTS: number[][] = [
+export const PACT_SLOTS: number[][] = [
 	[1,0,0,0,0,0,0,0,0], // 1  — 1 slot, 1st level
 	[2,0,0,0,0,0,0,0,0], // 2  — 2 slots, 1st level
 	[0,2,0,0,0,0,0,0,0], // 3  — 2 slots, 2nd level
@@ -949,4 +949,66 @@ export function isASILevel(className: ClassName, level: number): boolean {
 	const cls = getClass(className);
 	if (!cls) return false;
 	return cls.features.some((f) => f.level === level && f.tags.includes('asi'));
+}
+
+// ---------------------------------------------------------------------------
+// Multiclass Spell Slot Computation
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute multiclass spell slots from the effective caster level.
+ *
+ * Per 5e multiclass rules:
+ *  - Full casters (wizard, cleric, druid, bard, sorcerer): contribute full level
+ *  - Half casters (paladin, ranger): contribute floor(level / 2)
+ *  - Third casters (EK fighter, AT rogue via subclass): contribute floor(level / 3)
+ *  - Pact casters (warlock): do NOT contribute to multiclass slots
+ *
+ * Result is looked up in the full-caster spell slot table.
+ * Returns an array of 9 slot counts [1st..9th] or empty for non-casters.
+ */
+export function getMulticlassSpellSlots(classes: ClassLevel[]): number[] {
+	let effectiveLevel = 0;
+	for (const entry of classes) {
+		const cls = getClass(entry.name);
+		if (!cls?.spellcasting) continue;
+		switch (cls.spellcasting.style) {
+			case 'full':
+				effectiveLevel += entry.level;
+				break;
+			case 'half':
+				effectiveLevel += Math.floor(entry.level / 2);
+				break;
+			case 'third':
+				effectiveLevel += Math.floor(entry.level / 3);
+				break;
+			// 'pact' and 'none' do not contribute
+		}
+	}
+	if (effectiveLevel <= 0) return [];
+	effectiveLevel = Math.min(effectiveLevel, 20);
+	return [...(FULL_CASTER_SLOTS[effectiveLevel - 1] ?? [])];
+}
+
+/**
+ * Get Warlock pact magic slots for a given warlock level.
+ *
+ * Returns { count, slotLevel } or null if the character has no warlock levels.
+ * All pact slots are the same spell level, refreshing on short rest.
+ */
+export function getPactSlotInfo(warlockLevel: number): { count: number; slotLevel: number } | null {
+	if (warlockLevel <= 0 || warlockLevel > 20) return null;
+	const row = PACT_SLOTS[warlockLevel - 1];
+	if (!row) return null;
+	// Find the highest index with a non-zero value — that's the slot level
+	let slotLevel = 0;
+	let count = 0;
+	for (let i = 0; i < row.length; i++) {
+		if (row[i] > 0) {
+			slotLevel = i + 1;
+			count = row[i];
+		}
+	}
+	if (count === 0) return null;
+	return { count, slotLevel };
 }

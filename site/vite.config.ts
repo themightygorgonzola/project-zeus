@@ -11,6 +11,9 @@ export default defineConfig(({ mode }) => {
 		plugins: [sveltekit()],
 		server: {
 			port: 5173
+		},
+		test: {
+			include: ['src/**/*.test.ts']
 		}
 	};
 });

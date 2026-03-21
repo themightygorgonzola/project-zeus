@@ -59,5 +59,6 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	}
 
 	await saveGameState(params.id, state);
+
 	return json({ ok: true, character });
 };

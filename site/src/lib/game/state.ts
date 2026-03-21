@@ -5,12 +5,15 @@
  * All game-layer code goes through these functions instead of raw JSON casts.
  */
 
-import { eq } from 'drizzle-orm';
+import { desc, eq, and, gt } from 'drizzle-orm';
 import { db } from '$lib/server/db/client';
-import { adventureState, adventureTurns } from '$lib/server/db/schema';
+import { adventureState, adventureTurns, adventureChat } from '$lib/server/db/schema';
+import { ulid } from 'ulid';
 import type {
 	AbilityName,
 	AbilityScores,
+	ClassLevel,
+	ClassSpellList,
 	ConditionEffectMap,
 	GameClock,
 	GameId,
@@ -128,14 +131,140 @@ function normalizeItem(value: unknown): Item {
 	};
 }
 
+const VALID_RECOVERY = new Set(['short-rest', 'long-rest', 'dawn']);
+function normalizeFeatureUses(raw: unknown): PlayerCharacter['featureUses'] {
+	if (!raw || typeof raw !== 'object') return {};
+	const result: PlayerCharacter['featureUses'] = {};
+	for (const [key, val] of Object.entries(raw as Record<string, unknown>)) {
+		if (val && typeof val === 'object') {
+			const entry = val as Record<string, unknown>;
+			const max = Math.max(0, toNumber(entry.max, 0));
+			const current = Math.max(0, Math.min(max, toNumber(entry.current, max)));
+			const recoversOn = typeof entry.recoversOn === 'string' && VALID_RECOVERY.has(entry.recoversOn)
+				? entry.recoversOn as 'short-rest' | 'long-rest' | 'dawn'
+				: 'long-rest';
+			result[key] = { current, max, recoversOn };
+		}
+	}
+	return result;
+}
+
 function normalizeCharacter(value: unknown): PlayerCharacter {
 	const obj = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 	const abilities = normalizeAbilityScores(obj.abilities);
 	const wisMod = Math.floor((abilities.wis - 10) / 2);
+	const legacyClassName = typeof obj.class === 'string'
+		? obj.class as PlayerCharacter['classes'][0]['name']
+		: 'fighter';
+	const legacyLevel = Math.max(1, toNumber(obj.level, 1));
 	const skillProficiencies = Array.isArray(obj.skillProficiencies)
 		? obj.skillProficiencies.filter((entry): entry is PlayerCharacter['skillProficiencies'][number] => typeof entry === 'string')
 		: [];
 	const proficiencyBonus = toNumber(obj.proficiencyBonus, 2);
+
+	// Normalize multiclass classes array
+	const classes: ClassLevel[] = Array.isArray(obj.classes)
+		? (obj.classes as unknown[])
+			.filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object')
+			.map((entry) => ({
+				name: (typeof entry.name === 'string' ? entry.name : 'fighter') as PlayerCharacter['classes'][0]['name'],
+				level: Math.max(1, toNumber(entry.level, 1)),
+				subclass: typeof entry.subclass === 'string' ? entry.subclass : undefined,
+				hitDiceRemaining: Math.max(0, toNumber(entry.hitDiceRemaining, Math.max(1, toNumber(entry.level, 1))))
+			}))
+		: [];
+	if (classes.length === 0 && typeof obj.class === 'string') {
+		classes.push({
+			name: legacyClassName,
+			level: legacyLevel,
+			subclass: typeof obj.subclass === 'string' ? obj.subclass : undefined,
+			hitDiceRemaining: Math.max(0, toNumber(obj.hitDiceRemaining, legacyLevel))
+		});
+	}
+	// Ensure at least one class entry
+	if (classes.length === 0) {
+		classes.push({ name: 'fighter', level: 1, hitDiceRemaining: 1 });
+	}
+	const totalLevel = classes.reduce((sum, c) => sum + c.level, 0);
+
+	// Normalize per-class spell lists
+	const classSpells: ClassSpellList[] = Array.isArray(obj.classSpells)
+		? (obj.classSpells as unknown[])
+			.filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object')
+			.map((entry) => ({
+				className: (typeof entry.className === 'string' ? entry.className : 'wizard') as ClassSpellList['className'],
+				spellcastingAbility: (typeof entry.spellcastingAbility === 'string' ? entry.spellcastingAbility : 'int') as AbilityName,
+				cantrips: toStringArray(entry.cantrips),
+				knownSpells: toStringArray(entry.knownSpells),
+				preparedSpells: toStringArray(entry.preparedSpells)
+			}))
+		: [];
+	if (
+		classSpells.length === 0 &&
+		typeof obj.class === 'string' &&
+		(
+			Array.isArray(obj.cantrips) ||
+			Array.isArray(obj.knownSpells) ||
+			Array.isArray(obj.preparedSpells) ||
+			typeof obj.spellcastingAbility === 'string'
+		)
+	) {
+		classSpells.push({
+			className: legacyClassName,
+			spellcastingAbility: (typeof obj.spellcastingAbility === 'string' ? obj.spellcastingAbility : 'int') as AbilityName,
+			cantrips: toStringArray(obj.cantrips),
+			knownSpells: toStringArray(obj.knownSpells),
+			preparedSpells: toStringArray(obj.preparedSpells)
+		});
+	}
+
+	const standardSpellSlots = Array.isArray(obj.spellSlots)
+		? obj.spellSlots.filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object')
+			.map((entry) => ({
+				level: Math.max(1, toNumber(entry.level, 1)),
+				current: Math.max(0, toNumber(entry.current, 0)),
+				max: Math.max(0, toNumber(entry.max, 0))
+			}))
+		: [];
+	const pactSlots = Array.isArray(obj.pactSlots)
+		? (obj.pactSlots as unknown[])
+			.filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object')
+			.map((entry) => ({
+				level: Math.max(1, toNumber(entry.level, 1)),
+				current: Math.max(0, toNumber(entry.current, 0)),
+				max: Math.max(0, toNumber(entry.max, 0))
+			}))
+		: [];
+	const migratedPactSlots = pactSlots.length === 0 && legacyClassName === 'warlock'
+		? standardSpellSlots.map((slot) => ({ ...slot }))
+		: pactSlots;
+	const migratedStandardSlots = pactSlots.length === 0 && legacyClassName === 'warlock'
+		? []
+		: standardSpellSlots;
+	const classFeatures = Array.isArray(obj.classFeatures)
+		? obj.classFeatures
+			.filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object' && typeof entry.name === 'string' && typeof entry.level === 'number')
+			.map((entry) => ({
+				name: entry.name as string,
+				level: entry.level as number,
+				source: typeof entry.source === 'string'
+					? entry.source as PlayerCharacter['classFeatures'][number]['source']
+					: undefined,
+				sourceClass:
+					typeof entry.sourceClass === 'string'
+						? entry.sourceClass as PlayerCharacter['classes'][0]['name']
+						: (entry.source === 'class' || entry.source === 'subclass') && typeof obj.class === 'string'
+							? legacyClassName
+							: undefined,
+				description: typeof entry.description === 'string' ? entry.description : undefined,
+				maxUses: typeof entry.maxUses === 'number' ? entry.maxUses : undefined,
+				currentUses: typeof entry.currentUses === 'number' ? entry.currentUses : undefined,
+				recoversOn:
+					typeof entry.recoversOn === 'string' && VALID_RECOVERY.has(entry.recoversOn)
+						? entry.recoversOn as 'short-rest' | 'long-rest' | 'dawn'
+						: undefined
+			}))
+		: [];
 
 	return {
 		id: typeof obj.id === 'string' ? obj.id : '',
@@ -143,12 +272,11 @@ function normalizeCharacter(value: unknown): PlayerCharacter {
 		adventureId: typeof obj.adventureId === 'string' ? obj.adventureId : '',
 		name: typeof obj.name === 'string' ? obj.name : 'Unnamed Hero',
 		race: typeof obj.race === 'string' ? obj.race as PlayerCharacter['race'] : 'human',
-		class: typeof obj.class === 'string' ? obj.class as PlayerCharacter['class'] : 'fighter',
+		classes,
 		subrace: typeof obj.subrace === 'string' ? obj.subrace : undefined,
-		subclass: typeof obj.subclass === 'string' ? obj.subclass : undefined,
 		background: typeof obj.background === 'string' ? obj.background : undefined,
 		alignment: typeof obj.alignment === 'string' ? obj.alignment as PlayerCharacter['alignment'] : undefined,
-		level: Math.max(1, toNumber(obj.level, 1)),
+		level: totalLevel,
 		abilities,
 		hp: Math.max(0, toNumber(obj.hp, 1)),
 		maxHp: Math.max(1, toNumber(obj.maxHp, 1)),
@@ -158,6 +286,9 @@ function normalizeCharacter(value: unknown): PlayerCharacter {
 		size: typeof obj.size === 'string' ? obj.size as PlayerCharacter['size'] : 'Medium',
 		proficiencyBonus,
 		skillProficiencies,
+		expertiseSkills: Array.isArray(obj.expertiseSkills)
+			? obj.expertiseSkills.filter((entry): entry is PlayerCharacter['expertiseSkills'][number] => typeof entry === 'string')
+			: [],
 		saveProficiencies: Array.isArray(obj.saveProficiencies)
 			? obj.saveProficiencies.filter((entry): entry is AbilityName => typeof entry === 'string')
 			: [],
@@ -165,23 +296,11 @@ function normalizeCharacter(value: unknown): PlayerCharacter {
 		armorProficiencies: toStringArray(obj.armorProficiencies),
 		weaponProficiencies: toStringArray(obj.weaponProficiencies),
 		toolProficiencies: toStringArray(obj.toolProficiencies),
-		classFeatures: Array.isArray(obj.classFeatures)
-			? obj.classFeatures.filter((entry): entry is PlayerCharacter['classFeatures'][number] => !!entry && typeof entry === 'object' && typeof (entry as Record<string, unknown>).name === 'string' && typeof (entry as Record<string, unknown>).level === 'number')
-			: [],
+		classFeatures,
 		feats: toStringArray(obj.feats),
-		spellcastingAbility: typeof obj.spellcastingAbility === 'string' ? obj.spellcastingAbility as AbilityName : undefined,
-		spellSlots: Array.isArray(obj.spellSlots)
-			? obj.spellSlots.filter((entry): entry is PlayerCharacter['spellSlots'][number] => !!entry && typeof entry === 'object')
-				.map((entry) => ({
-					level: Math.max(1, toNumber((entry as unknown as Record<string, unknown>).level, 1)),
-					current: Math.max(0, toNumber((entry as unknown as Record<string, unknown>).current, 0)),
-					max: Math.max(0, toNumber((entry as unknown as Record<string, unknown>).max, 0))
-				}))
-			: [],
-		knownSpells: toStringArray(obj.knownSpells),
-		preparedSpells: toStringArray(obj.preparedSpells),
-		cantrips: toStringArray(obj.cantrips),
-		hitDiceRemaining: Math.max(0, toNumber(obj.hitDiceRemaining, Math.max(1, toNumber(obj.level, 1)))),
+		spellSlots: migratedStandardSlots,
+		pactSlots: migratedPactSlots,
+		classSpells,
 		deathSaves: {
 			successes: Math.max(0, Math.min(3, toNumber((obj.deathSaves as Record<string, unknown> | undefined)?.successes, 0))),
 			failures: Math.max(0, Math.min(3, toNumber((obj.deathSaves as Record<string, unknown> | undefined)?.failures, 0)))
@@ -194,13 +313,24 @@ function normalizeCharacter(value: unknown): PlayerCharacter {
 		conditions: Array.isArray(obj.conditions)
 			? obj.conditions.filter((entry): entry is PlayerCharacter['conditions'][number] => typeof entry === 'string')
 			: [],
+		resistances: Array.isArray(obj.resistances)
+			? obj.resistances.filter((entry): entry is string => typeof entry === 'string')
+			: [],
+		exhaustionLevel: Math.max(0, Math.min(6, toNumber(obj.exhaustionLevel, 0))),
+		stable: typeof obj.stable === 'boolean' ? obj.stable : false,
+		dead: typeof obj.dead === 'boolean' ? obj.dead : false,
+		concentratingOn: typeof obj.concentratingOn === 'string' ? obj.concentratingOn : null,
+		featureUses: normalizeFeatureUses(obj.featureUses),
+		attunedItems: Array.isArray(obj.attunedItems)
+			? obj.attunedItems.filter((entry): entry is string => typeof entry === 'string')
+			: [],
 		backstory: typeof obj.backstory === 'string' ? obj.backstory : ''
 	};
 }
 
 function normalizeNpc(value: unknown): NPC {
 	const obj = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
-	return {
+	const base: NPC = {
 		id: typeof obj.id === 'string' ? obj.id : '',
 		name: typeof obj.name === 'string' ? obj.name : 'Unknown NPC',
 		role: typeof obj.role === 'string' ? obj.role as NPC['role'] : 'neutral',
@@ -211,6 +341,14 @@ function normalizeNpc(value: unknown): NPC {
 		alive: typeof obj.alive === 'boolean' ? obj.alive : true,
 		statBlock: obj.statBlock && typeof obj.statBlock === 'object' ? obj.statBlock as NPC['statBlock'] : undefined
 	};
+	if (typeof obj.lastInteractionTurn === 'number') base.lastInteractionTurn = obj.lastInteractionTurn;
+	if (Array.isArray(obj.interactionNotes)) {
+		base.interactionNotes = obj.interactionNotes
+			.filter((n: unknown) => n && typeof n === 'object' && typeof (n as Record<string, unknown>).turn === 'number' && typeof (n as Record<string, unknown>).note === 'string')
+			.map((n: unknown) => ({ turn: (n as Record<string, unknown>).turn as number, note: (n as Record<string, unknown>).note as string }));
+	}
+	if (typeof obj.archived === 'boolean') base.archived = obj.archived;
+	return base;
 }
 
 function normalizeQuest(value: unknown): Quest {
@@ -270,9 +408,68 @@ export function createInitialGameState(worldSeed: string): GameState {
 		turnLog: [],
 		worldSeed,
 		nextTurnNumber: 1,
+		sceneFacts: [],
 		createdAt: now,
 		updatedAt: now
 	};
+}
+
+export function buildOpeningPreamble(state: GameState): string {
+	const location = state.locations.find((loc) => loc.id === state.partyLocationId) ?? state.locations[0];
+	if (!location) {
+		return 'Your adventure begins. The world waits to see what you do first.';
+	}
+
+	const localNpcs = state.npcs
+		.filter((npc) => npc.alive !== false && npc.locationId === location.id && npc.role !== 'hostile')
+		.map((npc) => npc.name);
+	const quest = state.quests.find((q) => q.status === 'available' || q.status === 'active');
+	const firstObjective = quest?.objectives.find((o) => !o.done)?.text ?? quest?.objectives[0]?.text;
+	const feature = location.features[0];
+	const timeBeat = `It is day ${state.clock.day}, ${state.clock.timeOfDay}, under ${state.clock.weather} skies.`;
+
+	const parts = [
+		`You begin in ${location.name}, ${location.description}`,
+		feature ? `A notable detail stands out immediately: ${feature}.` : '',
+		localNpcs.length > 0
+			? `${localNpcs.join(', ')} ${localNpcs.length === 1 ? 'is' : 'are'} nearby, close enough to approach.`
+			: '',
+		quest
+			? `A clear lead is already in front of you: ${quest.name}. ${firstObjective ? `The first step is simple — ${firstObjective}.` : quest.description}`
+			: '',
+		timeBeat,
+		'What do you do first?'
+	].filter(Boolean);
+
+	return parts.join('\n\n');
+}
+
+export function createOpeningGmTurn(state: GameState): TurnRecord | null {
+	if (state.locations.length === 0) return null;
+
+	const now = Date.now();
+	const turn: TurnRecord = {
+		id: ulid(),
+		turnNumber: state.nextTurnNumber,
+		actorType: 'gm',
+		actorId: 'gm',
+		action: '',
+		intent: 'free-narration',
+		status: 'completed',
+		resolvedActionSummary: 'Opening scene established',
+		mechanicResults: [],
+		stateChanges: {},
+		narrativeText: buildOpeningPreamble(state),
+		timestamp: now
+	};
+
+	state.nextTurnNumber += 1;
+	state.turnLog.push(turn);
+	if (state.turnLog.length > 50) {
+		state.turnLog = state.turnLog.slice(-50);
+	}
+
+	return turn;
 }
 
 // ---------------------------------------------------------------------------
@@ -309,6 +506,7 @@ function migrateV1toV2(rawState: Record<string, unknown>): GameState {
 		: defaultClock();
 	state.turnLog = Array.isArray(rawState.turnLog) ? rawState.turnLog as TurnRecord[] : [];
 	state.nextTurnNumber = Math.max(1, toNumber(rawState.nextTurnNumber, 1));
+	state.sceneFacts = Array.isArray(rawState.sceneFacts) ? rawState.sceneFacts.filter((f: unknown) => typeof f === 'string') : [];
 	state.createdAt = toNumber(rawState.createdAt, Date.now());
 	state.updatedAt = toNumber(rawState.updatedAt, state.createdAt);
 	state.conditionEffects = cloneConditionEffects();
@@ -382,7 +580,7 @@ export async function saveGameState(adventureId: string, state: GameState): Prom
 		.where(eq(adventureState.adventureId, adventureId));
 }
 
-export async function persistTurn(adventureId: string, turn: TurnRecord): Promise<void> {
+export async function persistTurn(adventureId: string, turn: TurnRecord, debugJson?: string | null): Promise<void> {
 	await db.insert(adventureTurns).values({
 		id: turn.id,
 		adventureId,
@@ -391,20 +589,71 @@ export async function persistTurn(adventureId: string, turn: TurnRecord): Promis
 		actorId: turn.actorId,
 		action: turn.action,
 		intent: turn.intent,
+		status: turn.status,
+		resolvedSummary: turn.resolvedActionSummary,
 		mechanicsJson: JSON.stringify(turn.mechanicResults),
 		stateChangesJson: JSON.stringify(turn.stateChanges),
 		narrativeText: turn.narrativeText,
+		debugJson: debugJson ?? null,
 		createdAt: turn.timestamp
 	});
 }
 
+/**
+ * Atomically persist a turn record and save updated game state in a single batch.
+ * This ensures turn and state are never out of sync — either both succeed or neither does.
+ */
+export async function persistTurnAndSaveState(
+	adventureId: string,
+	turn: TurnRecord,
+	state: GameState,
+	debugJson?: string | null
+): Promise<void> {
+	const now = Date.now();
+	state.version = GAME_STATE_VERSION;
+	state.stateVersion = GAME_STATE_VERSION;
+	state.updatedAt = now;
+
+	await db.batch([
+		db.insert(adventureTurns).values({
+			id: turn.id,
+			adventureId,
+			turnNumber: turn.turnNumber,
+			actorType: turn.actorType,
+			actorId: turn.actorId,
+			action: turn.action,
+			intent: turn.intent,
+			status: turn.status,
+			resolvedSummary: turn.resolvedActionSummary,
+			mechanicsJson: JSON.stringify(turn.mechanicResults),
+			stateChangesJson: JSON.stringify(turn.stateChanges),
+			narrativeText: turn.narrativeText,
+			debugJson: debugJson ?? null,
+			createdAt: turn.timestamp
+		}),
+		db.update(adventureState)
+			.set({
+				stateJson: JSON.stringify(state),
+				updatedAt: now
+			})
+			.where(eq(adventureState.adventureId, adventureId))
+	]);
+}
+
+/**
+ * Load the most recent N turns for an adventure, in chronological order.
+ * Orders by turnNumber DESC to get the latest, then reverses for chronological output.
+ */
 export async function loadRecentTurns(adventureId: string, limit = 20): Promise<TurnRecord[]> {
 	const rows = await db
 		.select()
 		.from(adventureTurns)
 		.where(eq(adventureTurns.adventureId, adventureId))
-		.orderBy(adventureTurns.turnNumber)
+		.orderBy(desc(adventureTurns.turnNumber))
 		.limit(limit);
+
+	// Reverse to chronological order (oldest first)
+	rows.reverse();
 
 	return rows.map((r) => ({
 		id: r.id,
@@ -413,6 +662,8 @@ export async function loadRecentTurns(adventureId: string, limit = 20): Promise<
 		actorId: r.actorId,
 		action: r.action,
 		intent: r.intent as TurnRecord['intent'],
+		status: (r.status ?? 'completed') as TurnRecord['status'],
+		resolvedActionSummary: r.resolvedSummary ?? '',
 		mechanicResults: JSON.parse(r.mechanicsJson) as TurnRecord['mechanicResults'],
 		stateChanges: JSON.parse(r.stateChangesJson) as TurnRecord['stateChanges'],
 		narrativeText: r.narrativeText,
@@ -529,4 +780,148 @@ export function mergeStateChanges(...changes: StateChange[]): StateChange {
 		if (c.encounterEnded) merged.encounterEnded = c.encounterEnded;
 	}
 	return merged;
+}
+
+// ---------------------------------------------------------------------------
+// Chat message persistence (durable player/party chat)
+// ---------------------------------------------------------------------------
+
+/** A persisted player chat message. */
+export interface ChatRecord {
+	id: string;
+	adventureId: string;
+	userId: string;
+	username: string;
+	text: string;
+	mentions: string[];
+	retroInvoked: boolean;
+	consumedByTurn: number | null;
+	createdAt: number;
+}
+
+/** Parse @mentions from a chat message text. Returns unique lowercase mention targets. */
+export function parseMentions(text: string): string[] {
+	const regex = /@(\w+)/g;
+	const mentions = new Set<string>();
+	let match: RegExpExecArray | null;
+	while ((match = regex.exec(text)) !== null) {
+		mentions.add(match[1].toLowerCase());
+	}
+	return [...mentions];
+}
+
+/** Persist a player chat message to the database. */
+export async function persistChatMessage(
+	adventureId: string,
+	userId: string,
+	username: string,
+	text: string,
+	id?: string
+): Promise<ChatRecord> {
+	const { ulid } = await import('ulid');
+	const msgId = id ?? ulid();
+	const mentions = parseMentions(text);
+	const now = Date.now();
+
+	await db.insert(adventureChat).values({
+		id: msgId,
+		adventureId,
+		userId,
+		username,
+		text,
+		mentionsJson: JSON.stringify(mentions),
+		retroInvoked: false,
+		consumedByTurn: null,
+		createdAt: now
+	});
+
+	return {
+		id: msgId,
+		adventureId,
+		userId,
+		username,
+		text,
+		mentions,
+		retroInvoked: false,
+		consumedByTurn: null,
+		createdAt: now
+	};
+}
+
+/** Load recent chat messages for an adventure, in chronological order. */
+export async function loadRecentChat(adventureId: string, limit = 50): Promise<ChatRecord[]> {
+	const rows = await db
+		.select()
+		.from(adventureChat)
+		.where(eq(adventureChat.adventureId, adventureId))
+		.orderBy(desc(adventureChat.createdAt))
+		.limit(limit);
+
+	rows.reverse(); // chronological
+
+	return rows.map((r) => ({
+		id: r.id,
+		adventureId: r.adventureId,
+		userId: r.userId,
+		username: r.username,
+		text: r.text,
+		mentions: JSON.parse(r.mentionsJson) as string[],
+		retroInvoked: r.retroInvoked,
+		consumedByTurn: r.consumedByTurn,
+		createdAt: r.createdAt
+	}));
+}
+
+/**
+ * Load unconsumed chat messages since the last GM turn (for building GM context).
+ * These are messages that haven't been included in a GM turn yet.
+ */
+export async function loadUnconsumedChat(adventureId: string): Promise<ChatRecord[]> {
+	const rows = await db
+		.select()
+		.from(adventureChat)
+		.where(
+			and(
+				eq(adventureChat.adventureId, adventureId),
+				eq(adventureChat.consumedByTurn, null as unknown as number)
+			)
+		)
+		.orderBy(adventureChat.createdAt);
+
+	return rows.map((r) => ({
+		id: r.id,
+		adventureId: r.adventureId,
+		userId: r.userId,
+		username: r.username,
+		text: r.text,
+		mentions: JSON.parse(r.mentionsJson) as string[],
+		retroInvoked: r.retroInvoked,
+		consumedByTurn: r.consumedByTurn,
+		createdAt: r.createdAt
+	}));
+}
+
+/**
+ * Mark chat messages as consumed by a specific GM turn.
+ * Called after a GM turn successfully completes to associate messages with that turn.
+ */
+export async function markChatConsumed(chatIds: string[], turnNumber: number): Promise<void> {
+	if (chatIds.length === 0) return;
+
+	for (const chatId of chatIds) {
+		await db
+			.update(adventureChat)
+			.set({ consumedByTurn: turnNumber })
+			.where(eq(adventureChat.id, chatId));
+	}
+}
+
+/**
+ * Mark a chat message as retro-invoked (player chose to include it in a GM invocation).
+ */
+export async function markChatRetroInvoked(chatId: string): Promise<void> {
+	await db
+		.update(adventureChat)
+		.set({ retroInvoked: true })
+		.where(eq(adventureChat.id, chatId));
 }
