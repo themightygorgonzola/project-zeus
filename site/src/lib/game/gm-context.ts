@@ -315,9 +315,9 @@ function buildGameStateContextBlock(state: GameState, worldBrief: string): strin
 		parts.push(`=== ACTIVE ENCOUNTER (Round ${enc.round}) ===`);
 		for (const cmb of enc.combatants) {
 			const tag = cmb.defeated ? ' (defeated: yes)' : '';
-			parts.push(`- ${cmb.name} (${cmb.type}): ${cmb.currentHp}/${cmb.maxHp} HP, AC ${cmb.ac}${tag}`);
+			parts.push(`- ${formatNameIdRef(cmb.name, cmb.id)} (${cmb.type}): ${cmb.currentHp}/${cmb.maxHp} HP, AC ${cmb.ac}${tag}`);
 		}
-		parts.push(`Use encounterEnded in stateChanges when the encounter resolves.`);
+		parts.push(`Use the exact [id:] values above as characterId in hpChanges. Use encounterEnded in stateChanges when the encounter resolves.`);
 		parts.push('');
 	}
 

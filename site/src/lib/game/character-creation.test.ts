@@ -295,3 +295,18 @@ describe('validateCharacterInput — basics', () => {
 		expect(errors).toHaveLength(0);
 	});
 });
+// ===========================================================================
+// Fighter starting weapon
+// ===========================================================================
+
+describe('createCharacter — fighter starting weapon', () => {
+    it('gives fighter a real weapon (Longsword) instead of a misc Martial Weapon', () => {
+        const pc = createCharacter(makeFighterInput(), 'user-1', 'adv-1');
+        const weapons = pc.inventory.filter((i) => i.category === 'weapon');
+        // Fighter must have at least one real weapon item (not a generic misc placeholder)
+        expect(weapons.length).toBeGreaterThanOrEqual(1);
+        // Default equipment selection gives Longsword (resolved from "Martial Weapon") + Crossbow
+        const longsword = weapons.find((w) => (w as any).weaponName === 'longsword');
+        expect(longsword).toBeDefined();
+    });
+});

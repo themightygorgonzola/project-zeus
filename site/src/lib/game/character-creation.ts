@@ -941,7 +941,18 @@ function resolveStartingEquipment(input: CharacterCreateInput, backgroundEquipme
 
 function itemFromLabel(label: string, equipPrimary = false): PlayerCharacter['inventory'][number] {
 	const { baseName, quantity } = parseItemLabel(label);
-	const weapon = getWeapon(baseName);
+
+	// Resolve generic placeholder labels to a canonical weapon name.
+	// "Martial Weapon" → longsword, "Simple Weapon" → handaxe.
+	const GENERIC_WEAPON_FALLBACK: Record<string, string> = {
+		'martial weapon': 'longsword',
+		'two martial weapons': 'longsword',
+		'simple weapon': 'handaxe',
+		'simple melee weapon': 'handaxe',
+		'simple ranged weapon': 'light crossbow',
+	};
+	const resolvedBaseName = GENERIC_WEAPON_FALLBACK[baseName.toLowerCase()] ?? baseName;
+	const weapon = getWeapon(resolvedBaseName);
 	if (weapon) {
 		return {
 			id: ulid(),

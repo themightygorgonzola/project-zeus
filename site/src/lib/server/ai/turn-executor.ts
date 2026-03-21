@@ -81,9 +81,14 @@ const HEALING_SPELLS = new Set([
 
 function classifyIntent(action: string): IntentType {
 	const lower = action.toLowerCase();
-	const asksAboutPossibility = lower.includes('?')
+	// Only treat as "asking about possibility" when the person is NOT issuing a first-person battle action.
+	// e.g. "I see this is odd? I attack the brigand!" should still be classified as attack.
+	const hasExplicitFirstPersonAttack = /\bi[\s.!,…]*(attack|strike|stab|shoot|fire|hit|charge|slash|fight|swing)\b/.test(lower);
+	const asksAboutPossibility = !hasExplicitFirstPersonAttack && (
+		lower.trimEnd().endsWith('?')
 		|| /^(can|could|would|should|do|does|did|where|what|who|when|why|how|are|is)\b/.test(lower)
-		|| /\b(any opportunities|looking for|want to find|are there opportunities|is there a way)\b/.test(lower);
+		|| /\b(any opportunities|looking for|want to find|are there opportunities|is there a way)\b/.test(lower)
+	);
 
 	// Death save must be checked BEFORE attack (to avoid 'throw' matching the attack regex)
 	if (/\b(death save|death saving throw|roll.*death|saving throw.*death)\b/.test(lower)) return 'death-save';
@@ -525,14 +530,24 @@ function actionMentionsWeapon(actionLower: string, weapon: WeaponItem): boolean 
 			if (token.length >= 3 && token !== 'weapon') aliases.add(token);
 		}
 	}
-	if ((weapon.weaponName ?? weapon.name).toLowerCase().includes('crossbow')) {
+	const wn = (weapon.weaponName ?? weapon.name).toLowerCase();
+	if (wn.includes('crossbow')) {
 		aliases.add('crossbow');
 		aliases.add('bolt');
 	}
-	if ((weapon.weaponName ?? weapon.name).toLowerCase().includes('bow')) {
+	if (wn.includes('bow')) {
 		aliases.add('bow');
 		aliases.add('arrow');
 	}
+	// Add common compound-word suffixes so "sword" matches "longsword"/"shortsword",
+	// "axe" matches "battleaxe"/"handaxe", etc.
+	if (wn.includes('sword')) aliases.add('sword');
+	if (wn.includes('axe')) aliases.add('axe');
+	if (wn.includes('spear')) aliases.add('spear');
+	if (wn.includes('staff')) aliases.add('staff');
+	if (wn.includes('hammer')) aliases.add('hammer');
+	if (wn.includes('dagger')) aliases.add('dagger');
+	if (wn.includes('mace')) aliases.add('mace');
 	return [...aliases].some((alias) => actionLower.includes(alias));
 }
 

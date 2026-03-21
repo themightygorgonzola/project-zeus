@@ -134,6 +134,18 @@ describe('parseTurnIntent', () => {
 		const intent = parseTurnIntent('I want to fight low level enemies. Are there opportunities to do so to prove my might?');
 		expect(intent.primaryIntent).toBe('talk');
 	});
+
+	it('classifies explicit first-person attack even when question mark appears earlier in message', () => {
+		// Regression: "...odd they come up? I attack the brigand!" was classified as talk
+		const intent = parseTurnIntent('I see the dice but this is really odd they come up after the combat rounds? I attack the brigand!');
+		expect(intent.primaryIntent).toBe('attack');
+	});
+
+	it('classifies attack with ellipsis hesitation', () => {
+		// Regression: "I.... attack with the sword..?" was classified as talk
+		const intent = parseTurnIntent('I.... attack with the sword..?');
+		expect(intent.primaryIntent).toBe('attack');
+	});
 });
 
 // -----------------------------------------------------------------------
