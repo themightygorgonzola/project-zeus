@@ -1087,9 +1087,19 @@ export function parseStateExtractionResponse(raw: string): StateChange {
  * The AI sometimes copies the full party-section token (e.g. "555[01KM...]") instead
  * of extracting only the bracketed ID portion.
  */
-function normalizeCharacterId(raw: string): string {
+function resolveCharacterId(raw: string, characters: GameState['characters']): string {
+	// Strip "name[id]" → "id"
 	const m = raw.match(/\[([^\]]+)\]$/);
-	return m ? m[1] : raw;
+	const normalized = m ? m[1] : raw;
+	// If normalized is already a known character id, return it
+	if (characters.find((c) => c.id === normalized)) return normalized;
+	// Fallback: try to match by character name (AI sometimes emits bare name)
+	const byName = characters.find((c) => c.name === normalized || c.name === raw);
+	if (byName) {
+		console.warn(`[resolveCharacterId] resolved character name "${raw}" → id "${byName.id}"`);
+		return byName.id;
+	}
+	return normalized;
 }
 
 /**
@@ -1114,7 +1124,7 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] hpChanges[${i}].characterId is not a non-empty string — stripped`);
 					return false;
 				}
-				hc.characterId = normalizeCharacterId(hc.characterId);
+				hc.characterId = resolveCharacterId(hc.characterId, state.characters);
 				if (typeof hc.newHp !== 'number' || !isFinite(hc.newHp)) {
 					console.warn(`[sanitize] hpChanges[${i}].newHp is not a finite number — stripped`);
 					return false;
@@ -1152,7 +1162,7 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] conditionsApplied[${i}].characterId is not a non-empty string — stripped`);
 					return false;
 				}
-				ca.characterId = normalizeCharacterId(ca.characterId);
+				ca.characterId = resolveCharacterId(ca.characterId, state.characters);
 				if (!validConditions.has(ca.condition)) {
 					console.warn(`[sanitize] conditionsApplied[${i}].condition="${ca.condition}" is not a valid condition — stripped`);
 					return false;
@@ -1180,7 +1190,7 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] xpAwarded[${i}].characterId is not a non-empty string — stripped`);
 					return false;
 				}
-				xp.characterId = normalizeCharacterId(xp.characterId);
+				xp.characterId = resolveCharacterId(xp.characterId, state.characters);
 				if (typeof xp.amount !== 'number' || !isFinite(xp.amount) || xp.amount < 0) {
 					console.warn(`[sanitize] xpAwarded[${i}].amount=${xp.amount} is not a valid positive number — stripped`);
 					return false;
@@ -1264,7 +1274,7 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] itemsGained[${i}].characterId is not a non-empty string — stripped`);
 					return false;
 				}
-				ig.characterId = normalizeCharacterId(ig.characterId);
+				ig.characterId = resolveCharacterId(ig.characterId, state.characters);
 				if (!ig.item || typeof ig.item !== 'object') {
 					console.warn(`[sanitize] itemsGained[${i}].item is not an object — stripped`);
 					return false;
@@ -1303,7 +1313,7 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] itemsLost[${i}].characterId is not a non-empty string — stripped`);
 					return false;
 				}
-				il.characterId = normalizeCharacterId(il.characterId);
+				il.characterId = resolveCharacterId(il.characterId, state.characters);
 				if (typeof il.itemId !== 'string' || !il.itemId) {
 					console.warn(`[sanitize] itemsLost[${i}].itemId is not a non-empty string — stripped`);
 					return false;
@@ -1331,7 +1341,7 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] itemsDropped[${i}].characterId is not a non-empty string — stripped`);
 					return false;
 				}
-				dr.characterId = normalizeCharacterId(dr.characterId);
+				dr.characterId = resolveCharacterId(dr.characterId, state.characters);
 				if (typeof dr.itemId !== 'string' || !dr.itemId) {
 					console.warn(`[sanitize] itemsDropped[${i}].itemId is not a non-empty string — stripped`);
 					return false;
@@ -1356,7 +1366,7 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] itemsPickedUp[${i}].characterId is not a non-empty string — stripped`);
 					return false;
 				}
-				pu.characterId = normalizeCharacterId(pu.characterId);
+				pu.characterId = resolveCharacterId(pu.characterId, state.characters);
 				if (typeof pu.itemId !== 'string' || !pu.itemId) {
 					console.warn(`[sanitize] itemsPickedUp[${i}].itemId is not a non-empty string — stripped`);
 					return false;

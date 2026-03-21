@@ -1,0 +1,779 @@
+{
+  "_schema": "zeus-adventure-export-v1",
+  "exportedAt": "2026-03-21T15:56:22.796Z",
+  "adventure": {
+    "id": "01KM8HMV1T8SXZRXBQ6WFND4J8",
+    "name": "8",
+    "status": "active",
+    "mode": "solo",
+    "createdAt": "2026-03-21T15:53:57.562Z"
+  },
+  "members": [
+    {
+      "userId": "01KKPVVHN3W3MS40ZJP8B3RM6V",
+      "username": "The Admin",
+      "role": "owner"
+    }
+  ],
+  "finalState": {
+    "version": 3,
+    "stateVersion": 3,
+    "characters": [
+      {
+        "id": "01KM8HN2CDZMH58HYQGR74E97V",
+        "userId": "01KKPVVHN3W3MS40ZJP8B3RM6V",
+        "adventureId": "01KM8HMV1T8SXZRXBQ6WFND4J8",
+        "name": "888",
+        "race": "human",
+        "classes": [
+          {
+            "name": "fighter",
+            "level": 1,
+            "hitDiceRemaining": 1
+          }
+        ],
+        "background": "soldier",
+        "alignment": "neutral-good",
+        "level": 1,
+        "abilities": {
+          "str": 16,
+          "dex": 14,
+          "con": 15,
+          "int": 11,
+          "wis": 13,
+          "cha": 9
+        },
+        "hp": 12,
+        "maxHp": 12,
+        "tempHp": 0,
+        "ac": 18,
+        "speed": 30,
+        "size": "Medium",
+        "proficiencyBonus": 2,
+        "skillProficiencies": [
+          "athletics",
+          "intimidation",
+          "acrobatics",
+          "animal-handling"
+        ],
+        "expertiseSkills": [],
+        "saveProficiencies": [
+          "str",
+          "con"
+        ],
+        "languages": [
+          "Common",
+          "Dwarvish"
+        ],
+        "armorProficiencies": [
+          "light",
+          "medium",
+          "heavy",
+          "shields"
+        ],
+        "weaponProficiencies": [
+          "simple",
+          "martial"
+        ],
+        "toolProficiencies": [
+          "gaming-set",
+          "vehicles-land"
+        ],
+        "classFeatures": [
+          {
+            "name": "Extra Language",
+            "level": 1,
+            "source": "race",
+            "description": "You can speak, read, and write one extra language of your choice."
+          },
+          {
+            "name": "Military Rank",
+            "level": 1,
+            "source": "background",
+            "description": "You have a military rank from your career as a soldier. Soldiers loyal to your former organization still recognize your authority and influence."
+          },
+          {
+            "name": "Fighting Style",
+            "level": 1,
+            "source": "class",
+            "sourceClass": "fighter",
+            "description": "You adopt a particular style of fighting as your specialty."
+          },
+          {
+            "name": "Second Wind",
+            "level": 1,
+            "source": "class",
+            "sourceClass": "fighter",
+            "description": "You have a limited well of stamina. On your turn, you can use a bonus action to regain hit points equal to 1d10 + your fighter level. Once used, you must finish a short or long rest."
+          }
+        ],
+        "feats": [],
+        "spellSlots": [],
+        "pactSlots": [],
+        "classSpells": [],
+        "deathSaves": {
+          "successes": 0,
+          "failures": 0
+        },
+        "inspiration": false,
+        "passivePerception": 11,
+        "inventory": [
+          {
+            "id": "01KM8HN2CDGF123C42Y5B6W4QW",
+            "name": "Martial Weapon",
+            "category": "misc",
+            "description": "Starting equipment: Martial Weapon.",
+            "value": 0,
+            "quantity": 1,
+            "weight": 0,
+            "rarity": "common",
+            "attunement": false,
+            "tags": [
+              "starting-equipment"
+            ]
+          },
+          {
+            "id": "01KM8HN2CD2ZT1KZH37QMSZWAF",
+            "name": "Shield",
+            "category": "armor",
+            "description": "A set of shield.",
+            "value": 10,
+            "quantity": 1,
+            "weight": 6,
+            "rarity": "common",
+            "attunement": false,
+            "armorName": "shield",
+            "baseAC": 2,
+            "magicBonus": 0,
+            "equipped": true,
+            "maxDexBonus": null,
+            "stealthDisadvantage": false
+          },
+          {
+            "id": "01KM8HN2CDB1VZ6AMHPWRZSQT4",
+            "name": "Light Crossbow",
+            "category": "weapon",
+            "description": "A light crossbow.",
+            "value": 25,
+            "quantity": 1,
+            "weight": 5,
+            "rarity": "common",
+            "attunement": false,
+            "weaponName": "light-crossbow",
+            "damage": "1d8",
+            "damageType": "piercing",
+            "magicBonus": 0,
+            "properties": [
+              "ammunition",
+              "loading",
+              "range",
+              "two-handed"
+            ],
+            "range": "80/320",
+            "equipped": false,
+            "specialProperties": []
+          },
+          {
+            "id": "01KM8HN2CD1ZD746GP3EBBGG89",
+            "name": "Bolts (20)",
+            "category": "misc",
+            "description": "Starting equipment: Bolts (20).",
+            "value": 0,
+            "quantity": 20,
+            "weight": 0,
+            "rarity": "common",
+            "attunement": false,
+            "tags": [
+              "starting-equipment"
+            ]
+          },
+          {
+            "id": "01KM8HN2CDZRQBBXRSVXQW1HWA",
+            "name": "Dungeoneer's Pack",
+            "category": "misc",
+            "description": "Starting equipment: Dungeoneer's Pack.",
+            "value": 0,
+            "quantity": 1,
+            "weight": 0,
+            "rarity": "common",
+            "attunement": false,
+            "tags": [
+              "starting-equipment"
+            ]
+          },
+          {
+            "id": "01KM8HN2CD19F2FB4YXAQCWP2R",
+            "name": "Insignia of Rank",
+            "category": "misc",
+            "description": "Starting equipment: Insignia of Rank.",
+            "value": 0,
+            "quantity": 1,
+            "weight": 0,
+            "rarity": "common",
+            "attunement": false,
+            "tags": [
+              "starting-equipment"
+            ]
+          },
+          {
+            "id": "01KM8HN2CDP3TZ9NFET9W61F6Y",
+            "name": "Trophy from a Fallen Enemy",
+            "category": "misc",
+            "description": "Starting equipment: Trophy from a Fallen Enemy.",
+            "value": 0,
+            "quantity": 1,
+            "weight": 0,
+            "rarity": "common",
+            "attunement": false,
+            "tags": [
+              "starting-equipment"
+            ]
+          },
+          {
+            "id": "01KM8HN2CD957N159MSPN69MXN",
+            "name": "Bone Dice or Deck of Cards",
+            "category": "misc",
+            "description": "Starting equipment: Bone Dice or Deck of Cards.",
+            "value": 0,
+            "quantity": 1,
+            "weight": 0,
+            "rarity": "common",
+            "attunement": false,
+            "tags": [
+              "starting-equipment"
+            ]
+          },
+          {
+            "id": "01KM8HN2CDJ45DT0H41V9A81M5",
+            "name": "Common Clothes",
+            "category": "misc",
+            "description": "Starting equipment: Common Clothes.",
+            "value": 0,
+            "quantity": 1,
+            "weight": 0,
+            "rarity": "common",
+            "attunement": false,
+            "tags": [
+              "starting-equipment"
+            ]
+          },
+          {
+            "id": "01KM8HN2CDSHTFKJNG9QHGBKKD",
+            "name": "Belt Pouch",
+            "category": "misc",
+            "description": "Starting equipment: Belt Pouch.",
+            "value": 0,
+            "quantity": 1,
+            "weight": 0,
+            "rarity": "common",
+            "attunement": false,
+            "tags": [
+              "starting-equipment"
+            ]
+          }
+        ],
+        "gold": 15,
+        "xp": 0,
+        "conditions": [],
+        "resistances": [],
+        "exhaustionLevel": 0,
+        "stable": false,
+        "dead": false,
+        "concentratingOn": null,
+        "featureUses": {
+          "Second Wind": {
+            "current": 1,
+            "max": 1,
+            "recoversOn": "short-rest"
+          }
+        },
+        "attunedItems": [],
+        "backstory": ""
+      }
+    ],
+    "npcs": [
+      {
+        "id": "01KM8HMV1T3D3K27NN7W7TNPC5",
+        "name": "Brenot",
+        "role": "neutral",
+        "locationId": "01KM8HMV1TZDB1JA8GRADSQ7RJ",
+        "disposition": 20,
+        "description": "The keeper of the local tavern. Friendly, well-informed, and always happy to share rumors over a drink.",
+        "notes": "Knows local gossip. Can point players toward quests. Has a soft spot for adventurers.",
+        "alive": true
+      },
+      {
+        "id": "01KM8HMV1T9REHEA4YKGWFQRVB",
+        "name": "Darith",
+        "role": "merchant",
+        "locationId": "01KM8HMV1TZDB1JA8GRADSQ7RJ",
+        "disposition": 0,
+        "description": "A traveling trader who deals in provisions, simple weapons, and the occasional curiosity.",
+        "notes": "Carries basic adventuring gear. Prices are fair but firm.",
+        "alive": true
+      },
+      {
+        "id": "01KM8HMV1T3VJS9VKHRSP5YFED",
+        "name": "Daris",
+        "role": "quest-giver",
+        "locationId": "01KM8HMV1TZDB1JA8GRADSQ7RJ",
+        "disposition": 10,
+        "description": "A worried elder who has been looking for capable souls to handle a growing problem.",
+        "notes": "Offers the starter quest. Knows about the local threat but is too old to deal with it personally.",
+        "alive": true
+      }
+    ],
+    "locations": [
+      {
+        "id": "01KM8HMV1TZDB1JA8GRADSQ7RJ",
+        "name": "Lorgard Reach",
+        "regionRef": 1,
+        "type": "settlement",
+        "description": "Lorgard Reach is a town nestled in the lands of Kagard League. Its people follow the traditions of the Halos. The Kamere flows nearby. The Joryr Way holds sway here. It is a place where adventurers might find work, supplies, and rumors.",
+        "connections": [],
+        "npcs": [
+          "01KM8HMV1T3D3K27NN7W7TNPC5",
+          "01KM8HMV1T9REHEA4YKGWFQRVB",
+          "01KM8HMV1T3VJS9VKHRSP5YFED"
+        ],
+        "features": [
+          "A town of about 22,178 people.",
+          "Under the rule of Kagard League.",
+          "The locals follow Halos customs."
+        ],
+        "visited": true,
+        "groundItems": [
+          {
+            "id": "01KM8HN2CCWEBV3YC9AHAXATFQ",
+            "name": "Chain Mail",
+            "category": "armor",
+            "description": "A set of chain mail.",
+            "value": 75,
+            "quantity": 1,
+            "weight": 55,
+            "rarity": "common",
+            "attunement": false,
+            "armorName": "chain-mail",
+            "baseAC": 16,
+            "magicBonus": 0,
+            "equipped": true,
+            "maxDexBonus": 0,
+            "stealthDisadvantage": true
+          }
+        ]
+      }
+    ],
+    "quests": [
+      {
+        "id": "01KM8HMV1T3KJZ0PMMZDY3F1NK",
+        "name": "Trouble Near Lorgard Reach",
+        "giverNpcId": "01KM8HMV1T3VJS9VKHRSP5YFED",
+        "status": "available",
+        "description": "The people of Lorgard Reach are worried. Feneth and Kagard contest influence around Kagard Gate. Someone needs to investigate and deal with the threat before it grows worse.",
+        "objectives": [
+          {
+            "id": "01KM8HMV1TFMK3NRVCB0QA8GA2",
+            "text": "Speak with the locals to learn more about the threat",
+            "done": false
+          },
+          {
+            "id": "01KM8HMV1T2FQ8DYMR7W7QJ267",
+            "text": "Investigate the source of the disturbance",
+            "done": false
+          },
+          {
+            "id": "01KM8HMV1T38FQCBW5X7GVN5AJ",
+            "text": "Resolve the threat",
+            "done": false
+          }
+        ],
+        "rewards": {
+          "xp": 100,
+          "gold": 25,
+          "items": [],
+          "reputationChanges": [
+            {
+              "npcId": "01KM8HMV1T3VJS9VKHRSP5YFED",
+              "delta": 10
+            }
+          ]
+        },
+        "recommendedLevel": 1,
+        "encounterTemplates": [
+          "soldier"
+        ]
+      }
+    ],
+    "conditionEffects": {
+      "blinded": {
+        "advantageOn": [],
+        "disadvantageOn": [
+          "attack-rolls",
+          "sight-based-ability-checks"
+        ],
+        "cantDo": [
+          "see"
+        ],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": [
+          "Attack rolls against the creature have advantage."
+        ]
+      },
+      "charmed": {
+        "advantageOn": [],
+        "disadvantageOn": [],
+        "cantDo": [
+          "attack-charmer",
+          "target-charmer-with-harmful-abilities"
+        ],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": [
+          "The charmer has advantage on social checks against the creature."
+        ]
+      },
+      "deafened": {
+        "advantageOn": [],
+        "disadvantageOn": [
+          "hearing-based-ability-checks"
+        ],
+        "cantDo": [
+          "hear"
+        ],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": []
+      },
+      "frightened": {
+        "advantageOn": [],
+        "disadvantageOn": [
+          "ability-checks-while-source-visible",
+          "attack-rolls-while-source-visible"
+        ],
+        "cantDo": [
+          "willingly-move-closer-to-source"
+        ],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": []
+      },
+      "grappled": {
+        "advantageOn": [],
+        "disadvantageOn": [],
+        "cantDo": [],
+        "autoFailSaves": [],
+        "speedMultiplier": 0,
+        "notes": [
+          "Speed becomes 0 and the creature cannot benefit from bonuses to speed."
+        ]
+      },
+      "incapacitated": {
+        "advantageOn": [],
+        "disadvantageOn": [],
+        "cantDo": [
+          "take-actions",
+          "take-reactions"
+        ],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": []
+      },
+      "invisible": {
+        "advantageOn": [
+          "attack-rolls"
+        ],
+        "disadvantageOn": [],
+        "cantDo": [],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": [
+          "Attack rolls against the creature have disadvantage.",
+          "The creature is heavily obscured for hiding purposes."
+        ]
+      },
+      "paralyzed": {
+        "advantageOn": [],
+        "disadvantageOn": [],
+        "cantDo": [
+          "move",
+          "speak"
+        ],
+        "autoFailSaves": [
+          "str",
+          "dex"
+        ],
+        "speedMultiplier": 0,
+        "notes": [
+          "The creature is incapacitated.",
+          "Attack rolls against the creature have advantage.",
+          "Hits from within 5 feet are critical hits."
+        ]
+      },
+      "petrified": {
+        "advantageOn": [],
+        "disadvantageOn": [],
+        "cantDo": [
+          "move",
+          "speak"
+        ],
+        "autoFailSaves": [
+          "str",
+          "dex"
+        ],
+        "speedMultiplier": 0,
+        "notes": [
+          "The creature is incapacitated.",
+          "It has resistance to all damage.",
+          "It is immune to poison and disease."
+        ]
+      },
+      "poisoned": {
+        "advantageOn": [],
+        "disadvantageOn": [
+          "attack-rolls",
+          "ability-checks"
+        ],
+        "cantDo": [],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": []
+      },
+      "prone": {
+        "advantageOn": [],
+        "disadvantageOn": [
+          "attack-rolls"
+        ],
+        "cantDo": [],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": [
+          "Movement to stand costs extra.",
+          "Melee attacks against the creature have advantage.",
+          "Ranged attacks against it have disadvantage."
+        ]
+      },
+      "restrained": {
+        "advantageOn": [],
+        "disadvantageOn": [
+          "attack-rolls"
+        ],
+        "cantDo": [],
+        "autoFailSaves": [
+          "dex"
+        ],
+        "speedMultiplier": 0,
+        "notes": [
+          "Attack rolls against the creature have advantage."
+        ]
+      },
+      "stunned": {
+        "advantageOn": [],
+        "disadvantageOn": [],
+        "cantDo": [
+          "move",
+          "speak"
+        ],
+        "autoFailSaves": [
+          "str",
+          "dex"
+        ],
+        "speedMultiplier": 0,
+        "notes": [
+          "The creature is incapacitated.",
+          "Attack rolls against the creature have advantage."
+        ]
+      },
+      "unconscious": {
+        "advantageOn": [],
+        "disadvantageOn": [],
+        "cantDo": [
+          "move",
+          "speak",
+          "take-actions",
+          "take-reactions"
+        ],
+        "autoFailSaves": [
+          "str",
+          "dex"
+        ],
+        "speedMultiplier": 0,
+        "notes": [
+          "The creature is unaware of its surroundings.",
+          "Attack rolls against the creature have advantage.",
+          "Hits from within 5 feet are critical hits."
+        ]
+      },
+      "exhaustion": {
+        "advantageOn": [],
+        "disadvantageOn": [
+          "ability-checks"
+        ],
+        "cantDo": [],
+        "autoFailSaves": [],
+        "speedMultiplier": 0.5,
+        "notes": [
+          "Higher exhaustion levels stack additional penalties."
+        ]
+      }
+    },
+    "partyLocationId": "01KM8HMV1TZDB1JA8GRADSQ7RJ",
+    "clock": {
+      "day": 1,
+      "timeOfDay": "morning",
+      "weather": "clear"
+    },
+    "worldSeed": "1774108435049-597943",
+    "nextTurnNumber": 4,
+    "sceneFacts": [],
+    "createdAt": 1774108437562,
+    "updatedAt": 1774108546442
+  },
+  "turns": [
+    {
+      "turnNumber": 1,
+      "actor": "gm",
+      "actorType": "gm",
+      "intent": "free-narration",
+      "status": "completed",
+      "mode": null,
+      "model": null,
+      "latencyMs": null,
+      "action": "",
+      "resolvedSummary": "Opening scene established",
+      "mechanics": [],
+      "promptMessages": [],
+      "rawAiResponse": null,
+      "gmProposedChanges": null,
+      "appliedStateChanges": {},
+      "narrativeText": "You begin in Lorgard Reach, Lorgard Reach is a town nestled in the lands of Kagard League. Its people follow the traditions of the Halos. The Kamere flows nearby. The Joryr Way holds sway here. It is a place where adventurers might find work, supplies, and rumors.\n\nA notable detail stands out immediately: A town of about 22,178 people..\n\nBrenot, Darith, Daris are nearby, close enough to approach.\n\nA clear lead is already in front of you: Trouble Near Lorgard Reach. The first step is simple — Speak with the locals to learn more about the threat.\n\nIt is day 1, morning, under clear skies.\n\nWhat do you do first?",
+      "createdAt": "2026-03-21T15:53:58.010Z"
+    },
+    {
+      "turnNumber": 2,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "drop-item",
+      "status": "completed",
+      "mode": "full-gm-2pass",
+      "model": "gpt-4o",
+      "latencyMs": 7029,
+      "action": "I drop my chainmail",
+      "resolvedSummary": "",
+      "mechanics": [],
+      "promptMessages": [
+        {
+          "role": "system",
+          "content": "You are the Game Master of a tabletop-style fantasy RPG.\nYou adjudicate player actions like a skilled tabletop GM: narrate consequences, call for dice checks when the outcome is uncertain, and announce combat clearly.\nYou narrate in second-person perspective, speaking directly to the party.\nYou are authoritative about the world — you describe what happens as a consequence of player actions.\nYou respect the mechanics: when dice results are provided, narrate around those outcomes faithfully.\nKeep responses vivid and concise (2–5 sentences for normal actions, more for important moments).\nEnd each response with a beat that invites the next player action.\n\nIMPORTANT: Return ONLY narrative prose. Do NOT return JSON. A separate system handles game state updates.\n\n=== TABLETOP ADJUDICATION ===\nThink like a tabletop GM running a session at a table:\n\nCALLING FOR CHECKS:\n- When the outcome is uncertain and failure has interesting consequences, call for a check.\n- Name the check explicitly: \"Make a Perception check\", \"Roll a Stealth check\", \"Give me a Persuasion check.\"\"\n- If the action is trivial or routine (opening an unlocked door, walking down a road), just narrate the result.\n- Do NOT silently decide contested outcomes — if a player tries to sneak, lie, or persuade and there is resistance, call for the roll.\n\nSTARTING COMBAT:\n- Combat begins ONLY when hostilities are explicit: someone attacks, an ambush springs, or a creature charges.\n- When combat truly begins, announce it clearly with a phrase like \"Roll for initiative!\" or \"Combat begins!\" so the boundary is unmistakable.\n- Scouting, observing, reconnaissance, hearing rumors about enemies, and cautious dialogue NEVER start combat on their own.\n- A player saying \"I look for enemies\" or \"I scout ahead\" is gathering information, not starting a fight.\n\nDURING COMBAT:\n- Think in terms of turns, actions, bonus actions, reactions, movement, and positioning.\n- Narrate each combatant's actions with tactical clarity: who attacks whom, what weapon or ability is used, and what happens.\n- Reference engine-provided dice results faithfully. Do NOT invent hit/miss/damage beyond what the engine resolved.\n\nDIALOGUE & SOCIAL ENCOUNTERS:\n- When a player speaks to an NPC, roleplay the NPC's response in character.\n- If the player is trying to persuade, deceive, or intimidate and the NPC would resist, call for the appropriate check.\n- Low-stakes conversation (asking for directions, buying supplies, friendly banter) does not require a roll.\n- When stakes are high (convincing a guard to let you pass, lying to a noble, negotiating a hostage release), call for a check before resolving the outcome.\n\n=== DISCRETION RULES ===\nYOU MAY freely:\n- Infer the nearest enemy, closest ally, or default equipped weapon when context is obvious\n- Describe the environment, add sensory details, weather effects, ambient sounds\n- Advance NPC dialogue, create NPC reactions, and roleplay NPC personalities\n- Introduce new NPCs, locations, and quests when the story calls for it\n- Decide obvious movement paths (e.g., \"I go inside\" → enter the building)\n- Add dramatic tension, foreshadowing, and world flavor\n- Resolve trivial actions without a roll (picking up an object, sitting down, eating rations)\n\nYOU MUST NOT:\n- Silently choose between multiple materially different resource expenditures (healing spells vs potions, different spell slots)\n- Violate action economy, spell legality, slot availability, or rest rules\n- Override or contradict engine-provided mechanic results (if [Mechanics: ...] is present, those are FACTS)\n- Kill or permanently incapacitate a player character without mechanical justification\n- Grant magical items above the party's level range without quest justification\n- Start combat from scouting, observation, or cautious inquiry alone\n- Silently decide the outcome of a contested or high-stakes action without calling for a roll\n\nWHEN AMBIGUOUS:\n- If the player's intent is unclear but harmless, make a reasonable assumption and narrate\n- If the ambiguity could cost significant resources, ask a brief in-world clarifying question instead of acting\n\n=== CURRENT LOCATION ===\nLorgard Reach[01KM8HMV1TZDB1JA8GRADSQ7RJ]\nType: settlement\nDescription: Lorgard Reach is a town nestled in the lands of Kagard League. Its people follow the traditions of the Halos. The Kamere flows nearby. The Joryr Way holds sway here. It is a place where adventurers might find work, supplies, and rumors.\nFeatures: A town of about 22,178 people.; Under the rule of Kagard League.; The locals follow Halos customs.\nNPCs present: Brenot[01KM8HMV1T3D3K27NN7W7TNPC5] (neutral, warm), Darith[01KM8HMV1T9REHEA4YKGWFQRVB] (merchant, neutral), Daris[01KM8HMV1T3VJS9VKHRSP5YFED] (quest-giver, warm)\n\n=== PARTY ===\n- 888[01KM8HN2CDZMH58HYQGR74E97V] (Lv1 human fighter) — 12/12 HP | AC 18 | Gear: Chain Mail[01KM8HN2CCWEBV3YC9AHAXATFQ], Shield[01KM8HN2CD2ZT1KZH37QMSZWAF], Light Crossbow[01KM8HN2CDB1VZ6AMHPWRZSQT4]\n\n=== QUESTS ===\n- Trouble Near Lorgard Reach[01KM8HMV1T3KJZ0PMMZDY3F1NK] [available]: The people of Lorgard Reach are worried. Feneth and Kagard contest influence around Kagard Gate. Someone needs to investigate and deal with the threat before it grows worse. | Objectives: [ ] Speak with the locals to learn more about the threat[01KM8HMV1TFMK3NRVCB0QA8GA2]; [ ] Investigate the source of the disturbance[01KM8HMV1T2FQ8DYMR7W7QJ267]; [ ] Resolve the threat[01KM8HMV1T38FQCBW5X7GVN5AJ]\n\n=== TIME ===\nDay 1, morning. Weather: clear.\n"
+        },
+        {
+          "role": "assistant",
+          "content": "You begin in Lorgard Reach, Lorgard Reach is a town nestled in the lands of Kagard League. Its people follow the traditions of the Halos. The Kamere flows nearby. The Joryr Way holds sway here. It is a place where adventurers might find work, supplies, and rumors.\n\nA notable detail stands out immediately: A town of about 22,178 people..\n\nBrenot, Darith, Daris are nearby, close enough to approach.\n\nA clear lead is already in front of you: Trouble Near Lorgard Reach. The first step is simple — Speak with the locals to learn more about the threat.\n\nIt is day 1, morning, under clear skies.\n\nWhat do you do first?"
+        },
+        {
+          "role": "user",
+          "content": "I drop my chainmail"
+        }
+      ],
+      "rawAiResponse": "You remove your chain mail, feeling a bit lighter and more agile as you set the heavy armor carefully on the cobblestone street nearby. The morning sun glints off the polished metal, drawing a few curious glances from passersby. With your armor temporarily set aside, you feel more at ease to blend in and perhaps approach the locals or one of the nearby NPCs for information.\n\nWhat would you like to do next?",
+      "gmProposedChanges": {
+        "itemsDropped": [
+          {
+            "characterId": "01KM8HN2CDZMH58HYQGR74E97V",
+            "itemId": "01KM8HN2CCWEBV3YC9AHAXATFQ"
+          }
+        ]
+      },
+      "appliedStateChanges": {
+        "hpChanges": [],
+        "conditionsApplied": [],
+        "xpAwarded": [],
+        "questUpdates": [],
+        "npcChanges": [],
+        "itemsLost": [],
+        "itemsGained": [],
+        "itemsDropped": [
+          {
+            "characterId": "01KM8HN2CDZMH58HYQGR74E97V",
+            "itemId": "01KM8HN2CCWEBV3YC9AHAXATFQ"
+          }
+        ],
+        "itemsPickedUp": [],
+        "locationItemsAdded": [],
+        "npcsAdded": [],
+        "locationsAdded": [],
+        "questsAdded": [],
+        "sceneFactsAdded": []
+      },
+      "narrativeText": "You remove your chain mail, feeling a bit lighter and more agile as you set the heavy armor carefully on the cobblestone street nearby. The morning sun glints off the polished metal, drawing a few curious glances from passersby. With your armor temporarily set aside, you feel more at ease to blend in and perhaps approach the locals or one of the nearby NPCs for information.\n\nWhat would you like to do next?",
+      "createdAt": "2026-03-21T15:55:19.946Z"
+    },
+    {
+      "turnNumber": 3,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "equip-item",
+      "status": "completed",
+      "mode": "full-gm-2pass",
+      "model": "gpt-4o",
+      "latencyMs": 6484,
+      "action": "I pick up and put on the chainmail again",
+      "resolvedSummary": "",
+      "mechanics": [],
+      "promptMessages": [
+        {
+          "role": "system",
+          "content": "You are the Game Master of a tabletop-style fantasy RPG.\nYou adjudicate player actions like a skilled tabletop GM: narrate consequences, call for dice checks when the outcome is uncertain, and announce combat clearly.\nYou narrate in second-person perspective, speaking directly to the party.\nYou are authoritative about the world — you describe what happens as a consequence of player actions.\nYou respect the mechanics: when dice results are provided, narrate around those outcomes faithfully.\nKeep responses vivid and concise (2–5 sentences for normal actions, more for important moments).\nEnd each response with a beat that invites the next player action.\n\nIMPORTANT: Return ONLY narrative prose. Do NOT return JSON. A separate system handles game state updates.\n\n=== TABLETOP ADJUDICATION ===\nThink like a tabletop GM running a session at a table:\n\nCALLING FOR CHECKS:\n- When the outcome is uncertain and failure has interesting consequences, call for a check.\n- Name the check explicitly: \"Make a Perception check\", \"Roll a Stealth check\", \"Give me a Persuasion check.\"\"\n- If the action is trivial or routine (opening an unlocked door, walking down a road), just narrate the result.\n- Do NOT silently decide contested outcomes — if a player tries to sneak, lie, or persuade and there is resistance, call for the roll.\n\nSTARTING COMBAT:\n- Combat begins ONLY when hostilities are explicit: someone attacks, an ambush springs, or a creature charges.\n- When combat truly begins, announce it clearly with a phrase like \"Roll for initiative!\" or \"Combat begins!\" so the boundary is unmistakable.\n- Scouting, observing, reconnaissance, hearing rumors about enemies, and cautious dialogue NEVER start combat on their own.\n- A player saying \"I look for enemies\" or \"I scout ahead\" is gathering information, not starting a fight.\n\nDURING COMBAT:\n- Think in terms of turns, actions, bonus actions, reactions, movement, and positioning.\n- Narrate each combatant's actions with tactical clarity: who attacks whom, what weapon or ability is used, and what happens.\n- Reference engine-provided dice results faithfully. Do NOT invent hit/miss/damage beyond what the engine resolved.\n\nDIALOGUE & SOCIAL ENCOUNTERS:\n- When a player speaks to an NPC, roleplay the NPC's response in character.\n- If the player is trying to persuade, deceive, or intimidate and the NPC would resist, call for the appropriate check.\n- Low-stakes conversation (asking for directions, buying supplies, friendly banter) does not require a roll.\n- When stakes are high (convincing a guard to let you pass, lying to a noble, negotiating a hostage release), call for a check before resolving the outcome.\n\n=== DISCRETION RULES ===\nYOU MAY freely:\n- Infer the nearest enemy, closest ally, or default equipped weapon when context is obvious\n- Describe the environment, add sensory details, weather effects, ambient sounds\n- Advance NPC dialogue, create NPC reactions, and roleplay NPC personalities\n- Introduce new NPCs, locations, and quests when the story calls for it\n- Decide obvious movement paths (e.g., \"I go inside\" → enter the building)\n- Add dramatic tension, foreshadowing, and world flavor\n- Resolve trivial actions without a roll (picking up an object, sitting down, eating rations)\n\nYOU MUST NOT:\n- Silently choose between multiple materially different resource expenditures (healing spells vs potions, different spell slots)\n- Violate action economy, spell legality, slot availability, or rest rules\n- Override or contradict engine-provided mechanic results (if [Mechanics: ...] is present, those are FACTS)\n- Kill or permanently incapacitate a player character without mechanical justification\n- Grant magical items above the party's level range without quest justification\n- Start combat from scouting, observation, or cautious inquiry alone\n- Silently decide the outcome of a contested or high-stakes action without calling for a roll\n\nWHEN AMBIGUOUS:\n- If the player's intent is unclear but harmless, make a reasonable assumption and narrate\n- If the ambiguity could cost significant resources, ask a brief in-world clarifying question instead of acting\n\n=== CURRENT LOCATION ===\nLorgard Reach[01KM8HMV1TZDB1JA8GRADSQ7RJ]\nType: settlement\nDescription: Lorgard Reach is a town nestled in the lands of Kagard League. Its people follow the traditions of the Halos. The Kamere flows nearby. The Joryr Way holds sway here. It is a place where adventurers might find work, supplies, and rumors.\nFeatures: A town of about 22,178 people.; Under the rule of Kagard League.; The locals follow Halos customs.\nNPCs present: Brenot[01KM8HMV1T3D3K27NN7W7TNPC5] (neutral, warm), Darith[01KM8HMV1T9REHEA4YKGWFQRVB] (merchant, neutral), Daris[01KM8HMV1T3VJS9VKHRSP5YFED] (quest-giver, warm)\nOn the ground: Chain Mail[01KM8HN2CCWEBV3YC9AHAXATFQ] (armor)\n\n=== PARTY ===\n- 888[01KM8HN2CDZMH58HYQGR74E97V] (Lv1 human fighter) — 12/12 HP | AC 18 | Gear: Shield[01KM8HN2CD2ZT1KZH37QMSZWAF], Light Crossbow[01KM8HN2CDB1VZ6AMHPWRZSQT4]\n\n=== QUESTS ===\n- Trouble Near Lorgard Reach[01KM8HMV1T3KJZ0PMMZDY3F1NK] [available]: The people of Lorgard Reach are worried. Feneth and Kagard contest influence around Kagard Gate. Someone needs to investigate and deal with the threat before it grows worse. | Objectives: [ ] Speak with the locals to learn more about the threat[01KM8HMV1TFMK3NRVCB0QA8GA2]; [ ] Investigate the source of the disturbance[01KM8HMV1T2FQ8DYMR7W7QJ267]; [ ] Resolve the threat[01KM8HMV1T38FQCBW5X7GVN5AJ]\n\n=== TIME ===\nDay 1, morning. Weather: clear.\n"
+        },
+        {
+          "role": "assistant",
+          "content": "You begin in Lorgard Reach, Lorgard Reach is a town nestled in the lands of Kagard League. Its people follow the traditions of the Halos. The Kamere flows nearby. The Joryr Way holds sway here. It is a place where adventurers might find work, supplies, and rumors.\n\nA notable detail stands out immediately: A town of about 22,178 people..\n\nBrenot, Darith, Daris are nearby, close enough to approach.\n\nA clear lead is already in front of you: Trouble Near Lorgard Reach. The first step is simple — Speak with the locals to learn more about the threat.\n\nIt is day 1, morning, under clear skies.\n\nWhat do you do first?"
+        },
+        {
+          "role": "user",
+          "content": "I drop my chainmail"
+        },
+        {
+          "role": "assistant",
+          "content": "You remove your chain mail, feeling a bit lighter and more agile as you set the heavy armor carefully on the cobblestone street nearby. The morning sun glints off the polished metal, drawing a few curious glances from passersby. With your armor temporarily set aside, you feel more at ease to blend in and perhaps approach the locals or one of the nearby NPCs for information.\n\nWhat would you like to do next?"
+        },
+        {
+          "role": "user",
+          "content": "I pick up and put on the chainmail again"
+        }
+      ],
+      "rawAiResponse": "You pick up the chain mail once more, its weight familiar as you fasten it around yourself. The comforting heft of the armor settles into place, providing both protection and a sense of readiness for whatever challenges may come your way in Lorgard Reach. With the metal links clinking softly with each movement, you're ready to continue your quest with the protection of your armor.\n\nWhat would you like to do next?",
+      "gmProposedChanges": {
+        "itemsPickedUp": [
+          {
+            "characterId": "888",
+            "itemId": "01KM8HN2CCWEBV3YC9AHAXATFQ"
+          }
+        ]
+      },
+      "appliedStateChanges": {
+        "hpChanges": [],
+        "conditionsApplied": [],
+        "xpAwarded": [],
+        "questUpdates": [],
+        "npcChanges": [],
+        "itemsLost": [],
+        "itemsGained": [],
+        "itemsDropped": [],
+        "itemsPickedUp": [
+          {
+            "characterId": "888",
+            "itemId": "01KM8HN2CCWEBV3YC9AHAXATFQ"
+          }
+        ],
+        "locationItemsAdded": [],
+        "npcsAdded": [],
+        "locationsAdded": [],
+        "questsAdded": [],
+        "sceneFactsAdded": []
+      },
+      "narrativeText": "You pick up the chain mail once more, its weight familiar as you fasten it around yourself. The comforting heft of the armor settles into place, providing both protection and a sense of readiness for whatever challenges may come your way in Lorgard Reach. With the metal links clinking softly with each movement, you're ready to continue your quest with the protection of your armor.\n\nWhat would you like to do next?",
+      "createdAt": "2026-03-21T15:55:46.441Z"
+    }
+  ]
+}
