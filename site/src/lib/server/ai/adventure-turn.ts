@@ -999,7 +999,8 @@ function tryParseGMJson(text: string): GMResponse | null {
 				const rescueKeys = [
 					'hpChanges', 'conditionsApplied', 'xpAwarded', 'locationChange',
 					'questUpdates', 'npcChanges', 'clockAdvance', 'spellSlotUsed',
-					'itemsLost', 'itemsGained', 'hitDiceUsed', 'featureUsed',
+					'itemsLost', 'itemsGained', 'itemsDropped', 'itemsPickedUp', 'locationItemsAdded',
+					'hitDiceUsed', 'featureUsed',
 					'encounterStarted', 'encounterEnded', 'deathSaveResult', 'deathSaveOutcome',
 					'npcsAdded', 'locationsAdded', 'questsAdded', 'sceneFactsAdded',
 					'companionPromoted', 'combatAction', 'enemyCombatActions'
@@ -1050,7 +1051,8 @@ export function parseStateExtractionResponse(raw: string): StateChange {
 			const stateChangeKeys = [
 				'hpChanges', 'conditionsApplied', 'xpAwarded', 'locationChange',
 				'questUpdates', 'npcChanges', 'clockAdvance', 'spellSlotUsed',
-				'itemsLost', 'itemsGained', 'hitDiceUsed', 'featureUsed',
+				'itemsLost', 'itemsGained', 'itemsDropped', 'itemsPickedUp', 'locationItemsAdded',
+				'hitDiceUsed', 'featureUsed',
 				'encounterStarted', 'encounterEnded', 'deathSaveResult', 'deathSaveOutcome',
 				'npcsAdded', 'locationsAdded', 'questsAdded', 'sceneFactsAdded',
 				'companionPromoted', 'combatAction', 'enemyCombatActions'
@@ -1309,6 +1311,93 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 				return true;
 			});
 			if (clean.itemsLost.length === 0) delete clean.itemsLost;
+		}
+	}
+
+	// --- itemsDropped ---
+	if (sc.itemsDropped) {
+		if (!Array.isArray(sc.itemsDropped)) {
+			console.warn('[sanitize] itemsDropped is not an array — stripped');
+		} else {
+			clean.itemsDropped = sc.itemsDropped.filter((dr, i) => {
+				if (!dr || typeof dr !== 'object') {
+					console.warn(`[sanitize] itemsDropped[${i}] is not an object — stripped`);
+					return false;
+				}
+				if (typeof dr.characterId !== 'string' || !dr.characterId) {
+					console.warn(`[sanitize] itemsDropped[${i}].characterId is not a non-empty string — stripped`);
+					return false;
+				}
+				dr.characterId = normalizeCharacterId(dr.characterId);
+				if (typeof dr.itemId !== 'string' || !dr.itemId) {
+					console.warn(`[sanitize] itemsDropped[${i}].itemId is not a non-empty string — stripped`);
+					return false;
+				}
+				return true;
+			});
+			if (clean.itemsDropped.length === 0) delete clean.itemsDropped;
+		}
+	}
+
+	// --- itemsPickedUp ---
+	if (sc.itemsPickedUp) {
+		if (!Array.isArray(sc.itemsPickedUp)) {
+			console.warn('[sanitize] itemsPickedUp is not an array — stripped');
+		} else {
+			clean.itemsPickedUp = sc.itemsPickedUp.filter((pu, i) => {
+				if (!pu || typeof pu !== 'object') {
+					console.warn(`[sanitize] itemsPickedUp[${i}] is not an object — stripped`);
+					return false;
+				}
+				if (typeof pu.characterId !== 'string' || !pu.characterId) {
+					console.warn(`[sanitize] itemsPickedUp[${i}].characterId is not a non-empty string — stripped`);
+					return false;
+				}
+				pu.characterId = normalizeCharacterId(pu.characterId);
+				if (typeof pu.itemId !== 'string' || !pu.itemId) {
+					console.warn(`[sanitize] itemsPickedUp[${i}].itemId is not a non-empty string — stripped`);
+					return false;
+				}
+				return true;
+			});
+			if (clean.itemsPickedUp.length === 0) delete clean.itemsPickedUp;
+		}
+	}
+
+	// --- locationItemsAdded ---
+	if (sc.locationItemsAdded) {
+		if (!Array.isArray(sc.locationItemsAdded)) {
+			console.warn('[sanitize] locationItemsAdded is not an array — stripped');
+		} else {
+			clean.locationItemsAdded = sc.locationItemsAdded.filter((la, i) => {
+				if (!la || typeof la !== 'object') {
+					console.warn(`[sanitize] locationItemsAdded[${i}] is not an object — stripped`);
+					return false;
+				}
+				if (typeof la.locationId !== 'string' || !la.locationId) {
+					console.warn(`[sanitize] locationItemsAdded[${i}].locationId is not a non-empty string — stripped`);
+					return false;
+				}
+				if (!la.item || typeof la.item !== 'object') {
+					console.warn(`[sanitize] locationItemsAdded[${i}].item is not an object — stripped`);
+					return false;
+				}
+				const item = la.item as unknown as Record<string, unknown>;
+				if (typeof item.id !== 'string' || !item.id) item.id = `item-loc-${Date.now()}-${i}`;
+				if (typeof item.name !== 'string' || !item.name) {
+					console.warn(`[sanitize] locationItemsAdded[${i}].item.name is missing — stripped`);
+					return false;
+				}
+				if (typeof item.category !== 'string') item.category = 'misc';
+				if (typeof item.description !== 'string') item.description = item.name as string;
+				if (typeof item.value !== 'number') item.value = 0;
+				if (typeof item.quantity !== 'number' || (item.quantity as number) < 1) item.quantity = 1;
+				if (typeof item.weight !== 'number') item.weight = 0;
+				if (typeof item.rarity !== 'string') item.rarity = 'common';
+				if (typeof item.attunement !== 'boolean') item.attunement = false;
+				return true;
+			});
+			if (clean.locationItemsAdded.length === 0) delete clean.locationItemsAdded;
 		}
 	}
 
@@ -1695,6 +1784,7 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 				connections: locData.connections ?? [],
 				npcs: [],
 				features: locData.features ?? [],
+				groundItems: locData.groundItems ?? [],
 				regionRef: null,
 				visited: false
 			};
@@ -1922,6 +2012,73 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 			} else {
 				item.quantity = currentQty - removeQty;
 			}
+		}
+	}
+
+	// Items dropped — move item from inventory to location ground (preserves original id + stats)
+	if (changes.itemsDropped) {
+		for (const dr of changes.itemsDropped) {
+			const char = state.characters.find((c) => c.id === dr.characterId);
+			if (!char) {
+				console.warn(`[applyGMStateChanges] itemsDropped references unknown characterId="${dr.characterId}" — skipped`);
+				continue;
+			}
+			const idx = char.inventory.findIndex((i) => i.id === dr.itemId);
+			if (idx === -1) {
+				console.warn(`[applyGMStateChanges] itemsDropped references unknown itemId="${dr.itemId}" for character "${char.name}" — skipped`);
+				continue;
+			}
+			const item = char.inventory.splice(idx, 1)[0];
+			const targetLocId = dr.locationId ?? state.partyLocationId;
+			const targetLoc = state.locations.find((l) => l.id === targetLocId);
+			if (targetLoc) {
+				if (!targetLoc.groundItems) targetLoc.groundItems = [];
+				targetLoc.groundItems.push(item);
+			} else {
+				console.warn(`[applyGMStateChanges] itemsDropped: locationId="${targetLocId}" not found — item lost`);
+			}
+		}
+	}
+
+	// Items picked up — move item from location ground to character inventory (restores original id + stats)
+	if (changes.itemsPickedUp) {
+		for (const pu of changes.itemsPickedUp) {
+			const char = state.characters.find((c) => c.id === pu.characterId);
+			if (!char) {
+				console.warn(`[applyGMStateChanges] itemsPickedUp references unknown characterId="${pu.characterId}" — skipped`);
+				continue;
+			}
+			const targetLocId = pu.locationId ?? state.partyLocationId;
+			const targetLoc = state.locations.find((l) => l.id === targetLocId);
+			if (!targetLoc || !targetLoc.groundItems) {
+				console.warn(`[applyGMStateChanges] itemsPickedUp: no ground items at locationId="${targetLocId}" — skipped`);
+				continue;
+			}
+			const groundIdx = targetLoc.groundItems.findIndex((i) => i.id === pu.itemId);
+			if (groundIdx === -1) {
+				console.warn(`[applyGMStateChanges] itemsPickedUp: itemId="${pu.itemId}" not found on ground at "${targetLoc.name}" — skipped`);
+				continue;
+			}
+			const item = targetLoc.groundItems.splice(groundIdx, 1)[0];
+			const existing = char.inventory.find((i) => i.id === item.id);
+			if (existing) {
+				existing.quantity = (existing.quantity ?? 1) + (item.quantity ?? 1);
+			} else {
+				char.inventory.push(item);
+			}
+		}
+	}
+
+	// Location items added — place items at an existing location (mid-game loot seeding)
+	if (changes.locationItemsAdded) {
+		for (const la of changes.locationItemsAdded) {
+			const loc = state.locations.find((l) => l.id === la.locationId);
+			if (!loc) {
+				console.warn(`[applyGMStateChanges] locationItemsAdded references unknown locationId="${la.locationId}" — skipped`);
+				continue;
+			}
+			if (!loc.groundItems) loc.groundItems = [];
+			loc.groundItems.push(la.item);
 		}
 	}
 
@@ -2154,15 +2311,25 @@ function distributeQuestRewards(state: GameState, quest: Quest): void {
 		}
 	}
 
-	// Items — award to the first living character (party leader)
+	// Items — place at party's current location so the player narrates finding them
+	// and explicitly picks them up (preserves item tracking rather than injecting silently)
 	if (rewards.items && rewards.items.length > 0) {
-		const recipient = livingChars[0];
-		for (const item of rewards.items) {
-			const existing = recipient.inventory.find((i) => i.id === item.id);
-			if (existing) {
-				existing.quantity = (existing.quantity ?? 1) + (item.quantity ?? 1);
-			} else {
-				recipient.inventory.push({ ...item, quantity: item.quantity ?? 1 });
+		const currentLoc = state.locations.find((l) => l.id === state.partyLocationId);
+		if (currentLoc) {
+			if (!currentLoc.groundItems) currentLoc.groundItems = [];
+			for (const item of rewards.items) {
+				currentLoc.groundItems.push({ ...item, quantity: item.quantity ?? 1 });
+			}
+		} else {
+			// Fallback: inject into party leader's inventory if no location found
+			const recipient = livingChars[0];
+			for (const item of rewards.items) {
+				const existing = recipient.inventory.find((i) => i.id === item.id);
+				if (existing) {
+					existing.quantity = (existing.quantity ?? 1) + (item.quantity ?? 1);
+				} else {
+					recipient.inventory.push({ ...item, quantity: item.quantity ?? 1 });
+				}
 			}
 		}
 	}

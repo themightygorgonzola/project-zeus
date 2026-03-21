@@ -205,6 +205,9 @@ function buildGameStateContextBlock(state: GameState, worldBrief: string): strin
 		if (localNpcs.length > 0) {
 			parts.push(`NPCs present: ${localNpcs.map((n) => `${n.name}[${n.id}] (${n.role}, ${dispositionLabel(n.disposition)})`).join(', ')}`);
 		}
+		if (loc.groundItems && loc.groundItems.length > 0) {
+			parts.push(`On the ground: ${loc.groundItems.map((i) => `${i.name}[${i.id}] (${i.category})`).join(', ')}`);
+		}
 		parts.push('');
 	}
 
@@ -393,13 +396,16 @@ function buildSystemPrompt(state: GameState, worldBrief: string): string {
 	parts.push(`    "hpChanges": [{"characterId": "exact-id-from-PARTY-brackets", "oldHp": N, "newHp": N, "reason": "..."}] or omit,`);
 	parts.push(`    "itemsGained": [{"characterId": "...", "item": {"id": "new-ulid", "name": "...", "category": "weapon|armor|consumable|quest|misc", "description": "...", "value": N, "quantity": N}}] or omit,`);
 	parts.push(`    "itemsLost": [{"characterId": "...", "itemId": "exact-item-id-from-inventory", "quantity": N}] or omit,`);
+	parts.push(`    "itemsDropped": [{"characterId": "...", "itemId": "exact-item-id-from-inventory"}] or omit,`);
+	parts.push(`    "itemsPickedUp": [{"characterId": "...", "itemId": "exact-item-id-from-ON-THE-GROUND"}] or omit,`);
+	parts.push(`    "locationItemsAdded": [{"locationId": "...", "item": {"id": "item-<unique>", "name": "...", "category": "...", "description": "...", "value": N, "quantity": N}}] or omit,`);
 	parts.push(`    "locationChange": {"from": "id-or-null", "to": "location-id"} or omit,`);
 	parts.push(`    "npcChanges": [{"npcId": "...", "field": "disposition|alive|hp|notes", "oldValue": X, "newValue": Y}] or omit,`);
 	parts.push(`    "questUpdates": [{"questId": "...", "field": "status", "oldValue": "active", "newValue": "completed|failed"} or {"questId": "...", "field": "objective", "objectiveId": "obj-id", "oldValue": false, "newValue": true}] or omit,`);
 	parts.push(`    "conditionsApplied": [{"characterId": "...", "condition": "...", "applied": true|false}] or omit,`);
 	parts.push(`    "xpAwarded": [{"characterId": "...", "amount": N}] or omit,`);
 	parts.push(`    "npcsAdded": [{"id": "npc-<unique>", "name": "...", "role": "merchant|quest-giver|hostile|neutral|ally|companion|boss", "locationId": "...", "disposition": 0, "description": "..."}] or omit,`);
-	parts.push(`    "locationsAdded": [{"id": "loc-<unique>", "name": "...", "type": "settlement|wilderness|dungeon|interior|road", "description": "...", "connections": ["existing-loc-id"], "features": ["..."]}] or omit,`);
+	parts.push(`    "locationsAdded": [{"id": "loc-<unique>", "name": "...", "type": "settlement|wilderness|dungeon|interior|road", "description": "...", "connections": ["existing-loc-id"], "features": ["..."], "groundItems": [{"id": "item-<unique>", "name": "...", "category": "...", "description": "...", "value": N, "quantity": N}]}] or omit,`);
 	parts.push(`    "questsAdded": [{"id": "quest-<unique>", "name": "...", "description": "...", "giverNpcId": "npc-id-or-null", "objectives": [{"id": "obj-<unique>", "text": "..."}], "recommendedLevel": N}] or omit,`);
 	parts.push(`    "sceneFactsAdded": ["fact about the scene or world"] or omit,`);
 	parts.push(`    "encounterStarted": {"creatures": [{"id": "npc-<unique>", "name": "...", "role": "hostile", "locationId": "...", "disposition": -100, "description": "...", "tier": "weak|normal|tough|elite|boss"}]} or omit,`);
@@ -412,8 +418,8 @@ function buildSystemPrompt(state: GameState, worldBrief: string): string {
 	parts.push(`=== CRITICAL RULES ===`);
 	parts.push(`IMPORTANT: For every "characterId" field, output ONLY the bare ID string that appears inside the brackets in the PARTY section — e.g. if the party entry reads "Alice[01ABC123]" then characterId must be "01ABC123", NOT "Alice[01ABC123]" and NOT "Alice". Never use a character's name, a name+bracket token, or any invented string as a characterId.`);
 	parts.push(`- Every NPC you mention by name for the FIRST TIME must be tracked via npcsAdded. Do not introduce named NPCs only in narrative.`);
-	parts.push(`- Every item gained or lost MUST appear in itemsGained/itemsLost. Do not mention acquiring or losing items only in narrative.`);
-	parts.push(`- If a character picks up, recovers, or reclaims an item they previously dropped (or that was otherwise removed from their inventory), emit itemsGained to restore it. Reconstruct the item's name, category, description, and value from prior conversation context. This applies even though the item is no longer visible in the PARTY gear list — the player physically picked it up, so it must be tracked.`);
+	parts.push(`- Every item gained or lost MUST appear in the correct stateChanges field(s). Do not mention acquiring or losing items only in narrative.`);
+	parts.push(`- ITEM DROP/PICKUP RULES: Use itemsDropped (with itemId from inventory) when a character sets an item down — it lands at the current location shown as "On the ground" next turn. Use itemsPickedUp (with the exact itemId shown in "On the ground") when recovering a dropped item — this restores the ORIGINAL item id intact. Use itemsLost only for consumed/sold/stolen/destroyed items. Use itemsGained only for truly new items (purchases, loot, rewards). Use locationItemsAdded to place new items at any location (chest unlocked, enemy killed, GM loot).`);
 	parts.push(`- When a companion NPC (shown in COMPANIONS) is in combat, include their combat actions in narrativeText and any HP/alive changes via npcChanges (use field: "hp" for companion HP changes).`);
 	parts.push(`- Use npcChanges with field: "notes" to record important NPC interaction details (e.g. deals struck, secrets revealed, favors owed). The note text goes in newValue as a string.`);
 	parts.push(`- To formally recruit an NPC as a companion, use companionPromoted with a stat block. This changes their role to "companion" and they will auto-travel with the party.`);
@@ -470,8 +476,8 @@ export function buildStateExtractionPrompt(state: GameState): string {
 	parts.push(`=== IMPORTANT GUIDELINES ===`);
 	parts.push(`- If the narrative describes movement to a NEW place not in KNOWN LOCATIONS, you MUST emit locationsAdded AND locationChange.`);
 	parts.push(`- If the narrative mentions a new NPC by name, you MUST emit npcsAdded.`);
-	parts.push(`- If the narrative describes gaining or losing an item, you MUST emit itemsGained/itemsLost.`);
-	parts.push(`- If a character picks up, recovers, or reclaims an item they previously dropped (or that was otherwise removed from their inventory), emit itemsGained to restore it — even if it no longer appears in the PARTY gear list. Reconstruct the item's name, category, description, and value from prior conversation context.`);
+	parts.push(`- If the narrative describes gaining or losing an item, emit the correct field: itemsDropped (placed on ground), itemsPickedUp (recovered from ground using exact id), itemsLost (consumed/sold/destroyed), itemsGained (brand new item), or locationItemsAdded (new item at a location).`);
+	parts.push(`- ITEM DROP/PICKUP: itemsDropped moves an item from inventory to the location's ground (preserving its original id). itemsPickedUp moves it back — use the EXACT item id from "On the ground" in the location state. Never use itemsGained to recover a ground item; that creates a hallucinated duplicate.`);
 	parts.push(`- If an NPC is killed in the narrative, emit npcChanges with field "alive", newValue false, AND field "hp", newValue 0.`);
 	parts.push(`- Use EXACT character/NPC/location/quest IDs from the state below. Do not invent references to entities not in state or not in your *Added fields.`);
 	parts.push(`- For new entities, generate unique IDs with prefixes: "npc-", "loc-", "quest-", "obj-", "item-".`);
@@ -494,13 +500,16 @@ export function buildStateExtractionPrompt(state: GameState): string {
 	parts.push(`    "hpChanges": [{"characterId": "exact-id", "oldHp": N, "newHp": N, "reason": "..."}] or omit,`);
 	parts.push(`    "itemsGained": [{"characterId": "...", "item": {"id": "item-<unique>", "name": "...", "category": "weapon|armor|consumable|quest|misc", "description": "...", "value": N, "quantity": N}}] or omit,`);
 	parts.push(`    "itemsLost": [{"characterId": "...", "itemId": "exact-item-id", "quantity": N}] or omit,`);
+	parts.push(`    "itemsDropped": [{"characterId": "...", "itemId": "exact-item-id-from-inventory"}] or omit,`);
+	parts.push(`    "itemsPickedUp": [{"characterId": "...", "itemId": "exact-item-id-from-ground"}] or omit,`);
+	parts.push(`    "locationItemsAdded": [{"locationId": "...", "item": {"id": "item-<unique>", "name": "...", "category": "...", "description": "...", "value": N, "quantity": N}}] or omit,`);
 	parts.push(`    "locationChange": {"from": "current-loc-id-or-null", "to": "destination-loc-id"} or omit,`);
 	parts.push(`    "npcChanges": [{"npcId": "...", "field": "disposition|alive|hp|notes", "oldValue": X, "newValue": Y}] or omit,`);
 	parts.push(`    "questUpdates": [{"questId": "...", "field": "status|objective", ...}] or omit,`);
 	parts.push(`    "conditionsApplied": [{"characterId": "...", "condition": "blinded|charmed|deafened|frightened|grappled|incapacitated|invisible|paralyzed|petrified|poisoned|prone|restrained|stunned|unconscious|exhaustion", "applied": true|false}] or omit,`);
 	parts.push(`    "xpAwarded": [{"characterId": "...", "amount": N}] or omit,`);
 	parts.push(`    "npcsAdded": [{"id": "npc-<unique>", "name": "...", "role": "merchant|quest-giver|hostile|neutral|ally|companion|boss", "locationId": "...", "disposition": 0, "description": "..."}] or omit,`);
-	parts.push(`    "locationsAdded": [{"id": "loc-<unique>", "name": "...", "type": "settlement|wilderness|dungeon|interior|road", "description": "...", "connections": ["existing-loc-id"], "features": ["..."]}] or omit,`);
+	parts.push(`    "locationsAdded": [{"id": "loc-<unique>", "name": "...", "type": "settlement|wilderness|dungeon|interior|road", "description": "...", "connections": ["existing-loc-id"], "features": ["..."], "groundItems": [{"id": "item-<unique>", "name": "...", "category": "...", "description": "...", "value": N, "quantity": N}]}] or omit,`);
 	parts.push(`    "questsAdded": [{"id": "quest-<unique>", "name": "...", "description": "...", "giverNpcId": "npc-id-or-null", "objectives": [{"id": "obj-<unique>", "text": "..."}], "recommendedLevel": N}] or omit,`);
 	parts.push(`    "sceneFactsAdded": ["important fact to remember"] or omit,`);
 	parts.push(`    "encounterStarted": {"creatures": [{"id": "npc-<unique>", "name": "...", "role": "hostile", "locationId": "...", "disposition": -100, "description": "...", "tier": "weak|normal|tough|elite|boss"}]} or omit,`);
@@ -545,7 +554,10 @@ export function buildStateExtractionPrompt(state: GameState): string {
 		for (const l of state.locations) {
 			const conns = l.connections.join(', ');
 			const connStr = conns ? ` → ${conns}` : '';
-			parts.push(`- ${l.name}[${l.id}] (${l.type})${connStr}`);
+			const groundStr = l.groundItems && l.groundItems.length > 0
+				? ` | On ground: ${l.groundItems.map((i) => `${i.name}[${i.id}]`).join(', ')}`
+				: '';
+			parts.push(`- ${l.name}[${l.id}] (${l.type})${connStr}${groundStr}`);
 		}
 		parts.push('');
 	}

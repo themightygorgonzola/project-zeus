@@ -673,6 +673,8 @@ export interface Location {
 	/** Free-form hazard / feature descriptions. */
 	features: string[];
 	visited: boolean;
+	/** Items lying on the ground at this location (dropped, looted, placed). */
+	groundItems?: Item[];
 }
 
 // ---------------------------------------------------------------------------
@@ -824,6 +826,12 @@ export interface StateChange {
 	hpChanges?: Array<{ characterId: GameId; oldHp: number; newHp: number; reason: string }>;
 	itemsGained?: Array<{ characterId: GameId; item: Item }>;
 	itemsLost?: Array<{ characterId: GameId; itemId: GameId; quantity: number }>;
+	/** Drop an item from a character's inventory onto the ground at a location (preserving the original item). */
+	itemsDropped?: Array<{ characterId: GameId; itemId: GameId; locationId?: GameId }>;
+	/** Pick up an item from the ground (by its original id) into a character's inventory. */
+	itemsPickedUp?: Array<{ characterId: GameId; itemId: GameId; locationId?: GameId }>;
+	/** Place items at an existing location (GM-seeded loot, unlocked chest, enemy drops). */
+	locationItemsAdded?: Array<{ locationId: GameId; item: Item }>;
 	locationChange?: { from: GameId | null; to: GameId };
 	npcChanges?: Array<{ npcId: GameId; field: string; oldValue: unknown; newValue: unknown }>;
 	questUpdates?: Array<{ questId: GameId; field: string; oldValue: unknown; newValue: unknown; objectiveId?: GameId }>;
@@ -867,6 +875,8 @@ export interface StateChange {
 		description: string;
 		connections?: GameId[];
 		features?: string[];
+		/** Pre-seed items at this location (treasure room, chest, loot pile). */
+		groundItems?: Item[];
 	}>;
 	/** Quests the GM introduced this turn. */
 	questsAdded?: Array<{
