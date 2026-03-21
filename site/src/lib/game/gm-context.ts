@@ -413,6 +413,7 @@ function buildSystemPrompt(state: GameState, worldBrief: string): string {
 	parts.push(`IMPORTANT: For every "characterId" field, output ONLY the bare ID string that appears inside the brackets in the PARTY section — e.g. if the party entry reads "Alice[01ABC123]" then characterId must be "01ABC123", NOT "Alice[01ABC123]" and NOT "Alice". Never use a character's name, a name+bracket token, or any invented string as a characterId.`);
 	parts.push(`- Every NPC you mention by name for the FIRST TIME must be tracked via npcsAdded. Do not introduce named NPCs only in narrative.`);
 	parts.push(`- Every item gained or lost MUST appear in itemsGained/itemsLost. Do not mention acquiring or losing items only in narrative.`);
+	parts.push(`- If a character picks up, recovers, or reclaims an item they previously dropped (or that was otherwise removed from their inventory), emit itemsGained to restore it. Reconstruct the item's name, category, description, and value from prior conversation context. This applies even though the item is no longer visible in the PARTY gear list — the player physically picked it up, so it must be tracked.`);
 	parts.push(`- When a companion NPC (shown in COMPANIONS) is in combat, include their combat actions in narrativeText and any HP/alive changes via npcChanges (use field: "hp" for companion HP changes).`);
 	parts.push(`- Use npcChanges with field: "notes" to record important NPC interaction details (e.g. deals struck, secrets revealed, favors owed). The note text goes in newValue as a string.`);
 	parts.push(`- To formally recruit an NPC as a companion, use companionPromoted with a stat block. This changes their role to "companion" and they will auto-travel with the party.`);
@@ -470,6 +471,7 @@ export function buildStateExtractionPrompt(state: GameState): string {
 	parts.push(`- If the narrative describes movement to a NEW place not in KNOWN LOCATIONS, you MUST emit locationsAdded AND locationChange.`);
 	parts.push(`- If the narrative mentions a new NPC by name, you MUST emit npcsAdded.`);
 	parts.push(`- If the narrative describes gaining or losing an item, you MUST emit itemsGained/itemsLost.`);
+	parts.push(`- If a character picks up, recovers, or reclaims an item they previously dropped (or that was otherwise removed from their inventory), emit itemsGained to restore it — even if it no longer appears in the PARTY gear list. Reconstruct the item's name, category, description, and value from prior conversation context.`);
 	parts.push(`- If an NPC is killed in the narrative, emit npcChanges with field "alive", newValue false, AND field "hp", newValue 0.`);
 	parts.push(`- Use EXACT character/NPC/location/quest IDs from the state below. Do not invent references to entities not in state or not in your *Added fields.`);
 	parts.push(`- For new entities, generate unique IDs with prefixes: "npc-", "loc-", "quest-", "obj-", "item-".`);
