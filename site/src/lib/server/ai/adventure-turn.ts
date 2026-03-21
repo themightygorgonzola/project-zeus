@@ -922,6 +922,9 @@ export function mergeStateChanges(engine: StateChange, gm: StateChange): StateCh
 		spellSlotUsed: engine.spellSlotUsed ?? gm.spellSlotUsed,
 		itemsLost: [...(engine.itemsLost ?? []), ...(gm.itemsLost ?? [])],
 		itemsGained: [...(engine.itemsGained ?? []), ...(gm.itemsGained ?? [])],
+		itemsDropped: [...(engine.itemsDropped ?? []), ...(gm.itemsDropped ?? [])],
+		itemsPickedUp: [...(engine.itemsPickedUp ?? []), ...(gm.itemsPickedUp ?? [])],
+		locationItemsAdded: [...(engine.locationItemsAdded ?? []), ...(gm.locationItemsAdded ?? [])],
 		hitDiceUsed: engine.hitDiceUsed ?? gm.hitDiceUsed,
 		featureUsed: engine.featureUsed ?? gm.featureUsed,
 		// World-building additions (typically from GM only; engine doesn't create world content)
