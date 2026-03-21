@@ -382,23 +382,19 @@ export function resolveTurn(playerAction: string, state: GameState | null, actor
 		case 'rest':
 			return resolveRest(base, actor, state, intent);
 		case 'move': {
-			const travelResult = resolveTravel(base, actor, state, intent);
-			// If travel produced no meaningful result, check for skill checks
-			// (e.g. "I sneak past the guards" or "I climb the wall")
-			if (
-				travelResult.status === 'ready-for-narration' &&
-				travelResult.mechanicResults.length === 0
-			) {
-				const check = detectPendingCheck(playerAction, intent, actor, state);
-				if (check) {
-					return {
-						...base,
-						status: 'awaiting-roll',
-						pendingCheck: check,
-						resolvedActionSummary: check.reason
-					};
-				}
+			// Check for skill-gated movement FIRST (sneak, climb, swim, etc.)
+			// These must intercept before resolveTravel, which would otherwise
+			// swallow the action and leave the AI to narrate the check in prose.
+			const moveCheck = detectPendingCheck(playerAction, intent, actor, state);
+			if (moveCheck) {
+				return {
+					...base,
+					status: 'awaiting-roll',
+					pendingCheck: moveCheck,
+					resolvedActionSummary: moveCheck.reason
+				};
 			}
+			const travelResult = resolveTravel(base, actor, state, intent);
 			return travelResult;
 		}
 		case 'cast-spell':
