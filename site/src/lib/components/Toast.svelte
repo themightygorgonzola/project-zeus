@@ -5,9 +5,7 @@
   Each toast auto-dismisses and can be clicked to navigate.
 -->
 <script lang="ts">
-	import { getToasts, dismissToast, type GameToast } from './toastStore';
-
-	const toasts = $derived(getToasts());
+	import { toasts, dismissToast, type GameToast } from './toastStore';
 
 	const variantColors: Record<string, string> = {
 		item: 'var(--accent-2)',
@@ -24,9 +22,9 @@
 	}
 </script>
 
-{#if toasts.length > 0}
+{#if $toasts.length > 0}
 	<div class="toast-stack" role="status" aria-live="polite">
-		{#each toasts as toast (toast.id)}
+		{#each $toasts as toast (toast.id)}
 			<div
 				class="toast-card"
 				style="--toast-accent: {variantColors[toast.variant] ?? variantColors.info}"
