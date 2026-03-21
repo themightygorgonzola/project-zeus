@@ -228,7 +228,8 @@ export async function executeAdventureTurn(
 			await notifyRoom(partyHost, payload.adventureId, {
 				type: 'ai:turn:end',
 				text: clarificationText,
-				model: 'server-executor'
+				model: 'server-executor',
+				clarification: resolvedTurn.clarification
 			});
 		}
 		const clarificationDebug = debugTurns ? buildClarificationDebug(resolvedTurn.stateChanges) : null;
@@ -2444,7 +2445,7 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 		// Use the combat engine to roll initiative and build the encounter
 		const allCombatCreatures = [...hostileNpcs, ...companionNpcs];
 		const { encounter } = createEncounter(state, allCombatCreatures);
-		initEncounterTurnOrder(encounter, state.npcs);
+		initEncounterTurnOrder(state, encounter, state.npcs);
 		state.activeEncounter = encounter;
 	}
 
@@ -2471,7 +2472,7 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 		}
 
 		const partySize = state.characters.length;
-		const resolution = resolveEncounter(state.activeEncounter, outcome, encounterNpcs, partySize);
+		const resolution = resolveEncounter(state, state.activeEncounter, outcome, encounterNpcs, partySize);
 
 		// Apply XP awards from the resolution
 		if (resolution.stateChange.xpAwarded) {

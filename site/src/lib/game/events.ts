@@ -223,6 +223,72 @@ export interface EnrichmentCompleteEvent extends BaseGameEvent<'enrichment:compl
 }
 
 // ---------------------------------------------------------------------------
+// Inventory events
+// ---------------------------------------------------------------------------
+
+/** An item was added to a character's inventory. */
+export interface InventoryAcquiredEvent extends BaseGameEvent<'inventory:acquired'> {
+	characterId: GameId;
+	characterName: string;
+	item: Item;
+}
+
+/** An item was consumed or removed from a character's inventory. */
+export interface InventoryRemovedEvent extends BaseGameEvent<'inventory:removed'> {
+	characterId: GameId;
+	characterName: string;
+	item: Item;
+	reason: 'consumed' | 'dropped' | 'given' | 'destroyed';
+}
+
+// ---------------------------------------------------------------------------
+// Interactive clarification events
+// ---------------------------------------------------------------------------
+
+/** Option presented to the player during a clarification request. */
+export interface ClarificationOption {
+	id: string;
+	label: string;
+	description?: string;
+}
+
+/**
+ * Engine requests the player to choose between multiple valid options
+ * instead of asking an open-ended text question.
+ */
+export interface ClarificationRequestEvent extends BaseGameEvent<'game:clarification-request'> {
+	/** The question being asked. */
+	prompt: string;
+	/** The category of clarification (item, target, direction, etc.) */
+	category: 'item' | 'target' | 'direction' | 'action' | 'other';
+	/** Available options the player can click on. */
+	options: ClarificationOption[];
+	/** Optional character context. */
+	characterId?: GameId;
+}
+
+// ---------------------------------------------------------------------------
+// World events (structured, not chat-based)
+// ---------------------------------------------------------------------------
+
+/** Party location changed — fires as a notification, not chat text. */
+export interface WorldLocationUpdateEvent extends BaseGameEvent<'world:location-update'> {
+	from: Location | null;
+	to: Location;
+}
+
+/**
+ * Time advanced in the game world.
+ * Replaces the old hack of pushing time changes through game:dice-roll.
+ */
+export interface WorldTimeAdvanceEvent extends BaseGameEvent<'world:time-advance'> {
+	from: GameClock;
+	to: GameClock;
+	/** Human-readable summary like "4 hours pass" */
+	summary: string;
+}
+
+// ---------------------------------------------------------------------------
 // Union type — everything the UI might receive
 // ---------------------------------------------------------------------------
 
@@ -247,7 +313,12 @@ export type GameEvent =
 	| NpcDiscoveredEvent
 	| LocationDiscoveredEvent
 	| QuestDiscoveredEvent
-	| EnrichmentCompleteEvent;
+	| EnrichmentCompleteEvent
+	| InventoryAcquiredEvent
+	| InventoryRemovedEvent
+	| ClarificationRequestEvent
+	| WorldLocationUpdateEvent
+	| WorldTimeAdvanceEvent;
 
 /**
  * Type guard for narrowing by event type.

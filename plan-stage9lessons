@@ -1,0 +1,65 @@
+Summarized conversation history
+
+Map frontend UI events and components
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/state.ts#1-1), lines 1 to 200
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/game/events.ts#1-1), lines 1 to 200
+
+Searched for regex `toast|notification|dice|time|clarify` (`**/*.svelte`), 20 results
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/routes/adventures/%5Bid%5D/%2Bpage.svelte#100-100), lines 100 to 200
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/routes/adventures/%5Bid%5D/%2Bpage.svelte#201-201), lines 201 to 800
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/components/JournalPanel.svelte#1-1), lines 1 to 200
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/components/CombatPanel.svelte#1-1), lines 1 to 200
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/components/AdventureCard.svelte)
+
+Searched for text `clock-advance` (`**/*.svelte`), no results
+
+Read [](file:///c%3A/MySoftwareFolder/project-zeus/site/src/lib/components)
+
+Searched for text `toast` (`**/*.svelte`), no results
+
+## Plan: Structured UI Events & Unified State Architecture
+
+This plan replaces the reactive "telephone game" (regex text parsing and full-state page reloads) with a robust Event-Driven Architecture. We will unify the game state to forever eliminate combat stat drift, introduce a dedicated notification/toast layer for systemic updates, replace text clarifications with interactive UI cards, and ground game mechanics with visceral, animated components.
+
+**Steps**
+
+1. **Unify Entity State Authority (Fixing Combat Drift)**
+   - Refactor `activeEncounter` in state.ts and combat.ts.
+   - Remove duplicated HP/Status tracking from `encounter.combatants`. Combatants will now act purely as references (holding entity IDs, initiative, and positions). All UI and engine calculations will reference the authoritative global `GameState.characters` and `GameState.npcs`.
+
+2. **Establish the Structured UI Event Protocol**
+   - Extend events.ts to define explicit, granular UI-facing schemas: `inventory:acquired`, `world:location-update`, `world:time-advance`, and `game:clarification-request`.
+   - Remove the hack in server logic that pushes time advancements out as `game:dice-roll` events (which caused the weird "🎲 Time Passes" text).
+
+3. **Implement Notification & Toast Routing**
+   - Create a central `ToastManager` and `Toast.svelte` component in components.
+   - In [site/src/routes/adventures/[id]/+page.svelte](site/src/routes/adventures/[id]/+page.svelte), map PartyKit websocket events directly to this manager before triggering `invalidateAll()`.
+   - **Specifics:** `inventory:acquired` renders an "Item Added" card. Bind its `onclick` event to change the active view state to the JournalPanel.svelte inventory tab. `world:location-update` will show a dedicated location banner instead of a chat log.
+
+4. **Interactive Clarifications (Breaking the Text Loop)**
+   - Modify the intent parsing in turn-executor.ts. When the AI detects ambiguity (e.g., multiple potions matching "use potion"), prevent it from dropping into an open GM narrative question.
+   - Emit a new `game:clarification-request` event with a structured payload (`[{ id: 'item-1', label: 'Health Potion' }, ...]`).
+   - Create an interactive chat component (e.g., `ClarificationCard.svelte`) analogous to the current roll requests, rendering clickable buttons that instantly submit the exact, valid entity ID back to the engine.
+
+5. **Strict Combat Context Routing (Preventing Fall-throughs)**
+   - Refactor routing in turn-executor.ts to establish a strict state machine. If `inCombat` is true, fallback narrative actions MUST route through an "Improvised Combat Action" mechanism rather than kicking back to the open GM sequence. This ensures actions like "I ready my crossbow" are mechanically captured in initiative order instead of misfiring as out-of-combat `Investigation` checks.
+
+6. **Visceral Mechanics UI (Dice Roll Suspense)**
+   - Intercept standard `game:dice-roll` payloads in +page.svelte.
+   - Stop prepending text to the chat window. Render a new `DiceRoll.svelte` block inside the chat transcript.
+   - The component will take `dc`, `modifiers`, and `result` props, running a CSS/JS rollout animation to build suspense before permanently stamping the card with "Success" or "Failure" logic comparisons.
+
+**Verification**
+- Run character through a rigged combat encounter: confirm "readying weapon" stays in initiative order and HP syncs transparently between global state and the combat UI.
+- Trigger an ambivalent action (e.g., "drink potion" with 3 in inventory) and visually confirm the interactive clarification card.
+- Pick up an item during exploration and click the Toast notification to verify automatic tab switching.
+
+**Decisions**
+- *Separation of Notification vs Chat:* By detaching structural updates (time, location, inventory) from text-chat rendering, we prevent the user's chat window from becoming a cluttered CLI history and make the progression feel like a true RPG UI.

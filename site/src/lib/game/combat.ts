@@ -39,8 +39,174 @@ import {
 import { XP_BY_CR } from './data/monsters';
 import { DEFAULT_CONDITION_EFFECTS } from './types';
 
+
 // ---------------------------------------------------------------------------
-// Types
+// Helpers
+// ---------------------------------------------------------------------------
+
+export interface CombatantState {
+	currentHp: number;
+	maxHp: number;
+	tempHp: number;
+	ac: number;
+	conditions: Condition[];
+	resistances: string[];
+	immunities: string[];
+	vulnerabilities: string[];
+	defeated: boolean;
+	concentration: boolean;
+}
+
+export function getCombatantState(state: GameState, combatant: Combatant): CombatantState {
+	if (combatant.type === 'character') {
+		const pc = state.characters.find(c => c.id === combatant.referenceId);
+		if (!pc) {
+			// Fall back to combatant snapshot (e.g., in tests without full state)
+			return {
+				currentHp: combatant.currentHp,
+				maxHp: combatant.maxHp,
+				tempHp: combatant.tempHp,
+				ac: combatant.ac,
+				conditions: combatant.conditions || [],
+				resistances: combatant.resistances || [],
+				immunities: combatant.immunities || [],
+				vulnerabilities: combatant.vulnerabilities || [],
+				defeated: combatant.defeated,
+				concentration: combatant.concentration
+			};
+		}
+		return {
+			currentHp: pc.hp,
+			maxHp: pc.maxHp,
+			tempHp: pc.tempHp,
+			ac: pc.ac,
+			conditions: pc.conditions || [],
+			resistances: pc.resistances || [],
+			immunities: [],
+			vulnerabilities: [],
+			defeated: pc.hp <= 0,
+			concentration: false
+		};
+	} else {
+		const npc = state.npcs.find(n => n.id === combatant.referenceId);
+		if (!npc || !npc.statBlock) {
+			// Fall back to combatant snapshot
+			return {
+				currentHp: combatant.currentHp,
+				maxHp: combatant.maxHp,
+				tempHp: combatant.tempHp,
+				ac: combatant.ac,
+				conditions: combatant.conditions || [],
+				resistances: combatant.resistances || [],
+				immunities: combatant.immunities || [],
+				vulnerabilities: combatant.vulnerabilities || [],
+				defeated: combatant.defeated,
+				concentration: combatant.concentration
+			};
+		}
+		const sb = npc.statBlock;
+		return {
+			currentHp: sb.hp,
+			maxHp: sb.maxHp,
+			tempHp: 0,
+			ac: sb.ac,
+			conditions: [],
+			resistances: sb.resistances || [],
+			immunities: sb.immunities || [],
+			vulnerabilities: sb.vulnerabilities || [],
+			defeated: !npc.alive || sb.hp <= 0,
+			concentration: false
+		};
+	}
+}
+
+export function updateCombatantHp(state: GameState, combatant: Combatant, hp: number, tempHp: number, defeated: boolean) {
+	// Update the combatant snapshot (so combat functions see fresh values)
+	combatant.currentHp = hp;
+	combatant.tempHp = tempHp;
+	combatant.defeated = defeated;
+
+	// Write through to the authoritative GameState
+	if (combatant.type === 'character') {
+		const pc = state.characters.find(c => c.id === combatant.referenceId);
+		if (pc) {
+			pc.hp = hp;
+			pc.tempHp = tempHp;
+		}
+	} else {
+		const npc = state.npcs.find(n => n.id === combatant.referenceId);
+		if (npc && npc.statBlock) {
+			npc.statBlock.hp = hp;
+			if (defeated) npc.alive = false;
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Bidirectional State Sync
+// ---------------------------------------------------------------------------
+
+/**
+ * Sync combatant snapshots FROM authoritative GameState.
+ * Call this before any combat operation to ensure combatants reflect
+ * any changes applied by the GM layer (e.g., healing, condition removal).
+ */
+export function syncCombatantsFromState(state: GameState, encounter: ActiveEncounter): void {
+	for (const combatant of encounter.combatants) {
+		if (combatant.type === 'character') {
+			const pc = state.characters.find(c => c.id === combatant.referenceId);
+			if (pc) {
+				combatant.name = pc.name;
+				combatant.currentHp = pc.hp;
+				combatant.maxHp = pc.maxHp;
+				combatant.tempHp = pc.tempHp;
+				combatant.ac = pc.ac;
+				combatant.conditions = [...(pc.conditions || [])];
+				combatant.defeated = pc.hp <= 0;
+			}
+		} else {
+			const npc = state.npcs.find(n => n.id === combatant.referenceId);
+			if (npc) {
+				combatant.name = npc.name;
+				if (npc.statBlock) {
+					combatant.currentHp = npc.statBlock.hp;
+					combatant.maxHp = npc.statBlock.maxHp;
+					combatant.tempHp = 0;
+					combatant.ac = npc.statBlock.ac;
+					combatant.resistances = npc.statBlock.resistances || [];
+					combatant.immunities = npc.statBlock.immunities || [];
+					combatant.vulnerabilities = npc.statBlock.vulnerabilities || [];
+				}
+				combatant.defeated = !npc.alive || (npc.statBlock?.hp ?? 0) <= 0;
+			}
+		}
+	}
+}
+
+/**
+ * Sync authoritative GameState FROM combatant snapshots.
+ * Call this after combat operations mutate combatants to ensure
+ * the global state picks up HP/alive changes.
+ */
+export function syncStateFromCombatants(state: GameState, encounter: ActiveEncounter): void {
+	for (const combatant of encounter.combatants) {
+		if (combatant.type === 'character') {
+			const pc = state.characters.find(c => c.id === combatant.referenceId);
+			if (pc) {
+				pc.hp = combatant.currentHp;
+				pc.tempHp = combatant.tempHp;
+			}
+		} else {
+			const npc = state.npcs.find(n => n.id === combatant.referenceId);
+			if (npc) {
+				if (npc.statBlock) {
+					npc.statBlock.hp = combatant.currentHp;
+				}
+				if (combatant.defeated) npc.alive = false;
+			}
+		}
+	}
+}
 // ---------------------------------------------------------------------------
 
 /** Action economy budget for a single combatant's turn. */
@@ -149,46 +315,24 @@ export function createEncounter(
 	const initEntries = rollInitiative(state.characters, creatures);
 
 	const combatants: Combatant[] = initEntries.map(entry => {
-		if (entry.type === 'character') {
-			const pc = state.characters.find(c => c.id === entry.referenceId)!;
-			return {
-				id: entry.id,
-				referenceId: entry.referenceId,
-				type: 'character' as CombatantType,
-				name: entry.name,
-				initiative: entry.initiative,
-				currentHp: pc.hp,
-				maxHp: pc.maxHp,
-				tempHp: pc.tempHp,
-				ac: pc.ac,
-				conditions: [...pc.conditions],
-				resistances: [...pc.resistances],
-				immunities: [],
-				vulnerabilities: [],
-				concentration: false,
-				defeated: false
-			};
-		} else {
-			const npc = creatures.find(c => c.id === entry.referenceId)!;
-			const sb = npc.statBlock!;
-			return {
-				id: entry.id,
-				referenceId: entry.referenceId,
-				type: 'npc' as CombatantType,
-				name: entry.name,
-				initiative: entry.initiative,
-				currentHp: sb.hp,
-				maxHp: sb.maxHp,
-				tempHp: 0,
-				ac: sb.ac,
-				conditions: [],
-				resistances: [...sb.resistances],
-				immunities: [...sb.immunities],
-				vulnerabilities: [...sb.vulnerabilities],
-				concentration: false,
-				defeated: false
-			};
-		}
+		// Build full snapshot; syncCombatantsFromState will fill live values
+		return {
+			id: entry.id,
+			referenceId: entry.referenceId,
+			type: entry.type,
+			name: entry.name,
+			initiative: entry.initiative,
+			currentHp: 0,
+			maxHp: 0,
+			tempHp: 0,
+			ac: 10,
+			conditions: [] as Condition[],
+			resistances: [] as string[],
+			immunities: [] as string[],
+			vulnerabilities: [] as string[],
+			concentration: false,
+			defeated: false
+		};
 	});
 
 	const encounterId = `enc-${Date.now()}`;
@@ -202,6 +346,14 @@ export function createEncounter(
 		status: 'active',
 		startedAt: Date.now()
 	};
+
+	// Populate combatant snapshots from authoritative game state.
+	// Include creatures in NPC lookup since they may not yet be in state.npcs.
+	const syncState: GameState = {
+		...state,
+		npcs: [...state.npcs, ...creatures.filter(c => !state.npcs.some(n => n.id === c.id))]
+	};
+	syncCombatantsFromState(syncState, encounter);
 
 	const stateChange: StateChange = {
 		encounterStarted: { creatures }
@@ -231,6 +383,7 @@ export function getCurrentCombatant(encounter: ActiveEncounter): Combatant | nul
  * Returns the combatant ID that should act first, or null if no human combatants exist.
  */
 export function initEncounterTurnOrder(
+	state: GameState,
 	encounter: ActiveEncounter,
 	npcs: NPC[]
 ): GameId | null {
@@ -264,7 +417,7 @@ export function initEncounterTurnOrder(
  * Returns the new current combatant, or null if no active combatants remain.
  * Mutates the encounter's round and turnIndex in-place.
  */
-export function advanceTurn(encounter: ActiveEncounter): Combatant | null {
+export function advanceTurn(state: GameState, encounter: ActiveEncounter): Combatant | null {
 	if (encounter.status !== 'active') return null;
 
 	const count = encounter.initiativeOrder.length;
@@ -286,7 +439,6 @@ export function advanceTurn(encounter: ActiveEncounter): Combatant | null {
 		}
 	}
 
-	// All combatants defeated — shouldn't happen in normal play
 	return null;
 }
 
@@ -395,12 +547,14 @@ function combineCombatAdvantage(
  * @param overrideAdv  Explicit advantage override (e.g., from features).
  */
 export function resolveAttack(
+	state: GameState,
 	attacker: PlayerCharacter,
 	target: Combatant,
 	weapon: WeaponItem,
 	encounter: ActiveEncounter,
 	overrideAdv?: AdvantageState
 ): CombatAttackResult {
+	const targetState = getCombatantState(state, target);
 	const reasons: string[] = [];
 
 	// Determine attack ability
@@ -413,7 +567,7 @@ export function resolveAttack(
 	if (attackerMods.resolvedAdvantage === 'disadvantage') reasons.push('attacker condition disadvantage');
 
 	// Get target's condition-based advantage for the attacker
-	const targetMods = getTargetConditionAdvantage(target.conditions);
+	const targetMods = getTargetConditionAdvantage(targetState.conditions);
 	reasons.push(...targetMods.reasons);
 
 	// Build the target-derived advantage state to pass as override to attackRoll.
@@ -459,34 +613,24 @@ export function resolveAttack(
 	const proficient = true; // In combat, we assume weapon proficiency was checked at equip time
 
 	// Roll the attack (attackRoll handles attacker conditions + our targetAdv override)
-	const atkResult = attackRoll(attacker, target.ac, damageDice, useAbility, proficient, targetAdv);
+	const atkResult = attackRoll(attacker, targetState.ac, damageDice, useAbility, proficient, targetAdv);
 
 	// Apply damage to target combatant if hit
 	let damageResult: DamageApplicationResult | null = null;
 	let targetDefeated = false;
 
 	if (atkResult.hits) {
-		// Look up target's resistances/immunities/vulnerabilities
-		const { resistances, immunities, vulnerabilities } = getTargetDefenses(target, encounter);
-
 		damageResult = applyDamage(
-			{ hp: target.currentHp, maxHp: target.maxHp, tempHp: target.tempHp },
+			{ hp: targetState.currentHp, maxHp: targetState.maxHp, tempHp: targetState.tempHp },
 			atkResult.totalDamage,
 			damageType,
-			resistances,
-			immunities,
-			vulnerabilities
+			targetState.resistances,
+			targetState.immunities,
+			targetState.vulnerabilities
 		);
 
-		// Update the combatant in-place
-		target.currentHp = damageResult.currentHp;
-		target.tempHp = target.tempHp - damageResult.tempHpAbsorbed;
-		if (target.tempHp < 0) target.tempHp = 0;
-
-		if (damageResult.currentHp <= 0) {
-			target.defeated = true;
-			targetDefeated = true;
-		}
+		if (damageResult.currentHp <= 0) targetDefeated = true;
+		updateCombatantHp(state, target, damageResult.currentHp, Math.max(0, targetState.tempHp - damageResult.tempHpAbsorbed), targetDefeated);
 	}
 
 	return {
@@ -516,12 +660,14 @@ function critDamageNotation(notation: string): string {
  * Resolve an NPC attack against a combatant using the creature's stat block attack data.
  */
 export function resolveNpcAttack(
+	state: GameState,
 	npc: NPC,
 	attackIndex: number,
 	target: Combatant,
 	encounter: ActiveEncounter,
 	attackerConditions: Condition[] = []
 ): CombatAttackResult {
+	const targetState = getCombatantState(state, target);
 	const reasons: string[] = [];
 	const sb = npc.statBlock;
 	if (!sb || !sb.attacks[attackIndex]) {
@@ -537,7 +683,7 @@ export function resolveNpcAttack(
 	}
 
 	// Get target's condition-based advantage for the attacker
-	const targetMods = getTargetConditionAdvantage(target.conditions);
+	const targetMods = getTargetConditionAdvantage(targetState.conditions);
 	reasons.push(...targetMods.reasons);
 
 	// Combine
@@ -552,7 +698,7 @@ export function resolveNpcAttack(
 	const total = chosen + attack.toHit;
 	const critical = chosen === 20;
 	const fumble = chosen === 1;
-	const hits = critical || (!fumble && total >= target.ac);
+	const hits = critical || (!fumble && total >= targetState.ac);
 
 	let totalDamage = 0;
 	let damageDice: DiceResult | null = null;
@@ -569,25 +715,17 @@ export function resolveNpcAttack(
 			totalDamage = damageDice.total;
 		}
 
-		const { resistances, immunities, vulnerabilities } = getTargetDefenses(target, encounter);
-
 		damageResult = applyDamage(
-			{ hp: target.currentHp, maxHp: target.maxHp, tempHp: target.tempHp },
+			{ hp: targetState.currentHp, maxHp: targetState.maxHp, tempHp: targetState.tempHp },
 			totalDamage,
 			attack.damageType,
-			resistances,
-			immunities,
-			vulnerabilities
+			targetState.resistances,
+			targetState.immunities,
+			targetState.vulnerabilities
 		);
 
-		target.currentHp = damageResult.currentHp;
-		target.tempHp = target.tempHp - damageResult.tempHpAbsorbed;
-		if (target.tempHp < 0) target.tempHp = 0;
-
-		if (damageResult.currentHp <= 0) {
-			target.defeated = true;
-			targetDefeated = true;
-		}
+		if (damageResult.currentHp <= 0) targetDefeated = true;
+		updateCombatantHp(state, target, damageResult.currentHp, Math.max(0, targetState.tempHp - damageResult.tempHpAbsorbed), targetDefeated);
 	}
 
 	return {
@@ -595,7 +733,7 @@ export function resolveNpcAttack(
 			roll: atkDice,
 			attackBonus: attack.toHit,
 			total,
-			targetAc: target.ac,
+			targetAc: targetState.ac,
 			hits,
 			critical,
 			fumble,
@@ -614,19 +752,7 @@ export function resolveNpcAttack(
 // Combatant Damage
 // ---------------------------------------------------------------------------
 
-/**
- * Get a target combatant's resistances, immunities, and vulnerabilities.
- */
-function getTargetDefenses(
-	target: Combatant,
-	_encounter: ActiveEncounter
-): { resistances: string[]; immunities: string[]; vulnerabilities: string[] } {
-	return {
-		resistances: target.resistances,
-		immunities: target.immunities,
-		vulnerabilities: target.vulnerabilities
-	};
-}
+
 
 // ---------------------------------------------------------------------------
 // Combatant Damage (direct)
@@ -641,6 +767,7 @@ function getTargetDefenses(
  * @returns The DamageApplicationResult or null if combatant not found.
  */
 export function resolveCombatantDamage(
+	state: GameState,
 	encounter: ActiveEncounter,
 	targetId: GameId,
 	amount: number,
@@ -650,10 +777,12 @@ export function resolveCombatantDamage(
 	vulnerabilities: string[] = []
 ): DamageApplicationResult | null {
 	const target = encounter.combatants.find(c => c.id === targetId);
-	if (!target || target.defeated) return null;
+	if (!target) return null;
+	const targetState = getCombatantState(state, target);
+	if (targetState.defeated) return null;
 
 	const result = applyDamage(
-		{ hp: target.currentHp, maxHp: target.maxHp, tempHp: target.tempHp },
+		{ hp: targetState.currentHp, maxHp: targetState.maxHp, tempHp: targetState.tempHp },
 		amount,
 		damageType,
 		resistances,
@@ -661,13 +790,8 @@ export function resolveCombatantDamage(
 		vulnerabilities
 	);
 
-	target.currentHp = result.currentHp;
-	target.tempHp = target.tempHp - result.tempHpAbsorbed;
-	if (target.tempHp < 0) target.tempHp = 0;
-
-	if (result.currentHp <= 0) {
-		target.defeated = true;
-	}
+	let targetDefeated = result.currentHp <= 0;
+	updateCombatantHp(state, target, result.currentHp, Math.max(0, targetState.tempHp - result.tempHpAbsorbed), targetDefeated);
 
 	return result;
 }
@@ -696,6 +820,7 @@ function crToKey(cr: number): string {
  * @param partySize  Number of PCs for XP division.
  */
 export function resolveEncounter(
+	state: GameState,
 	encounter: ActiveEncounter,
 	outcome: EncounterOutcome,
 	creatures: NPC[],
@@ -771,6 +896,7 @@ export function freshTurnBudget(speed: number): TurnBudget {
  * via the DEFAULT_CONDITION_EFFECTS speedMultiplier.
  */
 export function combatantTurnBudget(
+	state: GameState,
 	combatant: Combatant,
 	baseSpeed: number
 ): TurnBudget {
@@ -805,7 +931,7 @@ export function combatantTurnBudget(
 /**
  * Check if all combatants of a given type are defeated.
  */
-export function allDefeated(encounter: ActiveEncounter, type: CombatantType): boolean {
+export function allDefeated(state: GameState, encounter: ActiveEncounter, type: CombatantType): boolean {
 	return encounter.combatants
 		.filter(c => c.type === type)
 		.every(c => c.defeated);
@@ -814,7 +940,7 @@ export function allDefeated(encounter: ActiveEncounter, type: CombatantType): bo
 /**
  * Get all living combatants of a given type.
  */
-export function getLivingCombatants(encounter: ActiveEncounter, type?: CombatantType): Combatant[] {
+export function getLivingCombatants(state: GameState, encounter: ActiveEncounter, type?: CombatantType): Combatant[] {
 	return encounter.combatants.filter(c =>
 		!c.defeated && (type === undefined || c.type === type)
 	);

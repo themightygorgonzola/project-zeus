@@ -295,6 +295,10 @@ afterEach(() => {
 	resetRng();
 });
 
+// Shared state object for tests that need a GameState parameter.
+// Individual tests that need specific characters/npcs override this locally.
+const state = makeTestGameState([]);
+
 // ---------------------------------------------------------------------------
 // Initiative
 // ---------------------------------------------------------------------------
@@ -449,7 +453,7 @@ describe('advanceTurn', () => {
 		const c3 = makeCombatant({ id: 'c', name: 'Charlie' });
 		const enc = makeEncounter([c1, c2, c3]);
 
-		const next = advanceTurn(enc);
+		const next = advanceTurn(state, enc);
 		expect(next).toBeTruthy();
 		expect(next!.name).toBe('Bravo');
 		expect(enc.turnIndex).toBe(1);
@@ -461,7 +465,7 @@ describe('advanceTurn', () => {
 		const enc = makeEncounter([c1, c2]);
 		enc.turnIndex = 1; // at Bravo
 
-		const next = advanceTurn(enc);
+		const next = advanceTurn(state, enc);
 		expect(next).toBeTruthy();
 		expect(next!.name).toBe('Alpha');
 		expect(enc.round).toBe(2);
@@ -474,7 +478,7 @@ describe('advanceTurn', () => {
 		const c3 = makeCombatant({ id: 'c', name: 'Charlie' });
 		const enc = makeEncounter([c1, c2, c3]);
 
-		const next = advanceTurn(enc);
+		const next = advanceTurn(state, enc);
 		// Should skip Bravo and land on Charlie
 		expect(next!.name).toBe('Charlie');
 		expect(enc.turnIndex).toBe(2);
@@ -485,7 +489,7 @@ describe('advanceTurn', () => {
 		const c2 = makeCombatant({ id: 'b', defeated: true });
 		const enc = makeEncounter([c1, c2]);
 
-		const result = advanceTurn(enc);
+		const result = advanceTurn(state, enc);
 		expect(result).toBeNull();
 	});
 
@@ -494,7 +498,7 @@ describe('advanceTurn', () => {
 		const enc = makeEncounter([c1]);
 		enc.status = 'defeat';
 
-		expect(advanceTurn(enc)).toBeNull();
+		expect(advanceTurn(state, enc)).toBeNull();
 	});
 });
 
@@ -512,7 +516,7 @@ describe('resolveAttack', () => {
 			target
 		]);
 
-		const result = resolveAttack(pc, target, weapon, enc);
+		const result = resolveAttack(state, pc, target, weapon, enc);
 
 		expect(result.attackResult).toBeDefined();
 		expect(result.damageType).toBe('slashing');
@@ -531,7 +535,7 @@ describe('resolveAttack', () => {
 			target
 		]);
 
-		const result = resolveAttack(pc, target, weapon, enc);
+		const result = resolveAttack(state, pc, target, weapon, enc);
 		// The attack bonus should include DEX mod (+2) + prof (+2) = +4
 		// (We can't directly verify internal ability choice, but the attack bonus should reflect DEX)
 		expect(result.attackResult.attackBonus).toBeDefined();
@@ -548,7 +552,7 @@ describe('resolveAttack', () => {
 			target
 		]);
 
-		const result = resolveAttack(rogue, target, weapon, enc);
+		const result = resolveAttack(state, rogue, target, weapon, enc);
 		// With finesse and DEX 18, the bonus should be higher than with STR 8
 		expect(result.attackResult.attackBonus).toBeDefined();
 	});
@@ -565,7 +569,7 @@ describe('resolveAttack', () => {
 		const weapon = makeLongsword();
 		const enc = makeEncounter([makeCombatant({ id: 'pc-1' }), target]);
 
-		const result = resolveAttack(pc, target, weapon, enc);
+		const result = resolveAttack(state, pc, target, weapon, enc);
 
 		// Should note advantage from paralysis
 		expect(result.attackerAdvantageReason).toEqual(
@@ -580,7 +584,7 @@ describe('resolveAttack', () => {
 		const weapon = makeLongsword();
 		const enc = makeEncounter([makeCombatant({ id: 'pc-1' }), target]);
 
-		const result = resolveAttack(pc, target, weapon, enc);
+		const result = resolveAttack(state, pc, target, weapon, enc);
 
 		// Poisoned gives disadvantage on attack rolls
 		expect(result.attackerAdvantageReason).toEqual(
@@ -601,7 +605,7 @@ describe('resolveAttack', () => {
 		const weapon = makeLongsword();
 		const enc = makeEncounter([makeCombatant({ id: 'pc-1' }), target]);
 
-		const result = resolveAttack(pc, target, weapon, enc);
+		const result = resolveAttack(state, pc, target, weapon, enc);
 		expect(result.attackResult.advantageState).toBe('normal');
 	});
 
@@ -612,7 +616,7 @@ describe('resolveAttack', () => {
 		const weapon = makeLongsword();
 		const enc = makeEncounter([makeCombatant({ id: 'pc-1' }), target]);
 
-		const result = resolveAttack(pc, target, weapon, enc);
+		const result = resolveAttack(state, pc, target, weapon, enc);
 
 		if (result.attackResult.hits) {
 			expect(result.damageResult).not.toBeNull();
@@ -628,7 +632,7 @@ describe('resolveAttack', () => {
 		const weapon = makeLongsword();
 		const enc = makeEncounter([makeCombatant({ id: 'pc-1' }), target]);
 
-		const result = resolveAttack(pc, target, weapon, enc);
+		const result = resolveAttack(state, pc, target, weapon, enc);
 
 		if (result.attackResult.hits) {
 			expect(result.targetDefeated).toBe(true);
@@ -644,13 +648,13 @@ describe('resolveAttack', () => {
 		setRng(mulberry32(123));
 		const target1 = makeCombatant({ id: 'gob-1', ac: 15, currentHp: 20, maxHp: 20 });
 		const enc1 = makeEncounter([makeCombatant({ id: 'pc-1' }), target1]);
-		const result1 = resolveAttack(pc, target1, weapon, enc1);
+		const result1 = resolveAttack(state, pc, target1, weapon, enc1);
 
 		// Second run with same seed
 		setRng(mulberry32(123));
 		const target2 = makeCombatant({ id: 'gob-1', ac: 15, currentHp: 20, maxHp: 20 });
 		const enc2 = makeEncounter([makeCombatant({ id: 'pc-1' }), target2]);
-		const result2 = resolveAttack(pc, target2, weapon, enc2);
+		const result2 = resolveAttack(state, pc, target2, weapon, enc2);
 
 		expect(result1.attackResult.total).toBe(result2.attackResult.total);
 		expect(result1.attackResult.hits).toBe(result2.attackResult.hits);
@@ -667,7 +671,7 @@ describe('resolveNpcAttack', () => {
 		const target = makeCombatant({ id: 'pc-1', name: 'Aldric', ac: 18, currentHp: 28, maxHp: 28 });
 		const enc = makeEncounter([makeCombatant({ id: 'g1', type: 'npc' }), target]);
 
-		const result = resolveNpcAttack(goblin, 0, target, enc);
+		const result = resolveNpcAttack(state, goblin, 0, target, enc);
 
 		expect(result.attackResult).toBeDefined();
 		expect(result.damageType).toBe('slashing'); // Scimitar
@@ -681,7 +685,7 @@ describe('resolveNpcAttack', () => {
 		const target = makeCombatant({ id: 'pc-1', ac: 18, currentHp: 28, maxHp: 28 });
 		const enc = makeEncounter([target]);
 
-		expect(() => resolveNpcAttack(goblin, 99, target, enc)).toThrow();
+		expect(() => resolveNpcAttack(state, goblin, 99, target, enc)).toThrow();
 	});
 
 	it('throws when NPC has no stat block', () => {
@@ -698,7 +702,7 @@ describe('resolveNpcAttack', () => {
 		const target = makeCombatant({ id: 'pc-1' });
 		const enc = makeEncounter([target]);
 
-		expect(() => resolveNpcAttack(npc, 0, target, enc)).toThrow();
+		expect(() => resolveNpcAttack(state, npc, 0, target, enc)).toThrow();
 	});
 
 	it('applies advantage from target conditions', () => {
@@ -712,7 +716,7 @@ describe('resolveNpcAttack', () => {
 		});
 		const enc = makeEncounter([makeCombatant({ id: 'g1', type: 'npc' }), target]);
 
-		const result = resolveNpcAttack(goblin, 0, target, enc);
+		const result = resolveNpcAttack(state, goblin, 0, target, enc);
 
 		expect(result.attackerAdvantageReason).toEqual(
 			expect.arrayContaining([expect.stringContaining('stunned')])
@@ -725,7 +729,7 @@ describe('resolveNpcAttack', () => {
 		const target = makeCombatant({ id: 'pc-1', ac: 18, currentHp: 28, maxHp: 28 });
 		const enc = makeEncounter([makeCombatant({ id: 'g1', type: 'npc' }), target]);
 
-		const result = resolveNpcAttack(goblin, 1, target, enc);
+		const result = resolveNpcAttack(state, goblin, 1, target, enc);
 
 		expect(result.damageType).toBe('piercing'); // Shortbow
 	});
@@ -736,12 +740,12 @@ describe('resolveNpcAttack', () => {
 		setRng(mulberry32(77));
 		const target1 = makeCombatant({ id: 'pc-1', ac: 15, currentHp: 30, maxHp: 30 });
 		const enc1 = makeEncounter([makeCombatant({ id: 'g1', type: 'npc' }), target1]);
-		const r1 = resolveNpcAttack(goblin, 0, target1, enc1);
+		const r1 = resolveNpcAttack(state, goblin, 0, target1, enc1);
 
 		setRng(mulberry32(77));
 		const target2 = makeCombatant({ id: 'pc-1', ac: 15, currentHp: 30, maxHp: 30 });
 		const enc2 = makeEncounter([makeCombatant({ id: 'g1', type: 'npc' }), target2]);
-		const r2 = resolveNpcAttack(goblin, 0, target2, enc2);
+		const r2 = resolveNpcAttack(state, goblin, 0, target2, enc2);
 
 		expect(r1.attackResult.total).toBe(r2.attackResult.total);
 		expect(r1.attackResult.hits).toBe(r2.attackResult.hits);
@@ -757,7 +761,7 @@ describe('resolveCombatantDamage', () => {
 		const target = makeCombatant({ id: 'a', currentHp: 20, maxHp: 20 });
 		const enc = makeEncounter([target]);
 
-		const result = resolveCombatantDamage(enc, 'a', 8);
+		const result = resolveCombatantDamage(state, enc, 'a', 8);
 
 		expect(result).not.toBeNull();
 		expect(result!.currentHp).toBe(12);
@@ -769,7 +773,7 @@ describe('resolveCombatantDamage', () => {
 		const target = makeCombatant({ id: 'a', currentHp: 20, maxHp: 20, tempHp: 5 });
 		const enc = makeEncounter([target]);
 
-		const result = resolveCombatantDamage(enc, 'a', 8);
+		const result = resolveCombatantDamage(state, enc, 'a', 8);
 
 		expect(result).not.toBeNull();
 		expect(result!.tempHpAbsorbed).toBe(5);
@@ -782,7 +786,7 @@ describe('resolveCombatantDamage', () => {
 		const target = makeCombatant({ id: 'a', currentHp: 5, maxHp: 20 });
 		const enc = makeEncounter([target]);
 
-		const result = resolveCombatantDamage(enc, 'a', 10);
+		const result = resolveCombatantDamage(state, enc, 'a', 10);
 
 		expect(result).not.toBeNull();
 		expect(target.defeated).toBe(true);
@@ -794,21 +798,21 @@ describe('resolveCombatantDamage', () => {
 		const target = makeCombatant({ id: 'a', defeated: true });
 		const enc = makeEncounter([target]);
 
-		expect(resolveCombatantDamage(enc, 'a', 5)).toBeNull();
+		expect(resolveCombatantDamage(state, enc, 'a', 5)).toBeNull();
 	});
 
 	it('returns null when combatant not found', () => {
 		const target = makeCombatant({ id: 'a' });
 		const enc = makeEncounter([target]);
 
-		expect(resolveCombatantDamage(enc, 'nonexistent', 5)).toBeNull();
+		expect(resolveCombatantDamage(state, enc, 'nonexistent', 5)).toBeNull();
 	});
 
 	it('applies immunity (fire damage, fire immune)', () => {
 		const target = makeCombatant({ id: 'a', currentHp: 20, maxHp: 20 });
 		const enc = makeEncounter([target]);
 
-		const result = resolveCombatantDamage(enc, 'a', 15, 'fire', [], ['fire'], []);
+		const result = resolveCombatantDamage(state, enc, 'a', 15, 'fire', [], ['fire'], []);
 
 		expect(result).not.toBeNull();
 		expect(result!.effectiveDamage).toBe(0);
@@ -820,7 +824,7 @@ describe('resolveCombatantDamage', () => {
 		const target = makeCombatant({ id: 'a', currentHp: 20, maxHp: 20 });
 		const enc = makeEncounter([target]);
 
-		const result = resolveCombatantDamage(enc, 'a', 7, 'fire', ['fire'], [], []);
+		const result = resolveCombatantDamage(state, enc, 'a', 7, 'fire', ['fire'], [], []);
 
 		expect(result).not.toBeNull();
 		expect(result!.effectiveDamage).toBe(3); // floor(7/2) = 3
@@ -832,7 +836,7 @@ describe('resolveCombatantDamage', () => {
 		const target = makeCombatant({ id: 'a', currentHp: 20, maxHp: 20 });
 		const enc = makeEncounter([target]);
 
-		const result = resolveCombatantDamage(enc, 'a', 5, 'fire', [], [], ['fire']);
+		const result = resolveCombatantDamage(state, enc, 'a', 5, 'fire', [], [], ['fire']);
 
 		expect(result).not.toBeNull();
 		expect(result!.effectiveDamage).toBe(10);
@@ -866,7 +870,7 @@ describe('resolveEncounter', () => {
 
 		const enc = makeEncounter(combatants);
 
-		const result = resolveEncounter(enc, 'victory', goblins, 3);
+		const result = resolveEncounter(state, enc, 'victory', goblins, 3);
 
 		// CR 1/4 = 50 XP each, 4 goblins = 200 total, divided by 3 PCs = 66 each
 		expect(result.totalXp).toBe(200);
@@ -887,7 +891,7 @@ describe('resolveEncounter', () => {
 		];
 
 		const enc = makeEncounter(combatants);
-		const result = resolveEncounter(enc, 'victory', goblins, 2);
+		const result = resolveEncounter(state, enc, 'victory', goblins, 2);
 
 		expect(result.stateChange.xpAwarded).toBeDefined();
 		// Only Aldric gets XP (Lyra is defeated)
@@ -903,7 +907,7 @@ describe('resolveEncounter', () => {
 		];
 		const enc = makeEncounter(combatants);
 
-		const result = resolveEncounter(enc, 'defeat', goblins, 1);
+		const result = resolveEncounter(state, enc, 'defeat', goblins, 1);
 
 		expect(result.totalXp).toBe(0);
 		expect(result.xpPerCharacter).toBe(0);
@@ -923,7 +927,7 @@ describe('resolveEncounter', () => {
 		];
 		const enc = makeEncounter(combatants);
 
-		const result = resolveEncounter(enc, 'negotiated', goblins, 1);
+		const result = resolveEncounter(state, enc, 'negotiated', goblins, 1);
 
 		// Only 1 goblin defeated = 50 XP
 		expect(result.totalXp).toBe(50);
@@ -935,7 +939,7 @@ describe('resolveEncounter', () => {
 			makeCombatant({ id: 'pc-1', referenceId: 'pc-1', type: 'character' })
 		]);
 
-		const result = resolveEncounter(enc, 'flee', [], 1);
+		const result = resolveEncounter(state, enc, 'flee', [], 1);
 
 		expect(result.stateChange.encounterEnded).toBeDefined();
 		expect(result.stateChange.encounterEnded!.outcome).toBe('flee');
@@ -966,7 +970,7 @@ describe('freshTurnBudget', () => {
 describe('combatantTurnBudget', () => {
 	it('returns full budget for healthy combatant', () => {
 		const combatant = makeCombatant({ conditions: [] });
-		const budget = combatantTurnBudget(combatant, 30);
+		const budget = combatantTurnBudget(state, combatant, 30);
 
 		expect(budget.action).toBe(true);
 		expect(budget.bonusAction).toBe(true);
@@ -976,7 +980,7 @@ describe('combatantTurnBudget', () => {
 
 	it('sets speed to 0 for grappled combatant', () => {
 		const combatant = makeCombatant({ conditions: ['grappled'] });
-		const budget = combatantTurnBudget(combatant, 30);
+		const budget = combatantTurnBudget(state, combatant, 30);
 
 		// Grappled: speedMultiplier = 0
 		expect(budget.movement).toBe(0);
@@ -985,14 +989,14 @@ describe('combatantTurnBudget', () => {
 
 	it('halves speed for exhausted combatant', () => {
 		const combatant = makeCombatant({ conditions: ['exhaustion'] });
-		const budget = combatantTurnBudget(combatant, 30);
+		const budget = combatantTurnBudget(state, combatant, 30);
 
 		expect(budget.movement).toBe(15); // 30 * 0.5
 	});
 
 	it('disables actions for incapacitated combatant', () => {
 		const combatant = makeCombatant({ conditions: ['incapacitated'] });
-		const budget = combatantTurnBudget(combatant, 30);
+		const budget = combatantTurnBudget(state, combatant, 30);
 
 		// Incapacitated: cantDo includes 'take-actions' and 'take-reactions'
 		expect(budget.action).toBe(false);
@@ -1002,7 +1006,7 @@ describe('combatantTurnBudget', () => {
 
 	it('disables actions for unconscious combatant', () => {
 		const combatant = makeCombatant({ conditions: ['unconscious'] });
-		const budget = combatantTurnBudget(combatant, 30);
+		const budget = combatantTurnBudget(state, combatant, 30);
 
 		// Unconscious: cantDo includes 'take-actions' and 'take-reactions', speed 0
 		expect(budget.action).toBe(false);
@@ -1013,7 +1017,7 @@ describe('combatantTurnBudget', () => {
 
 	it('stacks multiple condition effects', () => {
 		const combatant = makeCombatant({ conditions: ['restrained', 'exhaustion'] });
-		const budget = combatantTurnBudget(combatant, 40);
+		const budget = combatantTurnBudget(state, combatant, 40);
 
 		// Restrained: speed × 0, exhaustion: speed × 0.5
 		// 40 × 0 × 0.5 = 0
@@ -1033,8 +1037,8 @@ describe('allDefeated', () => {
 			makeCombatant({ id: 'g2', type: 'npc', defeated: true })
 		]);
 
-		expect(allDefeated(enc, 'npc')).toBe(true);
-		expect(allDefeated(enc, 'character')).toBe(false);
+		expect(allDefeated(state, enc, 'npc')).toBe(true);
+		expect(allDefeated(state, enc, 'character')).toBe(false);
 	});
 
 	it('returns false when some NPCs are alive', () => {
@@ -1043,7 +1047,7 @@ describe('allDefeated', () => {
 			makeCombatant({ id: 'g2', type: 'npc', defeated: false })
 		]);
 
-		expect(allDefeated(enc, 'npc')).toBe(false);
+		expect(allDefeated(state, enc, 'npc')).toBe(false);
 	});
 });
 
@@ -1056,11 +1060,11 @@ describe('getLivingCombatants', () => {
 			makeCombatant({ id: 'g2', type: 'npc', defeated: true })
 		]);
 
-		const livingPCs = getLivingCombatants(enc, 'character');
+		const livingPCs = getLivingCombatants(state, enc, 'character');
 		expect(livingPCs).toHaveLength(1);
 		expect(livingPCs[0].id).toBe('pc-1');
 
-		const livingNPCs = getLivingCombatants(enc, 'npc');
+		const livingNPCs = getLivingCombatants(state, enc, 'npc');
 		expect(livingNPCs).toHaveLength(1);
 		expect(livingNPCs[0].id).toBe('g1');
 	});
@@ -1072,7 +1076,7 @@ describe('getLivingCombatants', () => {
 			makeCombatant({ id: 'g2', type: 'npc', defeated: true })
 		]);
 
-		const living = getLivingCombatants(enc);
+		const living = getLivingCombatants(state, enc);
 		expect(living).toHaveLength(2);
 	});
 });
@@ -1124,7 +1128,7 @@ describe('NPC critical hits', () => {
 		const target = makeCombatant({ id: 'pc-1', ac: 1, currentHp: 50, maxHp: 50 });
 		const enc = makeEncounter([makeCombatant({ id: 'g1', type: 'npc' }), target]);
 
-		const result = resolveNpcAttack(goblin, 0, target, enc);
+		const result = resolveNpcAttack(state, goblin, 0, target, enc);
 
 		expect(result.attackResult.critical).toBe(true);
 		expect(result.attackResult.hits).toBe(true);
@@ -1198,33 +1202,33 @@ describe('Full encounter: 3 PCs vs 4 Goblins', () => {
 
 			if (current.type === 'character') {
 				// PC attacks first living NPC
-				const targetNpc = getLivingCombatants(encounter, 'npc')[0];
+				const targetNpc = getLivingCombatants(state, encounter, 'npc')[0];
 				if (targetNpc) {
 					const pc = pcs.find(p => p.id === current!.referenceId)!;
 					const weapon = pc.classes[0].name === 'rogue' ? rapier : longsword;
-					resolveAttack(pc, targetNpc, weapon, encounter);
+					resolveAttack(state, pc, targetNpc, weapon, encounter);
 				}
 			} else {
 				// NPC attacks first living PC
-				const targetPc = getLivingCombatants(encounter, 'character')[0];
+				const targetPc = getLivingCombatants(state, encounter, 'character')[0];
 				if (targetPc) {
 					const npc = goblins.find(g => g.id === current!.referenceId)!;
-					resolveNpcAttack(npc, 0, targetPc, encounter);
+					resolveNpcAttack(state, npc, 0, targetPc, encounter);
 				}
 			}
 
 			// Check for encounter end conditions
-			if (allDefeated(encounter, 'npc')) {
+			if (allDefeated(state, encounter, 'npc')) {
 				// Victory!
 				break;
 			}
-			if (allDefeated(encounter, 'character')) {
+			if (allDefeated(state, encounter, 'character')) {
 				// Defeat!
 				break;
 			}
 
 			// Advance to next turn
-			const next = advanceTurn(encounter);
+			const next = advanceTurn(state, encounter);
 			if (!next) break;
 			turns++;
 		}
@@ -1234,8 +1238,8 @@ describe('Full encounter: 3 PCs vs 4 Goblins', () => {
 		expect(turnLog.length).toBeGreaterThan(0);
 
 		// === Phase 3: Resolve Encounter ===
-		const outcome = allDefeated(encounter, 'npc') ? 'victory' : 'defeat';
-		const result = resolveEncounter(encounter, outcome as any, goblins, 3);
+		const outcome = allDefeated(state, encounter, 'npc') ? 'victory' : 'defeat';
+		const result = resolveEncounter(state, encounter, outcome as any, goblins, 3);
 
 		expect(result.outcome).toBeDefined();
 		expect(result.stateChange.encounterEnded).toBeDefined();
@@ -1265,7 +1269,7 @@ describe('Full encounter: 3 PCs vs 4 Goblins', () => {
 			maxHp: 20
 		});
 
-		const budget = combatantTurnBudget(incapCombatant, 30);
+		const budget = combatantTurnBudget(state, incapCombatant, 30);
 
 		// Incapacitated prevents actions and reactions
 		expect(budget.action).toBe(false);
@@ -1286,20 +1290,20 @@ describe('Full encounter: 3 PCs vs 4 Goblins', () => {
 		expect(enc.round).toBe(1);
 		expect(getCurrentCombatant(enc)!.name).toBe('A');
 
-		advanceTurn(enc);
+		advanceTurn(state, enc);
 		expect(getCurrentCombatant(enc)!.name).toBe('B');
 		expect(enc.round).toBe(1);
 
-		advanceTurn(enc);
+		advanceTurn(state, enc);
 		expect(getCurrentCombatant(enc)!.name).toBe('C');
 		expect(enc.round).toBe(1);
 
 		// Wrap to round 2
-		advanceTurn(enc);
+		advanceTurn(state, enc);
 		expect(getCurrentCombatant(enc)!.name).toBe('A');
 		expect(enc.round).toBe(2);
 
-		advanceTurn(enc);
+		advanceTurn(state, enc);
 		expect(getCurrentCombatant(enc)!.name).toBe('B');
 		expect(enc.round).toBe(2);
 	});
@@ -1309,7 +1313,7 @@ describe('Full encounter: 3 PCs vs 4 Goblins', () => {
 		const enc = makeEncounter([target]);
 
 		// Apply 15 damage
-		const result = resolveCombatantDamage(enc, 'a', 15);
+		const result = resolveCombatantDamage(state, enc, 'a', 15);
 
 		expect(result).not.toBeNull();
 		// 10 temp HP absorbs first, then 5 real damage

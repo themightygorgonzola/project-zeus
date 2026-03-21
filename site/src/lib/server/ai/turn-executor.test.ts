@@ -903,7 +903,9 @@ describe('resolveCombatAttack (Phase 8c)', () => {
 	it('syncs character HP from combatants in updatedCharacters', () => {
 		const { state } = makeCombatState();
 
-		// Manually reduce PC combatant's HP to simulate enemy damage
+		// Reduce PC HP in both the authoritative state AND the combatant snapshot
+		const pc = state.characters.find(c => c.id === 'pc-1');
+		if (pc) pc.hp = 20;
 		const pcCmb = state.activeEncounter!.combatants.find(c => c.type === 'character');
 		if (pcCmb) pcCmb.currentHp = 20; // was 30
 
@@ -1413,18 +1415,18 @@ function makeCompanionCombatState() {
 
 describe('initEncounterTurnOrder', () => {
 	it('sets awaitingActorId to the first character in initiative order', () => {
-		const { encounter, cmb1 } = makeTwoPlayerCombatState();
+		const { encounter, cmb1, state } = makeTwoPlayerCombatState();
 		encounter.awaitingActorId = undefined;
 
-		initEncounterTurnOrder(encounter, []);
+		initEncounterTurnOrder(state, encounter, []);
 		expect(encounter.awaitingActorId).toBe(cmb1.id);
 	});
 
 	it('returns the first combatant id', () => {
-		const { encounter, cmb1 } = makeTwoPlayerCombatState();
+		const { encounter, cmb1, state } = makeTwoPlayerCombatState();
 		encounter.awaitingActorId = undefined;
 
-		const result = initEncounterTurnOrder(encounter, []);
+		const result = initEncounterTurnOrder(state, encounter, []);
 		expect(result).toBe(cmb1.id);
 	});
 
@@ -1435,8 +1437,9 @@ describe('initEncounterTurnOrder', () => {
 		const cmbPc = makeCombatant({ id: 'cmb-pc-1', referenceId: pc.id, type: 'character', initiative: 10 });
 		const encounter = makeEncounter([cmbWolf, cmbPc]);
 		encounter.awaitingActorId = undefined;
+		const state = makeState([pc], { npcs: [wolf] });
 
-		initEncounterTurnOrder(encounter, [wolf]);
+		initEncounterTurnOrder(state, encounter, [wolf]);
 		expect(encounter.awaitingActorId).toBe(cmbPc.id);
 	});
 
@@ -1447,8 +1450,9 @@ describe('initEncounterTurnOrder', () => {
 		const cmbEnemy = makeCombatant({ id: 'cmb-enemy-1', referenceId: enemy.id, type: 'npc', initiative: 10 });
 		const encounter = makeEncounter([cmbCompanion, cmbEnemy]);
 		encounter.awaitingActorId = undefined;
+		const state = makeState([], { npcs: [companion, enemy] });
 
-		initEncounterTurnOrder(encounter, [companion, enemy]);
+		initEncounterTurnOrder(state, encounter, [companion, enemy]);
 		expect(encounter.awaitingActorId).toBe(cmbCompanion.id);
 	});
 
@@ -1457,8 +1461,9 @@ describe('initEncounterTurnOrder', () => {
 		const cmbEnemy = makeCombatant({ id: 'cmb-enemy-1', referenceId: enemy.id, type: 'npc' });
 		const encounter = makeEncounter([cmbEnemy]);
 		encounter.awaitingActorId = undefined;
+		const state = makeState([], { npcs: [enemy] });
 
-		initEncounterTurnOrder(encounter, [enemy]);
+		initEncounterTurnOrder(state, encounter, [enemy]);
 		expect(encounter.awaitingActorId).toBeNull();
 	});
 });
@@ -2197,5 +2202,44 @@ describe('resolveTurn — pending check integration (Phase B2)', () => {
 		const result = resolveTurn('I intimidate the goblin chieftain.', state, 'user-1');
 		expect(result.status).toBe('awaiting-roll');
 		expect(result.pendingCheck!.skill).toBe('intimidation');
+	});
+
+	it('blocks investigation checks during active combat (improvised action)', () => {
+		const actor = makeCharacter();
+		const encounter: ActiveEncounter = {
+			id: 'enc-combat-block', round: 1, turnIndex: 0,
+			initiativeOrder: ['pc-1'], combatants: [{
+				id: 'pc-1', referenceId: 'pc-1', type: 'character', name: 'Hero',
+				initiative: 15, currentHp: 20, maxHp: 20, tempHp: 0, ac: 15,
+				conditions: [], resistances: [], immunities: [], vulnerabilities: [],
+				concentration: false, defeated: false
+			}],
+			status: 'active', startedAt: Date.now()
+		};
+		const state = makeState([actor], { activeEncounter: encounter });
+		const result = resolveTurn('I investigate the strange markings.', state, 'user-1');
+		// Should NOT trigger investigation — it's mid-combat
+		expect(result.status).toBe('ready-for-narration');
+		expect(result.pendingCheck).toBeUndefined();
+		expect(result.resolvedActionSummary).toContain('Improvised combat action');
+	});
+
+	it('allows stealth checks during combat (hide action)', () => {
+		const actor = makeCharacter();
+		const encounter: ActiveEncounter = {
+			id: 'enc-stealth', round: 1, turnIndex: 0,
+			initiativeOrder: ['pc-1'], combatants: [{
+				id: 'pc-1', referenceId: 'pc-1', type: 'character', name: 'Hero',
+				initiative: 15, currentHp: 20, maxHp: 20, tempHp: 0, ac: 15,
+				conditions: [], resistances: [], immunities: [], vulnerabilities: [],
+				concentration: false, defeated: false
+			}],
+			status: 'active', startedAt: Date.now()
+		};
+		const state = makeState([actor], { activeEncounter: encounter });
+		const result = resolveTurn('I hide behind the pillar.', state, 'user-1');
+		// Stealth is combat-valid — should trigger
+		expect(result.status).toBe('awaiting-roll');
+		expect(result.pendingCheck!.skill).toBe('stealth');
 	});
 });

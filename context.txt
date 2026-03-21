@@ -1,10 +1,277 @@
-C:/MySoftwareFolder/project-zeus/site/src/routes/admin/adventure/[id]/+page.svelte:291:10 Unexpected block closing tag
-https://svelte.dev/e/block_unexpected_close
-C:/MySoftwareFolder/project-zeus/site/src/routes/admin/adventure/[id]/+page.svelte:291:10
-289 |                        {/each}
- 290 |                      </div>
- 291 |                    {/if}
-                           ^
- 292 |                  {/if}
- 293 |
-Click outside, press Esc key, or fix the code to dismiss.
+The Admin
+I hold and wait until I notice anything. Once I have a clear sign of harpies I will drink it.
+Game Master
+Which item do you want to use? (Healing Draught, Potion to Ward Against Fear)
+The Admin
+Potion to Ward Against Fear
+Game Master
+You have multiple potion-like consumables. Which one do you want to use? (Healing Draught, Potion to Ward Against Fear)
+The Admin
+I want to use my Potion to Ward Against Fear
+Game Master
+You have multiple potion-like consumables. Which one do you want to use? (Healing Draught, Potion to Ward Against Fear)
+The Admin
+2
+
+This was weird. Looks like the turn executor. 
+
+I think we gotta make sure that the interaction is actually thought through. Ive mentioned dice rolls (none have yet been asked to happen), I've seen this kind of stuff:
+System
+🎲 Waited 1 period(s): morning → afternoon, day 1 → 1: 
+
+That's kinda cool. Like we should be doing more of these for state changes and when things happen and to capture user input -- and not rely on text. Dice rolls, clarification, etc. That would systematize the input much better. We'll make a plan to move in that direction
+
+
+...
+Game Master
+The forest around you remains a study in cautious quietude, the only sounds breaking the silence are the rustle of wind through leaves and the occasional distant call of a forest bird. Time trickles by uneventfully as you maintain your vigil, each shift in the shadows watched with the same intensity.
+
+With traps set and crossbow ready, you await the smallest whisper of activity, a harbinger of the harpies you suspect dwell nearby. The tension in the air is palpable, underscoring the need for patience in your watch.
+
+Would you like to continue waiting, or is there another tactic you wish to employ to draw out potential threats?
+The Admin
+What actions could draw them out? Are they active at this time usually? I'd want to make full use of the traps
+Game Master
+Which item do you want to use? (Healing Draught, Potion to Ward Against Fear)
+
+This was even weirder
+
+Game Master
+You have multiple potion-like consumables. Which one do you want to use? (Healing Draught, Potion to Ward Against Fear)
+The Admin
+Potion to Ward Against Fear
+Game Master
+You have multiple potion-like consumables. Which one do you want to use? (Healing Draught, Potion to Ward Against Fear)
+The Admin
+the second one
+Game Master
+You uncork the vial of the Potion to Ward Against Fear and quickly down its contents. The liquid tastes of bitter her..
+okay, got there in the end
+
+
+Game Master
+Make an Investigation check.
+Game Master
+Make an Investigation check.
+🎲 Roll
+
+WHOA
+Wait
+The Admin
+I let them investigate and quietly ready my crossbow.
+Game Master
+Make an Investigation check.
+
+Why am I rolling investigation???
+
+The Admin
+I let them investigate and quietly ready my crossbow.
+Game Master
+Make an Investigation check.
+Game Master
+🎲 Rolling Make an Investigation check.…
+Game Master
+Keeping yourself cloaked in shadows, you quietly ready your crossbow, eyes keenly following the harpies as they flit lower, their attention captured by the illusion of prey. As they hang just above your traps, their movements frenetic but cautious, your mind swiftly pieces together details—a break in the usual pattern; a shadow more substantial than the rest.
+
+With the success of your investigation, you identify the leader among them, her feathers darker, her gaze more exacting. She hovers suspiciously close to the trap line, a crucial detail that puts you in a position of strategic advantage.
+
+The question remains: will you take your shot now, or bide your time for even greater opportunity?
+System
+🎲 99: Investigation check (DC 12): 
+Wait what did I roll? The check was against 12 right ok but what did I get, what modifiers, etc
+SUPER sick that we did a roll though that's the first one!! NICE!
+
+
+prep--
+
+Game Master
+You focus your aim on the harpy leader, her piercing gaze unwittingly fixed on the ensnaring path below. Your breath steadies, heartbeats marking time as your finger finds the trigger. With deliberate precision, you let the bolt fly.
+
+The crossbow hums softly as the bolt sails through the air, straight and true toward its intended target. The moment stretches into an eternity—then, the solid thunk of impact splits the air, and the leader shrieks, their attention shifting instantly from curiosity to alarm. The flock erupts in a cacophony of wings and cries, scattering in confusion as your trap waits eagerly for the unfortunate. The battle's rhythm begins—roll for initiative!
+⚔️ Combat begins! Enemies: Harpy Leader, Harpy 1, Harpy 2
+
+COMBAT BEGINS!! first time! This is fucking sick dude
+However it says ROLL FOR INITIATIVE - but there's no roll thing here! I guess I'll say I got like a 15?
+
+The Admin
+I roll a 15
+Game Master
+Your swift response positions you advantageously in the initiative
+
+Okay guess that works. I'd rather it be a actual roll
+
+
+
+Game Master
+Amidst the chaotic ballet of feathers and haunting cries, you move with deliberate agility. You swiftly reload your crossbow, instincts honed and sure, before unleashing another bolt towards the enemy leader. The bolt strikes true, biting into the harpy leader's flesh and drawing another piercing shriek from her lips. Her fearsome countenance twists with pain and anger, feathers falling like tainted snowflakes.
+
+The harpy leader, flanked by her minions, retaliates with a wild-eyed frenzy. Yet, in her wrath, precision falters, and her strikes either miss or fail to breach your stalwart defenses. Similarly, the other harpies swoop and slash, their strikes a flurry of chaotic attempts to land a blow. However, your chain mail and shield deflect their claws, a barrier they struggle in vain to penetrate.
+
+With the harpies still caught in this tangled dance of ferocity and your traps lying not far behind them, the battlefield lies volatile and charged. What will be your next move as the fight continues to unfold?
+System
+🎲 99 attacks Harpy Leader with light-crossbow: 
+System
+🎲 99 deals 5 piercing damage to Harpy Leader: 
+System
+🎲 Harpy 2 attacks 99 with Strike: 
+System
+🎲 Harpy Leader attacks 99 with Strike: 
+System
+🎲 Harpy 1 attacks 99 with Strike: 
+
+AH WOAH OK HOLY SHIT lol
+
+Game Master
+With the adrenaline of combat coursing through your veins, you close the distance, your crossbow a steadfast companion even in such tight quarters. You fire another bolt, the mechanical clink drowned out by the chaos around you. The projectile finds its mark, embedding into the harpy leader's side and eliciting a guttural screech that echoes like a clarion of woe through the trees.
+
+The harpy swarm whirls around, frenzied attempts to claw and rake at you falling short against your agile defense. One of the harpies lunges, claws grazed by futility as your armored form remains untouched. The other harpies, eyes wild with frustration, find their own attempts similarly thwarted, their swings unfocused and misdirected.
+
+Through the cacophony, you remain poised, your resolve as unyielding as the metal encasing you. The battle continues to pulse with fierce energy, your enemy weakened but not yet defeated. With harpy cries filling the air, your next move looms with its promise of turning the tide. How will you push your advantage now?
+System
+🎲 99 attacks Harpy Leader with light-crossbow: 
+System
+🎲 99 deals 6 piercing damage to Harpy Leader: 
+System
+🎲 Harpy 2 attacks 99 with Strike: 
+System
+🎲 Harpy Leader attacks 99 with Strike: 
+System
+🎲 Harpy 1 attacks 99 with Strike: 
+
+Yo okay we're doing it. We're not taking damage I guess which is fine but at least an encounter is actually happening
+{
+  "hpChanges": [
+    {
+      "characterId": "npc-unique-harpy-leader",
+      "oldHp": 30,
+      "newHp": 24,
+      "reason": "99's light-crossbow attack"
+    }
+  ]
+
+And goddamn it better hold up holy shit maybe I should have gotten some companions LOL
+
+Narrative Text
+With a surge of defiant adrenaline, you grip the crossbow firmly, its smooth wood now doubling as an instrument of brute force. Charging toward the wounded harpy leader, your voice rises in a fierce battle cry, confidence and defiance writ large across your stance. The stock of your crossbow crashes down on the harpy leader, the impact reverberating with solid, satisfying force. Her breath leaves in a ragged gasp as the momentum of your strike catches her off-guard, further staggering her frail and already wounded form. The desperation in her eyes grows as you tower over her, a formidable opponent wielding raw strength. The moment pulses with tension—as the battle rages around you, the resolve burns bright in your unyielding gaze. Ready for the next swing, what is your follow-through in this combat?
+Applied State Changes (merged)
+{}
+
+No damage?!
+
+also this whole time:
+○
+Speak with the locals to learn more about the threat
+○
+Investigate the source of the disturbance
+○
+Resolve the threat
+
+No update here
+
+#48
+move
+As the harpy lays stunned I loose another bolt point blank at her head
+The Admin
+10:31:40 AM
+▲
+📨 Prompt
+⚙️ Engine
+🤖 AI Response
+✅ Applied
+📊 Meta
+📋 Copy
+Narrative Text
+Seizing the opportunity as the harpy leader reels from your impromptu attack, you deftly reload your crossbow. Her wings droop with the weight of pain, and the chaos around you fades to silence as you steady your aim. The distance is negligible, the outcome nearly assured. Your bolt fires with lethal precision, and with a final gasp, the harpy leader crumples, her reign of terror extinguished amidst a shower of leafy debris. Her death cry echoes as the remaining harpies pause, their fear palpable in the wake of their leader's fall. Realizing the leader's demise, the other harpies hesitate, their chaotic movements faltering. The balance of the battle shifts once more. How do you capitalize on this momentary advantage?
+Applied State Changes (merged)
+{
+  "npcChanges": [
+    {
+      "npcId": "npc-unique-harpy-leader",
+      "field": "alive",
+      "newValue": false
+    },
+    {
+      "npcId": "npc-unique-harpy-leader",
+      "field": "hp",
+      "newValue": 0
+    }
+  ]
+}
+
+Okay well good thing the narrative bot can.. somehow escape combat and force a death? I mean that's what I would prefer sometimes if the narrative calls for it but we seem to have exited combat, there's no basic harpy attacks happening
+
+
+Game Master
+A primal roar of triumph bursts from your lips, echoing through the clearing as you reload your crossbow, brimming with confidence despite the bruising chaos around you. The harpies circle, their wings kicking up turbulent gusts that stir the undergrowth. You take aim at Harpy 2, the shriek of your weapon punctuating your determination. The bolt flies—only to disappear into the canopy, its path marred by a miscalculation that draws a frustrated hiss from between your teeth.
+
+The response is immediate. Harpy 2 retaliates with vicious precision, diving toward you with a fury that belies her avian grace. Her strike connects with brutal force—pain radiates through your torso, and you stagger, blood pounding in your ears. As you recoil, the harpy leader seizes the opportunity, her savage blow landing with uncanny accuracy. The impact jostles your senses, compounded by the remnants of her previous vengeance. Your strength wanes, vitality slipping between the fingers of your resolve, yet you remain upright, determined.
+
+Harpy 1 attempts its own assault, but its strike whirls wide, skittering harmlessly off your chain mail. As the cacophony of flapping wings and shrill cries swells once more, the battlefield waits breathlessly for your next move. With the taste of iron on your lips and determination steeling your heart, the question presses: how will you weather the hurricane of claws and ire now upon you?
+System
+🎲 99 attacks Harpy 2 with light-crossbow: 
+System
+🎲 Harpy 2 attacks 99 with Strike: 
+System
+🎲 Harpy 2 deals 5 bludgeoning damage to 99: 
+System
+🎲 Harpy Leader attacks 99 with Strike: 
+System
+🎲 Harpy Leader deals 4 bludgeoning damage to 99: 
+System
+🎲 Harpy 1 attacks 99 with Strike: 
+
+Wait LOL the leader was DEAD!! he's back! I'm fucking doomed!
+⚔
+Combat
+Round 1
+▶
+99
+AC 18
+21
+12/12
+
+My hp still says 12 though even though it should be 3. Well I'll see this one out see if I'm invulnerable or actually on 3hp
+
+After next prompt:
+
+Narrative Text
+Indeed, the harpy leader had met a decisive end with your previous attack. My apologies for that oversight. Let's recalibrate the scene accordingly: Amid the chaos, as you reload and fire at the harpies, your bolt misses its mark and tears into the undergrowth. Harpy 2 seizes the momentary vulnerability with a piercing strike that lands true, its impact an unyielding barrage against your defenses, staggering but not felling you. The remaining harpies, despite their leader's demise now looming like a warning omen, are yet emboldened by one another's presence, hastening amidst the debris and shadows. Pain radiates where talons found purchase, but you remain unbroken and resolute in your determination. What is your next act to overcome the nesting threat?
+Applied State Changes (merged)
+{
+  "hpChanges": [
+    {
+      "characterId": "01KM8MD9AD1XJPGXYE4YJ1WSSP",
+      "oldHp": 12,
+      "newHp": 3,
+      "reason": "Piercing strike from Harpy 2"
+    }
+  ]
+}
+
+Well that's not ideal lol
+
+
+Game Master
+The tension ripples through the air as the aftermath of the harpy leader's death clings like a veil over the battleground. Undeterred by the throbbing pain of your recent clash, you focus intently, crossbow reloaded with a determined precision. Aiming at Harpy 2, your shot speeds forth, only to veer off its intended course, embedding deep into the forest floor, missing its target.
+
+The harpies, stripped of their leader, falter but remain locked in a frenzied dance around you. Harpy 2 recoils and strikes with fleeting ferocity, but its talons find nothing but empty air. Echoes of its leader’s presence urge Harpy 1 and the ghostly presence of the leader to flounder in their attack, the specter of hesitation hanging visibly behind their eyes.
+
+Despite their numbers, not one manages to land a decisive blow against your steadfast form. Their confusion and panic hang palpable around them as they circle back to reassess. You stand resolute at the forest's edge, a warrior poised to end this skirmish. What will be your next decisive maneuver as the harpies test the limits of your resolve?
+System
+🎲 99 attacks Harpy 2 with light-crossbow: 
+System
+🎲 Harpy 2 attacks 99 with Strike: 
+System
+🎲 Harpy Leader attacks 99 with Strike: 
+System
+🎲 Harpy 1 attacks 99 with Strike: 
+
+Ok I think we're stuck here. Let's give it up.
+
+
+
+
+
+
+
+

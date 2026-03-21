@@ -403,7 +403,9 @@ export function resolveTurn(playerAction: string, state: GameState | null, actor
 		}
 		case 'cast-spell':
 			return resolveCastSpell(base, actor, state, intent);
-		default:
+		default: {
+			const inCombat = !!(state.activeEncounter && state.activeEncounter.status === 'active');
+
 			// During companion's turn, any input (including 'auto', free-narration)
 			// should route to combat so the companion acts.
 			if (state.activeEncounter?.awaitingActorId) {
@@ -417,6 +419,34 @@ export function resolveTurn(playerAction: string, state: GameState | null, actor
 					}
 				}
 			}
+
+			// ── Combat context routing ──────────────────────────────────
+			// When in active combat, non-attack/spell intents ("I ready my crossbow",
+			// "I look around") must stay within the combat loop as improvised actions,
+			// NOT fall through to open skill checks or unconstrained GM narration.
+			if (inCombat) {
+				// Only allow combat-valid checks (athletics to grapple/shove,
+				// acrobatics to tumble, stealth to hide) during combat.
+				const COMBAT_VALID_SKILLS = new Set([
+					'athletics', 'acrobatics', 'stealth', 'intimidation', 'medicine'
+				]);
+				const check = detectPendingCheck(playerAction, intent, actor, state);
+				if (check && check.skill && COMBAT_VALID_SKILLS.has(check.skill)) {
+					return {
+						...base,
+						status: 'awaiting-roll',
+						pendingCheck: check,
+						resolvedActionSummary: check.reason
+					};
+				}
+				// Treat as improvised combat action — stays in initiative order,
+				// the AI narrator will describe it within the combat context.
+				return {
+					...base,
+					resolvedActionSummary: `Improvised combat action: ${playerAction}`
+				};
+			}
+
 			// ── Non-combat check detection ──────────────────────────────
 			// talk, examine, free-narration: detect if the action warrants
 			// a skill check before falling through to unconstrained narrative.
@@ -433,6 +463,7 @@ export function resolveTurn(playerAction: string, state: GameState | null, actor
 			}
 			// Low-stakes / trivial — let AI handle as free narration
 			return base;
+		}
 	}
 }
 
@@ -691,7 +722,7 @@ export function autoAdvancePastNpcs(
 	let iters = 0;
 
 	while (iters++ < maxIter) {
-		const next = advanceTurn(encounter);
+		const next = advanceTurn(state, encounter);
 		if (!next) break;
 
 		// Is this combatant a human actor (PC or companion)?
@@ -712,7 +743,7 @@ export function autoAdvancePastNpcs(
 				const pcTargets = encounter.combatants.filter(c => c.type === 'character' && !c.defeated);
 				if (pcTargets.length > 0) {
 					const targetCombatant = pcTargets[iters % pcTargets.length];
-					const attackResult = resolveNpcAttack(npc, 0, targetCombatant, encounter);
+					const attackResult = resolveNpcAttack(state, npc, 0, targetCombatant, encounter);
 					const attackName = npc.statBlock.attacks[0].name;
 
 					mechanicResults.push(
@@ -758,7 +789,7 @@ export function autoAdvancePastNpcs(
 					});
 
 					// Check if all PCs down
-					if (allDefeated(encounter, 'character')) {
+					if (allDefeated(state, encounter, 'character')) {
 						encounterEnded = { outcome: 'defeat' };
 						encounter.awaitingActorId = null;
 						break;
@@ -830,7 +861,7 @@ function resolveCompanionAction(
 		}
 	}
 
-	const attackResult = resolveNpcAttack(npc, 0, target, encounter);
+	const attackResult = resolveNpcAttack(state, npc, 0, target, encounter);
 	const attackName = npc.statBlock.attacks[0].name;
 
 	mechanicResults.push(
@@ -869,7 +900,7 @@ function resolveCompanionAction(
 	}
 
 	// Check encounter end
-	if (attackResult.targetDefeated && allDefeated(encounter, 'npc')) {
+	if (attackResult.targetDefeated && allDefeated(state, encounter, 'npc')) {
 		stateChanges.encounterEnded = { outcome: 'victory' };
 	}
 
@@ -1096,7 +1127,7 @@ function resolveCombatAttack(
 	const weapon = chooseAttackWeapon(actor, intent);
 
 	// 3. Resolve attack
-	const result = resolveAttack(actor, target, weapon, encounter);
+	const result = resolveAttack(state, actor, target, weapon, encounter);
 
 	// 4. Build mechanic results
 	const mechanicResults: MechanicResult[] = buildAttackMechanicResults(
@@ -1126,7 +1157,7 @@ function resolveCombatAttack(
 	}
 
 	// Check if all enemies defeated → auto-end encounter
-	if (result.targetDefeated && allDefeated(encounter, 'npc')) {
+	if (result.targetDefeated && allDefeated(state, encounter, 'npc')) {
 		stateChanges.encounterEnded = { outcome: 'victory' };
 	}
 
@@ -1219,7 +1250,7 @@ export function resolveEnemyTurns(
 		const selectedTarget = pcTargets[targetIndex];
 
 		// Use first attack from stat block
-		const attackResult = resolveNpcAttack(npc, 0, selectedTarget, encounter);
+		const attackResult = resolveNpcAttack(state, npc, 0, selectedTarget, encounter);
 
 		// Build mechanic results
 		const attackName = npc.statBlock.attacks[0].name;
@@ -1254,7 +1285,7 @@ export function resolveEnemyTurns(
 	if (hpChanges.length > 0) stateChanges.hpChanges = hpChanges;
 
 	// Check if all PCs defeated
-	if (allDefeated(encounter, 'character')) {
+	if (allDefeated(state, encounter, 'character')) {
 		stateChanges.encounterEnded = { outcome: 'defeat' };
 	}
 

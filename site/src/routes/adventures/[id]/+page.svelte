@@ -6,6 +6,15 @@
 	import GlassPanel from '$components/GlassPanel.svelte';
 	import JournalPanel from '$components/JournalPanel.svelte';
 	import CombatPanel from '$components/CombatPanel.svelte';
+	import Toast from '$components/Toast.svelte';
+	import DiceRoll from '$components/DiceRoll.svelte';
+	import {
+		toastItemAcquired,
+		toastItemRemoved,
+		toastLocationUpdate,
+		toastTimeAdvance,
+		toastQuestUpdate
+	} from '$components/toastStore';
 	import type { PlayerCharacter, ActiveEncounter, NPC } from '$lib/game';
 	import { toWorldSnapshot, type PrototypeWorld } from '$lib/worldgen/prototype';
 	import type { TurnRecord } from '$lib/game/types';
@@ -82,7 +91,7 @@
 	});
 
 	/* ── transcript messages ────────────────────────────── */
-	type MessageKind = 'party' | 'gm-narration' | 'gm-thinking' | 'mechanic' | 'system' | 'error' | 'roll-request';
+	type MessageKind = 'party' | 'gm-narration' | 'gm-thinking' | 'mechanic' | 'system' | 'error' | 'roll-request' | 'clarification' | 'dice-roll';
 
 	interface TranscriptMessage {
 		id: string;
@@ -98,6 +107,20 @@
 		canRetroInvoke?: boolean;
 		/** For roll-request messages: the pending check to resolve */
 		pendingRollCheck?: PendingCheck;
+		/** For clarification messages: clickable options */
+		clarificationOptions?: Array<{ id: string; label: string; description?: string }>;
+		/** For clarification messages: category like 'target', 'item', 'spell' */
+		clarificationCategory?: string;
+		/** For dice-roll messages: structured roll data */
+		diceRollData?: {
+			label: string;
+			notation: string;
+			rolls: number[];
+			total: number;
+			dc?: number;
+			success?: boolean;
+			type: string;
+		};
 	}
 
 	let messages = $state<TranscriptMessage[]>([]);
@@ -266,11 +289,21 @@
 			if (msg.type === 'ai:turn:end') {
 				gmThinking = false;
 				const text = String(msg.text ?? '');
+				const clarification = (msg as any).clarification as { reason: string; question: string; options: string[] } | undefined;
+
+				// Determine message kind & extra fields
+				const isClarification = !!clarification && clarification.options?.length > 0;
+				const msgKind: MessageKind = isClarification ? 'clarification' : 'gm-narration';
+				const extraFields = isClarification ? {
+					clarificationOptions: clarification!.options.map((opt, i) => ({ id: `opt-${i}`, label: opt })),
+					clarificationCategory: clarification!.reason
+				} : {};
+
 				if (gmPendingId) {
 					if (text) {
-						// Normal narrative: replace the placeholder with the GM response
+						// Replace the placeholder with the GM response (or clarification card)
 						messages = messages.map((m) =>
-							m.id === gmPendingId ? { ...m, text, kind: 'gm-narration', isPending: false } : m
+							m.id === gmPendingId ? { ...m, text, kind: msgKind, isPending: false, ...extraFields } : m
 						);
 					} else {
 						// Mid-round turn: no narrative — silently discard the thinking placeholder
@@ -280,11 +313,12 @@
 				} else if (text) {
 					messages = [...messages, {
 						id: `gm-${Date.now()}`,
-						kind: 'gm-narration',
+						kind: msgKind,
 						userId: 'gm',
 						username: 'Game Master',
 						text,
 						ts: Date.now(),
+						...extraFields
 					}];
 				}
 				lastGmTurnTs = Date.now();
@@ -330,17 +364,27 @@
 				if (msg.type === 'game:state-update') {
 					invalidateAll();
 				}
-				// Mechanic event in transcript
+				// Mechanic event in transcript — render as DiceRoll card
 				if (msg.type === 'game:dice-roll') {
 					const label = String(msg.label ?? 'Roll');
-					const result = msg.result as { total?: number; outcome?: string } | undefined;
+					const result = msg.result as { type?: string; label?: string; dice?: { notation?: string; rolls?: number[]; total?: number }; dc?: number; success?: boolean } | undefined;
+					const dice = result?.dice;
 					messages = [...messages, {
 						id: `dice-${Date.now()}`,
-						kind: 'mechanic',
+						kind: 'dice-roll',
 						userId: 'system',
 						username: 'System',
-						text: `🎲 ${label}: ${result?.total ?? result?.outcome ?? ''}`,
-						ts: Date.now()
+						text: `🎲 ${label}: ${dice?.total ?? ''}`,
+						ts: Date.now(),
+						diceRollData: {
+							label,
+							notation: dice?.notation ?? '1d20',
+							rolls: dice?.rolls ?? [dice?.total ?? 0],
+							total: dice?.total ?? 0,
+							dc: result?.dc,
+							success: result?.success,
+							type: result?.type ?? 'other'
+						}
 					}];
 					await scrollChatToBottom();
 				}
@@ -420,6 +464,50 @@
 					await scrollChatToBottom();
 				}
 			}
+
+			// --- Structured UI events (routed to toasts, not chat) ---
+
+			if (msg.type === 'inventory:acquired') {
+				const itemName = String((msg as any).item?.name ?? 'Unknown Item');
+				toastItemAcquired(itemName);
+				invalidateAll();
+			}
+
+			if (msg.type === 'inventory:removed') {
+				const itemName = String((msg as any).item?.name ?? 'Unknown Item');
+				const reason = String((msg as any).reason ?? 'removed');
+				toastItemRemoved(itemName, reason);
+				invalidateAll();
+			}
+
+			if (msg.type === 'world:location-update') {
+				const toLocation = (msg as any).to;
+				const locationName = String(toLocation?.name ?? 'Unknown Location');
+				toastLocationUpdate(locationName);
+				// No invalidateAll needed — game:state-update handles the data refresh
+			}
+
+			if (msg.type === 'world:time-advance') {
+				const summary = String((msg as any).summary ?? 'Time passes');
+				toastTimeAdvance(summary);
+			}
+
+			if (msg.type === 'game:clarification-request') {
+				const payload = msg as any;
+				const options = (payload.options ?? []) as Array<{ id: string; label: string; description?: string }>;
+				const prompt = String(payload.prompt ?? 'Choose an option:');
+				messages = [...messages, {
+					id: `clarify-${Date.now()}`,
+					kind: 'clarification' as MessageKind,
+					userId: 'gm',
+					username: 'Game Master',
+					text: prompt,
+					ts: Date.now(),
+					clarificationOptions: options,
+					clarificationCategory: String(payload.category ?? 'other')
+				}];
+				await scrollChatToBottom();
+			}
 		});
 	}
 
@@ -462,6 +550,30 @@
 		if (!msg) return;
 		gmAwake = true;
 		await invokeGM(msg.text);
+	}
+
+	/** Handle a clarification option selection — replaces the card and re-invokes the GM */
+	async function selectClarification(msgId: string, optionLabel: string) {
+		if (gmThinking) return;
+		// Replace the clarification card with the chosen option (shown as user message)
+		messages = [...messages.filter((m) => m.id !== msgId), {
+			id: `local-${Date.now()}`,
+			kind: 'party' as MessageKind,
+			userId: currentUserId,
+			username: currentUsername,
+			text: optionLabel,
+			ts: Date.now()
+		}];
+		await scrollChatToBottom();
+		// Also broadcast the choice to other players
+		socket?.send(JSON.stringify({
+			type: 'player:chat',
+			userId: currentUserId,
+			username: currentUsername,
+			text: optionLabel,
+		}));
+		// Re-invoke GM with the selected option
+		await invokeGM(optionLabel);
 	}
 
 	/** Resolve a pending roll request — calls dice engine + narrator (Phase B4) */
@@ -798,6 +910,23 @@
 												🎲 Roll
 											</button>
 										</div>
+									{:else if msg.kind === 'clarification' && msg.clarificationOptions?.length}
+										<div class="clarification-card">
+											<span class="clarification-prompt">{msg.text}</span>
+											<div class="clarification-options">
+												{#each msg.clarificationOptions as opt (opt.id)}
+													<button
+														class="btn clarification-btn"
+														onclick={() => selectClarification(msg.id, opt.label)}
+														disabled={gmThinking}
+													>
+														{opt.label}
+													</button>
+												{/each}
+											</div>
+										</div>
+									{:else if msg.kind === 'dice-roll' && msg.diceRollData}
+										<DiceRoll roll={msg.diceRollData} />
 									{:else}
 										<span class="chat-text">{@html formatMessageText(msg.text)}</span>
 									{/if}
@@ -852,6 +981,9 @@
 		</div>
 	</div>
 </div>
+
+<!-- Toast notifications (fixed overlay) -->
+<Toast />
 
 <style>
 	/* ===== Layout ===== */
@@ -1442,6 +1574,48 @@
 	}
 
 	.roll-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	/* Clarification card */
+	.clarification-card {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.clarification-prompt {
+		font-size: 0.94rem;
+		font-weight: 500;
+		color: var(--accent-2, #34d3a2);
+	}
+
+	.clarification-options {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+	}
+
+	.clarification-btn {
+		background: rgba(52, 211, 162, 0.15);
+		color: var(--accent-2, #34d3a2);
+		border: 1px solid rgba(52, 211, 162, 0.35);
+		border-radius: 8px;
+		padding: 0.4rem 0.85rem;
+		font-size: 0.88rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+	}
+
+	.clarification-btn:hover:not(:disabled) {
+		background: rgba(52, 211, 162, 0.3);
+		transform: scale(1.03);
+		box-shadow: 0 0 10px rgba(52, 211, 162, 0.25);
+	}
+
+	.clarification-btn:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
 	}
