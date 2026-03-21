@@ -506,6 +506,18 @@ function getEquippedWeapon(actor: PlayerCharacter): WeaponItem | null {
 	)) ?? null;
 }
 
+/** Mark a weapon as equipped (and un-equip the previous weapon of the same slot). */
+function autoEquipWeapon(actor: PlayerCharacter, weapon: WeaponItem): void {
+	if (weapon.equipped) return; // already equipped
+	// Un-equip other weapons (a character wields one weapon at a time)
+	for (const item of actor.inventory) {
+		if (item.category === 'weapon' && (item as WeaponItem).equipped) {
+			(item as WeaponItem).equipped = false;
+		}
+	}
+	weapon.equipped = true;
+}
+
 function getCarriedWeapons(actor: PlayerCharacter): WeaponItem[] {
 	return actor.inventory.filter(
 		(item): item is WeaponItem => item.category === 'weapon' && item.quantity > 0
@@ -557,7 +569,10 @@ function chooseAttackWeapon(actor: PlayerCharacter, intent: ParsedTurnIntent): W
 
 	const actionLower = normalizeActionText(intent.rawAction);
 	const explicitlyMentioned = carriedWeapons.find((weapon) => actionMentionsWeapon(actionLower, weapon));
-	if (explicitlyMentioned) return explicitlyMentioned;
+	if (explicitlyMentioned) {
+		autoEquipWeapon(actor, explicitlyMentioned);
+		return explicitlyMentioned;
+	}
 
 	const equipped = getEquippedWeapon(actor);
 	if (equipped) return equipped;
@@ -565,16 +580,24 @@ function chooseAttackWeapon(actor: PlayerCharacter, intent: ParsedTurnIntent): W
 	const prefersRanged = /\b(shoot|fire|snipe|aim|loose|bolt|arrow|crossbow|bow)\b/.test(actionLower);
 	if (prefersRanged) {
 		const rangedWeapon = carriedWeapons.find((weapon) => weapon.properties.includes('range') || Boolean(weapon.range));
-		if (rangedWeapon) return rangedWeapon;
+		if (rangedWeapon) {
+			autoEquipWeapon(actor, rangedWeapon);
+			return rangedWeapon;
+		}
 	}
 
 	const prefersMelee = /\b(slash|stab|swing|cut|thrust|cleave|smash|bash)\b/.test(actionLower);
 	if (prefersMelee) {
 		const meleeWeapon = carriedWeapons.find((weapon) => !weapon.properties.includes('range') && !weapon.range);
-		if (meleeWeapon) return meleeWeapon;
+		if (meleeWeapon) {
+			autoEquipWeapon(actor, meleeWeapon);
+			return meleeWeapon;
+		}
 	}
 
-	return carriedWeapons[0] ?? buildUnarmedStrike();
+	const fallback = carriedWeapons[0] ?? buildUnarmedStrike();
+	if (fallback.id) autoEquipWeapon(actor, fallback);
+	return fallback;
 }
 
 function scoreEnemyReference(actionLower: string, enemyName: string): number {

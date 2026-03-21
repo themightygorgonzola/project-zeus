@@ -2075,11 +2075,14 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 				const combatant = state.activeEncounter?.combatants.find((c) => c.id === hc.characterId);
 				if (combatant) {
 					combatant.currentHp = Math.max(0, Math.min(hc.newHp, combatant.maxHp));
-					if (combatant.currentHp === 0) {
-						combatant.defeated = true;
-						// Sync alive flag on NPC record
-						const npc = state.npcs.find((n) => n.id === combatant.referenceId || n.id === combatant.id);
-						if (npc) npc.alive = false;
+					const defeated = combatant.currentHp === 0;
+					if (defeated) combatant.defeated = true;
+					// Write through to NPC statBlock so getCombatantState() sees
+					// the updated HP on the next turn (it reads npc.statBlock.hp).
+					const npc = state.npcs.find((n) => n.id === combatant.referenceId || n.id === combatant.id);
+					if (npc) {
+						if (npc.statBlock) npc.statBlock.hp = combatant.currentHp;
+						if (defeated) npc.alive = false;
 					}
 				} else {
 					console.warn(`[applyGMStateChanges] hpChange references unknown characterId="${hc.characterId}" — skipped`);

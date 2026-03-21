@@ -1,0 +1,1956 @@
+{
+  "_schema": "zeus-adventure-export-v1",
+  "exportedAt": "2026-03-21T23:27:20.436Z",
+  "adventure": {
+    "id": "01KM9BCCWN6YTX0KFRQZRKPTZX",
+    "name": "12",
+    "status": "active",
+    "mode": "solo",
+    "createdAt": "2026-03-21T23:23:43.893Z"
+  },
+  "members": [
+    {
+      "userId": "01KKPVVHN3W3MS40ZJP8B3RM6V",
+      "username": "The Admin",
+      "role": "owner"
+    }
+  ],
+  "finalState": {
+    "version": 3,
+    "stateVersion": 3,
+    "characters": [
+      {
+        "id": "01KM9BCMSXBKFQ6CPR3GBMB7HX",
+        "userId": "01KKPVVHN3W3MS40ZJP8B3RM6V",
+        "adventureId": "01KM9BCCWN6YTX0KFRQZRKPTZX",
+        "name": "tweve",
+        "race": "human",
+        "classes": [
+          {
+            "name": "fighter",
+            "level": 1,
+            "hitDiceRemaining": 1
+          }
+        ],
+        "background": "soldier",
+        "alignment": "neutral-good",
+        "level": 1,
+        "abilities": {
+          "str": 16,
+          "dex": 14,
+          "con": 15,
+          "int": 11,
+          "wis": 13,
+          "cha": 9
+        },
+        "hp": 12,
+        "maxHp": 12,
+        "tempHp": 0,
+        "ac": 18,
+        "speed": 30,
+        "size": "Medium",
+        "proficiencyBonus": 2,
+        "skillProficiencies": [
+          "athletics",
+          "intimidation",
+          "acrobatics",
+          "animal-handling"
+        ],
+        "expertiseSkills": [],
+        "saveProficiencies": [
+          "str",
+          "con"
+        ],
+        "languages": [
+          "Common",
+          "Dwarvish"
+        ],
+        "armorProficiencies": [
+          "light",
+          "medium",
+          "heavy",
+          "shields"
+        ],
+        "weaponProficiencies": [
+          "simple",
+          "martial"
+        ],
+        "toolProficiencies": [
+          "gaming-set",
+          "vehicles-land"
+        ],
+        "classFeatures": [
+          {
+            "name": "Extra Language",
+            "level": 1,
+            "source": "race",
+            "description": "You can speak, read, and write one extra language of your choice."
+          },
+          {
+            "name": "Military Rank",
+            "level": 1,
+            "source": "background",
+            "description": "You have a military rank from your career as a soldier. Soldiers loyal to your former organization still recognize your authority and influence."
+          },
+          {
+            "name": "Fighting Style",
+            "level": 1,
+            "source": "class",
+            "sourceClass": "fighter",
+            "description": "You adopt a particular style of fighting as your specialty."
+          },
+          {
+            "name": "Second Wind",
+            "level": 1,
+            "source": "class",
+            "sourceClass": "fighter",
+            "description": "You have a limited well of stamina. On your turn, you can use a bonus action to regain hit points equal to 1d10 + your fighter level. Once used, you must finish a short or long rest."
+          }
+        ],
+        "feats": [],
+        "spellSlots": [],
+        "pactSlots": [],
+        "classSpells": [],
+        "deathSaves": {
+          "successes": 0,
+          "failures": 0
+        },
+        "inspiration": false,
+        "passivePerception": 11,
+        "inventory": [
+          {
+            "id": "01KM9BCMSWYT2S80RVNJC47NB6",
+            "name": "Chain Mail",
+            "category": "armor",
+            "description": "A set of chain mail.",
+            "value": 75,
+            "quantity": 1,
+            "weight": 55,
+            "rarity": "common",
+            "attunement": false,
+            "armorName": "chain-mail",
+            "baseAC": 16,
+            "magicBonus": 0,
+            "equipped": true,
+            "maxDexBonus": 0,
+            "stealthDisadvantage": true
+          },
+          {
+            "id": "01KM9BCMSWT55Q0YPX1MEXKR7X",
+            "name": "Longsword",
+            "category": "weapon",
+            "description": "A longsword.",
+            "value": 15,
+            "quantity": 1,
+            "weight": 3,
+            "rarity": "common",
+            "attunement": false,
+            "weaponName": "longsword",
+            "damage": "1d8",
+            "damageType": "slashing",
+            "magicBonus": 0,
+            "properties": [
+              "versatile"
+            ],
+            "equipped": false,
+            "specialProperties": []
+          },
+          {
+            "id": "01KM9BCMSWBZE8PSS4Q61VXPEG",
+            "name": "Shield",
+            "category": "armor",
+            "description": "A set of shield.",
+            "value": 10,
+            "quantity": 1,
+            "weight": 6,
+            "rarity": "common",
+            "attunement": false,
+            "armorName": "shield",
+            "baseAC": 2,
+            "magicBonus": 0,
+            "equipped": true,
+            "maxDexBonus": null,
+            "stealthDisadvantage": false
+          },
+          {
+            "id": "01KM9BCMSXTS3BN8KJ0NDGWQ2K",
+            "name": "Light Crossbow",
+            "category": "weapon",
+            "description": "A light crossbow.",
+            "value": 25,
+            "quantity": 1,
+            "weight": 5,
+            "rarity": "common",
+            "attunement": false,
+            "weaponName": "light-crossbow",
+            "damage": "1d8",
+            "damageType": "piercing",
+            "magicBonus": 0,
+            "properties": [
+              "ammunition",
+              "loading",
+              "range",
+              "two-handed"
+            ],
+            "range": "80/320",
+            "equipped": false,
+            "specialProperties": []
+          },
+          {
+            "id": "01KM9BCMSXZSF7EJY1QY5T4AJK",
+            "name": "Bolts (20)",
+            "category": "misc",
+            "description": "Starting equipment: Bolts (20).",
+            "value": 0,
+            "quantity": 20,
+            "weight": 0,
+            "rarity": "common",
+            "attunement": false,
+            "tags": [
+              "starting-equipment"
+            ]
+          },
+          {
+            "id": "01KM9BCMSXJMMTCZ1MZYGXDM25",
+            "name": "Dungeoneer's Pack",
+            "category": "misc",
+            "description": "Starting equipment: Dungeoneer's Pack.",
+            "value": 0,
+            "quantity": 1,
+            "weight": 0,
+            "rarity": "common",
+            "attunement": false,
+            "tags": [
+              "starting-equipment"
+            ]
+          },
+          {
+            "id": "01KM9BCMSX4RA1CS8ESB4EHQYB",
+            "name": "Insignia of Rank",
+            "category": "misc",
+            "description": "Starting equipment: Insignia of Rank.",
+            "value": 0,
+            "quantity": 1,
+            "weight": 0,
+            "rarity": "common",
+            "attunement": false,
+            "tags": [
+              "starting-equipment"
+            ]
+          },
+          {
+            "id": "01KM9BCMSXGA5P1DARZMK4843V",
+            "name": "Trophy from a Fallen Enemy",
+            "category": "misc",
+            "description": "Starting equipment: Trophy from a Fallen Enemy.",
+            "value": 0,
+            "quantity": 1,
+            "weight": 0,
+            "rarity": "common",
+            "attunement": false,
+            "tags": [
+              "starting-equipment"
+            ]
+          },
+          {
+            "id": "01KM9BCMSXRMNCB40YNZ38G3G1",
+            "name": "Bone Dice or Deck of Cards",
+            "category": "misc",
+            "description": "Starting equipment: Bone Dice or Deck of Cards.",
+            "value": 0,
+            "quantity": 1,
+            "weight": 0,
+            "rarity": "common",
+            "attunement": false,
+            "tags": [
+              "starting-equipment"
+            ]
+          },
+          {
+            "id": "01KM9BCMSXVZPC1SYGTMD42F2Z",
+            "name": "Common Clothes",
+            "category": "misc",
+            "description": "Starting equipment: Common Clothes.",
+            "value": 0,
+            "quantity": 1,
+            "weight": 0,
+            "rarity": "common",
+            "attunement": false,
+            "tags": [
+              "starting-equipment"
+            ]
+          },
+          {
+            "id": "01KM9BCMSXXG8EJD6GJPGR341Q",
+            "name": "Belt Pouch",
+            "category": "misc",
+            "description": "Starting equipment: Belt Pouch.",
+            "value": 0,
+            "quantity": 1,
+            "weight": 0,
+            "rarity": "common",
+            "attunement": false,
+            "tags": [
+              "starting-equipment"
+            ]
+          }
+        ],
+        "gold": 15,
+        "xp": 0,
+        "conditions": [],
+        "resistances": [],
+        "exhaustionLevel": 0,
+        "stable": false,
+        "dead": false,
+        "concentratingOn": null,
+        "featureUses": {
+          "Second Wind": {
+            "current": 1,
+            "max": 1,
+            "recoversOn": "short-rest"
+          }
+        },
+        "attunedItems": [],
+        "backstory": ""
+      }
+    ],
+    "npcs": [
+      {
+        "id": "01KM9BCCWZN7Z2VPNG499PWT1K",
+        "name": "Brenith",
+        "role": "neutral",
+        "locationId": "01KM9BCCWNMHJ0FJB2ZGQHG7AF",
+        "disposition": 20,
+        "description": "The keeper of the local tavern. Friendly, well-informed, and always happy to share rumors over a drink.",
+        "notes": "Knows local gossip. Can point players toward quests. Has a soft spot for adventurers.",
+        "alive": true
+      },
+      {
+        "id": "01KM9BCCX0ZF46JFR857CTN97V",
+        "name": "Fenara",
+        "role": "merchant",
+        "locationId": "01KM9BCCWNMHJ0FJB2ZGQHG7AF",
+        "disposition": 0,
+        "description": "A traveling trader who deals in provisions, simple weapons, and the occasional curiosity.",
+        "notes": "Carries basic adventuring gear. Prices are fair but firm.",
+        "alive": true
+      },
+      {
+        "id": "01KM9BCCX069ZDF562K050MYDR",
+        "name": "Jossara",
+        "role": "quest-giver",
+        "locationId": "01KM9BCCWNMHJ0FJB2ZGQHG7AF",
+        "disposition": 10,
+        "description": "A worried elder who has been looking for capable souls to handle a growing problem.",
+        "notes": "Offers the starter quest. Knows about the local threat but is too old to deal with it personally.",
+        "alive": true
+      },
+      {
+        "id": "npc-ggthk6",
+        "name": "Goblins",
+        "role": "hostile",
+        "locationId": "loc-146af3",
+        "disposition": -100,
+        "description": "A band of goblins, testing the usual divide between their savage realm and the village.",
+        "notes": "",
+        "alive": true,
+        "statBlock": {
+          "hp": 14,
+          "maxHp": 14,
+          "ac": 11,
+          "abilities": {
+            "str": 8,
+            "dex": 14,
+            "con": 10,
+            "int": 10,
+            "wis": 10,
+            "cha": 10
+          },
+          "speed": 30,
+          "cr": 0.25,
+          "attacks": [
+            {
+              "name": "Scimitar",
+              "toHit": 3,
+              "damage": "1d4",
+              "damageType": "slashing"
+            },
+            {
+              "name": "Shortbow",
+              "toHit": 3,
+              "damage": "1d4",
+              "damageType": "piercing",
+              "range": "80/320 ft."
+            }
+          ],
+          "savingThrows": [
+            {
+              "ability": "con",
+              "bonus": 1
+            }
+          ],
+          "skills": [
+            {
+              "skill": "perception",
+              "bonus": 1
+            }
+          ],
+          "resistances": [],
+          "immunities": [],
+          "vulnerabilities": [],
+          "traits": [],
+          "actions": [
+            {
+              "name": "Scimitar",
+              "description": "Melee Weapon Attack: +3 to hit, 5 ft. reach, one target. Hit: 1d4 slashing damage.",
+              "attack": {
+                "name": "Scimitar",
+                "toHit": 3,
+                "damage": "1d4",
+                "damageType": "slashing"
+              }
+            },
+            {
+              "name": "Shortbow",
+              "description": "Melee or Ranged Weapon Attack: +3 to hit, 80/320 ft. reach, one target. Hit: 1d4 piercing damage.",
+              "attack": {
+                "name": "Shortbow",
+                "toHit": 3,
+                "damage": "1d4",
+                "damageType": "piercing",
+                "range": "80/320 ft."
+              }
+            }
+          ],
+          "legendaryActions": []
+        },
+        "lastInteractionTurn": 7
+      }
+    ],
+    "locations": [
+      {
+        "id": "01KM9BCCWNMHJ0FJB2ZGQHG7AF",
+        "name": "Caeara Ford",
+        "regionRef": 2,
+        "type": "settlement",
+        "description": "Caeara Ford is a village nestled in the lands of Fenmere Empire. Its people follow the traditions of the Fenara. The Caemar flows nearby. The Aryr Cult holds sway here. It is a place where adventurers might find work, supplies, and rumors.",
+        "connections": [
+          "loc-146af3"
+        ],
+        "npcs": [
+          "01KM9BCCWZN7Z2VPNG499PWT1K",
+          "01KM9BCCX0ZF46JFR857CTN97V",
+          "01KM9BCCX069ZDF562K050MYDR"
+        ],
+        "features": [
+          "A village of about 15,034 people.",
+          "Under the rule of Fenmere Empire.",
+          "The locals follow Fenara customs."
+        ],
+        "visited": true
+      },
+      {
+        "id": "loc-146af3",
+        "name": "Outskirts of Caeara Ford",
+        "type": "wilderness",
+        "description": "Sparse woodlands and patches of dense underbrush, frequented by minor beasts and bandits.",
+        "connections": [
+          "01KM9BCCWNMHJ0FJB2ZGQHG7AF"
+        ],
+        "npcs": [],
+        "features": [],
+        "groundItems": [],
+        "regionRef": null,
+        "visited": true
+      }
+    ],
+    "quests": [
+      {
+        "id": "01KM9BCCX01P48XDQEVSSF7SJ9",
+        "name": "Trouble Near Caeara Ford",
+        "giverNpcId": "01KM9BCCX069ZDF562K050MYDR",
+        "status": "available",
+        "description": "The people of Caeara Ford are worried. Aroria and Loreth contest influence around Galholm Spire. Someone needs to investigate and deal with the threat before it grows worse.",
+        "objectives": [
+          {
+            "id": "01KM9BCCX0TX61DP8QVF2D75GD",
+            "text": "Speak with the locals to learn more about the threat",
+            "done": false
+          },
+          {
+            "id": "01KM9BCCX0YC5GHDPCMBFXEEDE",
+            "text": "Investigate the source of the disturbance",
+            "done": false
+          },
+          {
+            "id": "01KM9BCCX023GHZ7GRZP10YCDN",
+            "text": "Resolve the threat",
+            "done": false
+          }
+        ],
+        "rewards": {
+          "xp": 100,
+          "gold": 25,
+          "items": [],
+          "reputationChanges": [
+            {
+              "npcId": "01KM9BCCX069ZDF562K050MYDR",
+              "delta": 10
+            }
+          ]
+        },
+        "recommendedLevel": 1,
+        "encounterTemplates": [
+          "soldier"
+        ]
+      }
+    ],
+    "activeEncounter": {
+      "id": "enc-1774135524245",
+      "round": 1,
+      "turnIndex": 0,
+      "initiativeOrder": [
+        "npc-ggthk6",
+        "01KM9BCMSXBKFQ6CPR3GBMB7HX"
+      ],
+      "combatants": [
+        {
+          "id": "npc-ggthk6",
+          "referenceId": "npc-ggthk6",
+          "type": "npc",
+          "name": "Goblins",
+          "initiative": 15,
+          "currentHp": 10,
+          "maxHp": 14,
+          "tempHp": 0,
+          "ac": 11,
+          "conditions": [],
+          "resistances": [],
+          "immunities": [],
+          "vulnerabilities": [],
+          "concentration": false,
+          "defeated": false
+        },
+        {
+          "id": "01KM9BCMSXBKFQ6CPR3GBMB7HX",
+          "referenceId": "01KM9BCMSXBKFQ6CPR3GBMB7HX",
+          "type": "character",
+          "name": "tweve",
+          "initiative": 15,
+          "currentHp": 12,
+          "maxHp": 12,
+          "tempHp": 0,
+          "ac": 18,
+          "conditions": [],
+          "resistances": [],
+          "immunities": [],
+          "vulnerabilities": [],
+          "concentration": false,
+          "defeated": false
+        }
+      ],
+      "status": "active",
+      "startedAt": 1774135524245,
+      "awaitingActorId": "01KM9BCMSXBKFQ6CPR3GBMB7HX"
+    },
+    "conditionEffects": {
+      "blinded": {
+        "advantageOn": [],
+        "disadvantageOn": [
+          "attack-rolls",
+          "sight-based-ability-checks"
+        ],
+        "cantDo": [
+          "see"
+        ],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": [
+          "Attack rolls against the creature have advantage."
+        ]
+      },
+      "charmed": {
+        "advantageOn": [],
+        "disadvantageOn": [],
+        "cantDo": [
+          "attack-charmer",
+          "target-charmer-with-harmful-abilities"
+        ],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": [
+          "The charmer has advantage on social checks against the creature."
+        ]
+      },
+      "deafened": {
+        "advantageOn": [],
+        "disadvantageOn": [
+          "hearing-based-ability-checks"
+        ],
+        "cantDo": [
+          "hear"
+        ],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": []
+      },
+      "frightened": {
+        "advantageOn": [],
+        "disadvantageOn": [
+          "ability-checks-while-source-visible",
+          "attack-rolls-while-source-visible"
+        ],
+        "cantDo": [
+          "willingly-move-closer-to-source"
+        ],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": []
+      },
+      "grappled": {
+        "advantageOn": [],
+        "disadvantageOn": [],
+        "cantDo": [],
+        "autoFailSaves": [],
+        "speedMultiplier": 0,
+        "notes": [
+          "Speed becomes 0 and the creature cannot benefit from bonuses to speed."
+        ]
+      },
+      "incapacitated": {
+        "advantageOn": [],
+        "disadvantageOn": [],
+        "cantDo": [
+          "take-actions",
+          "take-reactions"
+        ],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": []
+      },
+      "invisible": {
+        "advantageOn": [
+          "attack-rolls"
+        ],
+        "disadvantageOn": [],
+        "cantDo": [],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": [
+          "Attack rolls against the creature have disadvantage.",
+          "The creature is heavily obscured for hiding purposes."
+        ]
+      },
+      "paralyzed": {
+        "advantageOn": [],
+        "disadvantageOn": [],
+        "cantDo": [
+          "move",
+          "speak"
+        ],
+        "autoFailSaves": [
+          "str",
+          "dex"
+        ],
+        "speedMultiplier": 0,
+        "notes": [
+          "The creature is incapacitated.",
+          "Attack rolls against the creature have advantage.",
+          "Hits from within 5 feet are critical hits."
+        ]
+      },
+      "petrified": {
+        "advantageOn": [],
+        "disadvantageOn": [],
+        "cantDo": [
+          "move",
+          "speak"
+        ],
+        "autoFailSaves": [
+          "str",
+          "dex"
+        ],
+        "speedMultiplier": 0,
+        "notes": [
+          "The creature is incapacitated.",
+          "It has resistance to all damage.",
+          "It is immune to poison and disease."
+        ]
+      },
+      "poisoned": {
+        "advantageOn": [],
+        "disadvantageOn": [
+          "attack-rolls",
+          "ability-checks"
+        ],
+        "cantDo": [],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": []
+      },
+      "prone": {
+        "advantageOn": [],
+        "disadvantageOn": [
+          "attack-rolls"
+        ],
+        "cantDo": [],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": [
+          "Movement to stand costs extra.",
+          "Melee attacks against the creature have advantage.",
+          "Ranged attacks against it have disadvantage."
+        ]
+      },
+      "restrained": {
+        "advantageOn": [],
+        "disadvantageOn": [
+          "attack-rolls"
+        ],
+        "cantDo": [],
+        "autoFailSaves": [
+          "dex"
+        ],
+        "speedMultiplier": 0,
+        "notes": [
+          "Attack rolls against the creature have advantage."
+        ]
+      },
+      "stunned": {
+        "advantageOn": [],
+        "disadvantageOn": [],
+        "cantDo": [
+          "move",
+          "speak"
+        ],
+        "autoFailSaves": [
+          "str",
+          "dex"
+        ],
+        "speedMultiplier": 0,
+        "notes": [
+          "The creature is incapacitated.",
+          "Attack rolls against the creature have advantage."
+        ]
+      },
+      "unconscious": {
+        "advantageOn": [],
+        "disadvantageOn": [],
+        "cantDo": [
+          "move",
+          "speak",
+          "take-actions",
+          "take-reactions"
+        ],
+        "autoFailSaves": [
+          "str",
+          "dex"
+        ],
+        "speedMultiplier": 0,
+        "notes": [
+          "The creature is unaware of its surroundings.",
+          "Attack rolls against the creature have advantage.",
+          "Hits from within 5 feet are critical hits."
+        ]
+      },
+      "exhaustion": {
+        "advantageOn": [],
+        "disadvantageOn": [
+          "ability-checks"
+        ],
+        "cantDo": [],
+        "autoFailSaves": [],
+        "speedMultiplier": 0.5,
+        "notes": [
+          "Higher exhaustion levels stack additional penalties."
+        ]
+      }
+    },
+    "partyLocationId": "loc-146af3",
+    "clock": {
+      "day": 1,
+      "timeOfDay": "morning",
+      "weather": "clear"
+    },
+    "worldSeed": "1774135421852-41574",
+    "nextTurnNumber": 21,
+    "sceneFacts": [],
+    "createdAt": 1774135423893,
+    "updatedAt": 1774135628787
+  },
+  "turns": [
+    {
+      "turnNumber": 1,
+      "actor": "gm",
+      "actorType": "gm",
+      "intent": "free-narration",
+      "status": "completed",
+      "mode": null,
+      "model": null,
+      "latencyMs": null,
+      "action": "",
+      "resolvedSummary": "Opening scene established",
+      "mechanics": [],
+      "promptMessages": [],
+      "rawAiResponse": null,
+      "gmProposedChanges": null,
+      "appliedStateChanges": {},
+      "narrativeText": "You begin in Caeara Ford, Caeara Ford is a village nestled in the lands of Fenmere Empire. Its people follow the traditions of the Fenara. The Caemar flows nearby. The Aryr Cult holds sway here. It is a place where adventurers might find work, supplies, and rumors.\n\nA notable detail stands out immediately: A village of about 15,034 people..\n\nBrenith, Fenara, Jossara are nearby, close enough to approach.\n\nA clear lead is already in front of you: Trouble Near Caeara Ford. The first step is simple — Speak with the locals to learn more about the threat.\n\nIt is day 1, morning, under clear skies.\n\nWhat do you do first?",
+      "createdAt": "2026-03-21T23:23:44.219Z"
+    },
+    {
+      "turnNumber": 2,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "attack",
+      "status": "completed",
+      "mode": "full-gm-2pass",
+      "model": "gpt-4o",
+      "latencyMs": 12895,
+      "action": "I want to fight low level enemies",
+      "resolvedSummary": "",
+      "mechanics": [],
+      "promptMessages": [
+        {
+          "role": "system",
+          "content": "You are the Game Master of a tabletop-style fantasy RPG.\nYou adjudicate player actions like a skilled tabletop GM: narrate consequences, call for dice checks when the outcome is uncertain, and announce combat clearly.\nYou narrate in second-person perspective, speaking directly to the party.\nYou are authoritative about the world — you describe what happens as a consequence of player actions.\nYou respect the mechanics: when dice results are provided, narrate around those outcomes faithfully.\nKeep responses vivid and concise (2–5 sentences for normal actions, more for important moments).\nEnd each response with a beat that invites the next player action.\n\nIMPORTANT: Return ONLY narrative prose. Do NOT return JSON. A separate system handles game state updates.\n\n=== TABLETOP ADJUDICATION ===\nThink like a tabletop GM running a session at a table:\n\nCALLING FOR CHECKS:\n- When the outcome is uncertain and failure has interesting consequences, call for a check.\n- Name the check explicitly: \"Make a Perception check\", \"Roll a Stealth check\", \"Give me a Persuasion check.\"\"\n- If the action is trivial or routine (opening an unlocked door, walking down a road), just narrate the result.\n- Do NOT silently decide contested outcomes — if a player tries to sneak, lie, or persuade and there is resistance, call for the roll.\n\nSTARTING COMBAT:\n- Combat begins ONLY when hostilities are explicit: someone attacks, an ambush springs, or a creature charges.\n- When combat truly begins, announce it clearly with a phrase like \"Roll for initiative!\" or \"Combat begins!\" so the boundary is unmistakable.\n- Scouting, observing, reconnaissance, hearing rumors about enemies, and cautious dialogue NEVER start combat on their own.\n- A player saying \"I look for enemies\" or \"I scout ahead\" is gathering information, not starting a fight.\n\nDURING COMBAT:\n- Think in terms of turns, actions, bonus actions, reactions, movement, and positioning.\n- Narrate each combatant's actions with tactical clarity: who attacks whom, what weapon or ability is used, and what happens.\n- Reference engine-provided dice results faithfully. Do NOT invent hit/miss/damage beyond what the engine resolved.\n\nDIALOGUE & SOCIAL ENCOUNTERS:\n- When a player speaks to an NPC, roleplay the NPC's response in character.\n- If the player is trying to persuade, deceive, or intimidate and the NPC would resist, call for the appropriate check.\n- Low-stakes conversation (asking for directions, buying supplies, friendly banter) does not require a roll.\n- When stakes are high (convincing a guard to let you pass, lying to a noble, negotiating a hostage release), call for a check before resolving the outcome.\n\n=== DISCRETION RULES ===\nYOU MAY freely:\n- Infer the nearest enemy, closest ally, or default equipped weapon when context is obvious\n- Describe the environment, add sensory details, weather effects, ambient sounds\n- Advance NPC dialogue, create NPC reactions, and roleplay NPC personalities\n- Introduce new NPCs, locations, and quests when the story calls for it\n- Decide obvious movement paths (e.g., \"I go inside\" → enter the building)\n- Add dramatic tension, foreshadowing, and world flavor\n- Resolve trivial actions without a roll (picking up an object, sitting down, eating rations)\n\nYOU MUST NOT:\n- Silently choose between multiple materially different resource expenditures (healing spells vs potions, different spell slots)\n- Violate action economy, spell legality, slot availability, or rest rules\n- Override or contradict engine-provided mechanic results (if [Mechanics: ...] is present, those are FACTS)\n- Kill or permanently incapacitate a player character without mechanical justification\n- Grant magical items above the party's level range without quest justification\n- Start combat from scouting, observation, or cautious inquiry alone\n- Silently decide the outcome of a contested or high-stakes action without calling for a roll\n\nWHEN AMBIGUOUS:\n- If the player's intent is unclear but harmless, make a reasonable assumption and narrate\n- If the ambiguity could cost significant resources, ask a brief in-world clarifying question instead of acting\n\n=== CURRENT LOCATION ===\n[name: Caeara Ford][id: 01KM9BCCWNMHJ0FJB2ZGQHG7AF]\nType: settlement\nDescription: Caeara Ford is a village nestled in the lands of Fenmere Empire. Its people follow the traditions of the Fenara. The Caemar flows nearby. The Aryr Cult holds sway here. It is a place where adventurers might find work, supplies, and rumors.\nFeatures: A village of about 15,034 people.; Under the rule of Fenmere Empire.; The locals follow Fenara customs.\nNPCs present: [name: Brenith][id: 01KM9BCCWZN7Z2VPNG499PWT1K] (neutral, warm), [name: Fenara][id: 01KM9BCCX0ZF46JFR857CTN97V] (merchant, neutral), [name: Jossara][id: 01KM9BCCX069ZDF562K050MYDR] (quest-giver, warm)\n\n=== PARTY ===\n- [name: tweve][id: 01KM9BCMSXBKFQ6CPR3GBMB7HX] (Lv1 human fighter) — 12/12 HP | AC 18 | Gear: [name: Chain Mail][id: 01KM9BCMSWYT2S80RVNJC47NB6], [name: Longsword][id: 01KM9BCMSWT55Q0YPX1MEXKR7X], [name: Shield][id: 01KM9BCMSWBZE8PSS4Q61VXPEG], [name: Light Crossbow][id: 01KM9BCMSXTS3BN8KJ0NDGWQ2K]\n\n=== QUESTS ===\n- [name: Trouble Near Caeara Ford][id: 01KM9BCCX01P48XDQEVSSF7SJ9] (status: available): The people of Caeara Ford are worried. Aroria and Loreth contest influence around Galholm Spire. Someone needs to investigate and deal with the threat before it grows worse. | Objectives: objective(status: pending, text: Speak with the locals to learn more about the threat, id: 01KM9BCCX0TX61DP8QVF2D75GD); objective(status: pending, text: Investigate the source of the disturbance, id: 01KM9BCCX0YC5GHDPCMBFXEEDE); objective(status: pending, text: Resolve the threat, id: 01KM9BCCX023GHZ7GRZP10YCDN)\n\n=== TIME ===\nDay 1, morning. Weather: clear.\n"
+        },
+        {
+          "role": "assistant",
+          "content": "You begin in Caeara Ford, Caeara Ford is a village nestled in the lands of Fenmere Empire. Its people follow the traditions of the Fenara. The Caemar flows nearby. The Aryr Cult holds sway here. It is a place where adventurers might find work, supplies, and rumors.\n\nA notable detail stands out immediately: A village of about 15,034 people..\n\nBrenith, Fenara, Jossara are nearby, close enough to approach.\n\nA clear lead is already in front of you: Trouble Near Caeara Ford. The first step is simple — Speak with the locals to learn more about the threat.\n\nIt is day 1, morning, under clear skies.\n\nWhat do you do first?"
+        },
+        {
+          "role": "user",
+          "content": "I want to fight low level enemies"
+        }
+      ],
+      "rawAiResponse": "In search of a challenge, you leave the bustle of Caeara Ford behind, venturing towards its outskirts where wilderness encroaches. Knowing the village's proximity to the wildlands, you head along a dirt path winding through sparse woodlands and patches of dense underbrush, an area where travelers and villagers have reported sightings of minor beasts and bandits. \n\nAfter some time walking, rustling in a nearby thicket draws your attention, and you spot a band of goblins, testing the usual divide between their savage realm and the village. They have not yet noticed your approach, giving you the element of surprise should you choose to strike.\n\nIf you wish to engage, now is the time—your chance to thwart them before they cause further trouble. Do you wish to attack or take another action?",
+      "gmProposedChanges": {
+        "locationsAdded": [
+          {
+            "id": "loc-146af3",
+            "name": "Outskirts of Caeara Ford",
+            "type": "wilderness",
+            "description": "Sparse woodlands and patches of dense underbrush, frequented by minor beasts and bandits.",
+            "connections": [
+              "01KM9BCCWNMHJ0FJB2ZGQHG7AF"
+            ],
+            "features": [],
+            "groundItems": []
+          }
+        ],
+        "locationChange": {
+          "from": "01KM9BCCWNMHJ0FJB2ZGQHG7AF",
+          "to": "loc-146af3"
+        },
+        "npcsAdded": [
+          {
+            "id": "npc-ggthk6",
+            "name": "Goblins",
+            "role": "hostile",
+            "locationId": "loc-146af3",
+            "disposition": -100,
+            "description": "A band of goblins, testing the usual divide between their savage realm and the village."
+          }
+        ]
+      },
+      "appliedStateChanges": {
+        "locationChange": {
+          "from": "01KM9BCCWNMHJ0FJB2ZGQHG7AF",
+          "to": "loc-146af3"
+        },
+        "npcsAdded": [
+          {
+            "id": "npc-ggthk6",
+            "name": "Goblins",
+            "role": "hostile",
+            "locationId": "loc-146af3",
+            "disposition": -100,
+            "description": "A band of goblins, testing the usual divide between their savage realm and the village."
+          }
+        ],
+        "locationsAdded": [
+          {
+            "id": "loc-146af3",
+            "name": "Outskirts of Caeara Ford",
+            "type": "wilderness",
+            "description": "Sparse woodlands and patches of dense underbrush, frequented by minor beasts and bandits.",
+            "connections": [
+              "01KM9BCCWNMHJ0FJB2ZGQHG7AF"
+            ],
+            "features": [],
+            "groundItems": []
+          }
+        ]
+      },
+      "narrativeText": "In search of a challenge, you leave the bustle of Caeara Ford behind, venturing towards its outskirts where wilderness encroaches. Knowing the village's proximity to the wildlands, you head along a dirt path winding through sparse woodlands and patches of dense underbrush, an area where travelers and villagers have reported sightings of minor beasts and bandits. \n\nAfter some time walking, rustling in a nearby thicket draws your attention, and you spot a band of goblins, testing the usual divide between their savage realm and the village. They have not yet noticed your approach, giving you the element of surprise should you choose to strike.\n\nIf you wish to engage, now is the time—your chance to thwart them before they cause further trouble. Do you wish to attack or take another action?",
+      "createdAt": "2026-03-21T23:24:12.948Z"
+    },
+    {
+      "turnNumber": 3,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "move",
+      "status": "awaiting-roll",
+      "mode": "awaiting-roll",
+      "model": "server-executor",
+      "latencyMs": 0,
+      "action": "How many goblins? I ready my sword and crouch preparing to sneak up on them",
+      "resolvedSummary": "Make a Stealth check.",
+      "mechanics": [],
+      "promptMessages": [],
+      "rawAiResponse": "",
+      "gmProposedChanges": null,
+      "appliedStateChanges": {},
+      "narrativeText": "Make a Stealth check.",
+      "createdAt": "2026-03-21T23:24:38.578Z"
+    },
+    {
+      "turnNumber": 4,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "examine",
+      "status": "completed",
+      "mode": "narrator",
+      "model": "gpt-4o",
+      "latencyMs": 0,
+      "action": "Make a Stealth check.",
+      "resolvedSummary": "tweve: Stealth check (DC 12) → Success (rolled 16)",
+      "mechanics": [
+        {
+          "type": "skill-check",
+          "label": "tweve: Stealth check (DC 12)",
+          "dice": {
+            "notation": "1d20",
+            "rolls": [
+              16
+            ],
+            "total": 16
+          },
+          "dc": 12,
+          "success": true
+        }
+      ],
+      "promptMessages": [
+        {
+          "role": "system",
+          "content": "You are the Narrator of a text-based fantasy RPG adventure.\nThe game engine has ALREADY resolved the player's action mechanically.\nYour job is to narrate what happened in vivid second-person prose.\n\nRULES:\n- The mechanic results provided to you are FACTS. Do not contradict them.\n- If the player healed 7 HP, narrate them healing 7 HP. If a spell slot was used, mention the magical exertion.\n- If a healing potion was consumed, describe drinking it. If travel occurred, describe the journey.\n- Do NOT invent additional mechanical effects (no extra damage, no bonus healing, no status changes beyond what's given).\n- You MAY add sensory detail, NPC reactions, environmental flavor, and dramatic tension.\n- Keep responses vivid and concise (2–5 sentences for normal actions, more for important moments).\n- End each response with a beat that invites the next player action.\n- Return ONLY narrative prose. Do NOT return JSON.\n\n=== CURRENT LOCATION ===\nName: Outskirts of Caeara Ford\nType: wilderness\nDescription: Sparse woodlands and patches of dense underbrush, frequented by minor beasts and bandits.\nNPCs present: Goblins (hostile)\n\n=== PARTY ===\n- [name: tweve][id: 01KM9BCMSXBKFQ6CPR3GBMB7HX] (Lv1 human fighter) — 12/12 HP | AC 18 | Gear: [name: Chain Mail][id: 01KM9BCMSWYT2S80RVNJC47NB6], [name: Longsword][id: 01KM9BCMSWT55Q0YPX1MEXKR7X], [name: Shield][id: 01KM9BCMSWBZE8PSS4Q61VXPEG], [name: Light Crossbow][id: 01KM9BCMSXTS3BN8KJ0NDGWQ2K]\n\n=== TIME ===\nDay 1, morning. Weather: clear.\n"
+        },
+        {
+          "role": "assistant",
+          "content": "You begin in Caeara Ford, Caeara Ford is a village nestled in the lands of Fenmere Empire. Its people follow the traditions of the Fenara. The Caemar flows nearby. The Aryr Cult holds sway here. It is a place where adventurers might find work, supplies, and rumors.\n\nA notable detail stands out immediately: A village of about 15,034 people..\n\nBrenith, Fenara, Jossara are nearby, close enough to approach.\n\nA clear lead is already in front of you: Trouble Near Caeara Ford. The first step is simple — Speak with the locals to learn more about the threat.\n\nIt is day 1, morning, under clear skies.\n\nWhat do you do first?"
+        },
+        {
+          "role": "user",
+          "content": "I want to fight low level enemies"
+        },
+        {
+          "role": "assistant",
+          "content": "In search of a challenge, you leave the bustle of Caeara Ford behind, venturing towards its outskirts where wilderness encroaches. Knowing the village's proximity to the wildlands, you head along a dirt path winding through sparse woodlands and patches of dense underbrush, an area where travelers and villagers have reported sightings of minor beasts and bandits. \n\nAfter some time walking, rustling in a nearby thicket draws your attention, and you spot a band of goblins, testing the usual divide between their savage realm and the village. They have not yet noticed your approach, giving you the element of surprise should you choose to strike.\n\nIf you wish to engage, now is the time—your chance to thwart them before they cause further trouble. Do you wish to attack or take another action?"
+        },
+        {
+          "role": "user",
+          "content": "How many goblins? I ready my sword and crouch preparing to sneak up on them"
+        },
+        {
+          "role": "assistant",
+          "content": "Make a Stealth check."
+        },
+        {
+          "role": "user",
+          "content": "The player said: \"Make a Stealth check.\"\n\nRESOLVED ACTION: \"Make a Stealth check.\"\nINTENT: examine\n\nMECHANIC RESULTS (these are FACTS — narrate around them):\n- SKILL-CHECK: tweve: Stealth check (DC 12) [1d20 → 16] (DC 12) (succeeded)\n\nNarrate what happens."
+        }
+      ],
+      "rawAiResponse": "You crouch low among the underbrush, your keen eyes counting four goblins huddled by a crude campsite. Their sharp, guttural voices quarrel over some small prize, oblivious to your stealthy approach. The soft padding of your boots on the earth and the gentle rustle of leaves all blend seamlessly with the forest sounds, cloaking your advance.\n\nYour grip tightens on the hilt of your longsword, every measured step bringing you closer to the group without a hint of your presence. From here, you are in perfect position to choose how to initiate your attack.\n\nThe goblins, lost in their squabble, remain unaware, granting you a crucial advantage. What is your next move?",
+      "gmProposedChanges": null,
+      "appliedStateChanges": {},
+      "narrativeText": "You crouch low among the underbrush, your keen eyes counting four goblins huddled by a crude campsite. Their sharp, guttural voices quarrel over some small prize, oblivious to your stealthy approach. The soft padding of your boots on the earth and the gentle rustle of leaves all blend seamlessly with the forest sounds, cloaking your advance.\n\nYour grip tightens on the hilt of your longsword, every measured step bringing you closer to the group without a hint of your presence. From here, you are in perfect position to choose how to initiate your attack.\n\nThe goblins, lost in their squabble, remain unaware, granting you a crucial advantage. What is your next move?",
+      "createdAt": "2026-03-21T23:24:49.207Z"
+    },
+    {
+      "turnNumber": 5,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "attack",
+      "status": "completed",
+      "mode": "full-gm-2pass",
+      "model": "gpt-4o",
+      "latencyMs": 4984,
+      "action": "I strike furiously at the nearest goblin striking with all I have",
+      "resolvedSummary": "",
+      "mechanics": [],
+      "promptMessages": [
+        {
+          "role": "system",
+          "content": "You are the Game Master of a tabletop-style fantasy RPG.\nYou adjudicate player actions like a skilled tabletop GM: narrate consequences, call for dice checks when the outcome is uncertain, and announce combat clearly.\nYou narrate in second-person perspective, speaking directly to the party.\nYou are authoritative about the world — you describe what happens as a consequence of player actions.\nYou respect the mechanics: when dice results are provided, narrate around those outcomes faithfully.\nKeep responses vivid and concise (2–5 sentences for normal actions, more for important moments).\nEnd each response with a beat that invites the next player action.\n\nIMPORTANT: Return ONLY narrative prose. Do NOT return JSON. A separate system handles game state updates.\n\n=== TABLETOP ADJUDICATION ===\nThink like a tabletop GM running a session at a table:\n\nCALLING FOR CHECKS:\n- When the outcome is uncertain and failure has interesting consequences, call for a check.\n- Name the check explicitly: \"Make a Perception check\", \"Roll a Stealth check\", \"Give me a Persuasion check.\"\"\n- If the action is trivial or routine (opening an unlocked door, walking down a road), just narrate the result.\n- Do NOT silently decide contested outcomes — if a player tries to sneak, lie, or persuade and there is resistance, call for the roll.\n\nSTARTING COMBAT:\n- Combat begins ONLY when hostilities are explicit: someone attacks, an ambush springs, or a creature charges.\n- When combat truly begins, announce it clearly with a phrase like \"Roll for initiative!\" or \"Combat begins!\" so the boundary is unmistakable.\n- Scouting, observing, reconnaissance, hearing rumors about enemies, and cautious dialogue NEVER start combat on their own.\n- A player saying \"I look for enemies\" or \"I scout ahead\" is gathering information, not starting a fight.\n\nDURING COMBAT:\n- Think in terms of turns, actions, bonus actions, reactions, movement, and positioning.\n- Narrate each combatant's actions with tactical clarity: who attacks whom, what weapon or ability is used, and what happens.\n- Reference engine-provided dice results faithfully. Do NOT invent hit/miss/damage beyond what the engine resolved.\n\nDIALOGUE & SOCIAL ENCOUNTERS:\n- When a player speaks to an NPC, roleplay the NPC's response in character.\n- If the player is trying to persuade, deceive, or intimidate and the NPC would resist, call for the appropriate check.\n- Low-stakes conversation (asking for directions, buying supplies, friendly banter) does not require a roll.\n- When stakes are high (convincing a guard to let you pass, lying to a noble, negotiating a hostage release), call for a check before resolving the outcome.\n\n=== DISCRETION RULES ===\nYOU MAY freely:\n- Infer the nearest enemy, closest ally, or default equipped weapon when context is obvious\n- Describe the environment, add sensory details, weather effects, ambient sounds\n- Advance NPC dialogue, create NPC reactions, and roleplay NPC personalities\n- Introduce new NPCs, locations, and quests when the story calls for it\n- Decide obvious movement paths (e.g., \"I go inside\" → enter the building)\n- Add dramatic tension, foreshadowing, and world flavor\n- Resolve trivial actions without a roll (picking up an object, sitting down, eating rations)\n\nYOU MUST NOT:\n- Silently choose between multiple materially different resource expenditures (healing spells vs potions, different spell slots)\n- Violate action economy, spell legality, slot availability, or rest rules\n- Override or contradict engine-provided mechanic results (if [Mechanics: ...] is present, those are FACTS)\n- Kill or permanently incapacitate a player character without mechanical justification\n- Grant magical items above the party's level range without quest justification\n- Start combat from scouting, observation, or cautious inquiry alone\n- Silently decide the outcome of a contested or high-stakes action without calling for a roll\n\nWHEN AMBIGUOUS:\n- If the player's intent is unclear but harmless, make a reasonable assumption and narrate\n- If the ambiguity could cost significant resources, ask a brief in-world clarifying question instead of acting\n\n=== CURRENT LOCATION ===\n[name: Outskirts of Caeara Ford][id: loc-146af3]\nType: wilderness\nDescription: Sparse woodlands and patches of dense underbrush, frequented by minor beasts and bandits.\nConnections: [name: Caeara Ford][id: 01KM9BCCWNMHJ0FJB2ZGQHG7AF]\nNPCs present: [name: Goblins][id: npc-ggthk6] (hostile, hateful)\n\n=== KNOWN LOCATIONS ===\n- [name: Caeara Ford][id: 01KM9BCCWNMHJ0FJB2ZGQHG7AF] (settlement) (visited: yes) → connects to: [name: Outskirts of Caeara Ford][id: loc-146af3]\n\n=== KNOWN NPCs (away from party) ===\nAt [name: Caeara Ford][id: 01KM9BCCWNMHJ0FJB2ZGQHG7AF]:\n  - [name: Jossara][id: 01KM9BCCX069ZDF562K050MYDR] (quest-giver, warm)\n  - [name: Fenara][id: 01KM9BCCX0ZF46JFR857CTN97V] (merchant, neutral)\n  - [name: Brenith][id: 01KM9BCCWZN7Z2VPNG499PWT1K] (neutral, warm)\n\n=== PARTY ===\n- [name: tweve][id: 01KM9BCMSXBKFQ6CPR3GBMB7HX] (Lv1 human fighter) — 12/12 HP | AC 18 | Gear: [name: Chain Mail][id: 01KM9BCMSWYT2S80RVNJC47NB6], [name: Longsword][id: 01KM9BCMSWT55Q0YPX1MEXKR7X], [name: Shield][id: 01KM9BCMSWBZE8PSS4Q61VXPEG], [name: Light Crossbow][id: 01KM9BCMSXTS3BN8KJ0NDGWQ2K]\n\n=== QUESTS ===\n- [name: Trouble Near Caeara Ford][id: 01KM9BCCX01P48XDQEVSSF7SJ9] (status: available): The people of Caeara Ford are worried. Aroria and Loreth contest influence around Galholm Spire. Someone needs to investigate and deal with the threat before it grows worse. | Objectives: objective(status: pending, text: Speak with the locals to learn more about the threat, id: 01KM9BCCX0TX61DP8QVF2D75GD); objective(status: pending, text: Investigate the source of the disturbance, id: 01KM9BCCX0YC5GHDPCMBFXEEDE); objective(status: pending, text: Resolve the threat, id: 01KM9BCCX023GHZ7GRZP10YCDN)\n\n=== TIME ===\nDay 1, morning. Weather: clear.\n"
+        },
+        {
+          "role": "assistant",
+          "content": "You begin in Caeara Ford, Caeara Ford is a village nestled in the lands of Fenmere Empire. Its people follow the traditions of the Fenara. The Caemar flows nearby. The Aryr Cult holds sway here. It is a place where adventurers might find work, supplies, and rumors.\n\nA notable detail stands out immediately: A village of about 15,034 people..\n\nBrenith, Fenara, Jossara are nearby, close enough to approach.\n\nA clear lead is already in front of you: Trouble Near Caeara Ford. The first step is simple — Speak with the locals to learn more about the threat.\n\nIt is day 1, morning, under clear skies.\n\nWhat do you do first?"
+        },
+        {
+          "role": "user",
+          "content": "I want to fight low level enemies"
+        },
+        {
+          "role": "assistant",
+          "content": "In search of a challenge, you leave the bustle of Caeara Ford behind, venturing towards its outskirts where wilderness encroaches. Knowing the village's proximity to the wildlands, you head along a dirt path winding through sparse woodlands and patches of dense underbrush, an area where travelers and villagers have reported sightings of minor beasts and bandits. \n\nAfter some time walking, rustling in a nearby thicket draws your attention, and you spot a band of goblins, testing the usual divide between their savage realm and the village. They have not yet noticed your approach, giving you the element of surprise should you choose to strike.\n\nIf you wish to engage, now is the time—your chance to thwart them before they cause further trouble. Do you wish to attack or take another action?"
+        },
+        {
+          "role": "user",
+          "content": "How many goblins? I ready my sword and crouch preparing to sneak up on them"
+        },
+        {
+          "role": "assistant",
+          "content": "Make a Stealth check."
+        },
+        {
+          "role": "user",
+          "content": "Make a Stealth check.\n[Mechanics: tweve: Stealth check (DC 12): 1d20 → 16 vs DC 12 ✓]"
+        },
+        {
+          "role": "assistant",
+          "content": "You crouch low among the underbrush, your keen eyes counting four goblins huddled by a crude campsite. Their sharp, guttural voices quarrel over some small prize, oblivious to your stealthy approach. The soft padding of your boots on the earth and the gentle rustle of leaves all blend seamlessly with the forest sounds, cloaking your advance.\n\nYour grip tightens on the hilt of your longsword, every measured step bringing you closer to the group without a hint of your presence. From here, you are in perfect position to choose how to initiate your attack.\n\nThe goblins, lost in their squabble, remain unaware, granting you a crucial advantage. What is your next move?"
+        },
+        {
+          "role": "user",
+          "content": "I strike furiously at the nearest goblin striking with all I have"
+        }
+      ],
+      "rawAiResponse": "With a swift and sudden movement, you burst from the cover of the shadows, bringing your longsword down upon the nearest goblin with all your might. The goblin looks up, surprise and fear flashing across its face too late, as your blade descends in a deadly arc.\n\nRoll for attack to see if your blow finds its mark.",
+      "gmProposedChanges": {
+        "encounterStarted": {
+          "creatures": [
+            {
+              "id": "npc-ggthk6",
+              "name": "Goblins",
+              "role": "hostile",
+              "locationId": "loc-146af3",
+              "disposition": -100,
+              "description": "...",
+              "tier": "weak"
+            }
+          ]
+        }
+      },
+      "appliedStateChanges": {
+        "encounterStarted": {
+          "creatures": [
+            {
+              "id": "npc-ggthk6",
+              "name": "Goblins",
+              "role": "hostile",
+              "locationId": "loc-146af3",
+              "disposition": -100,
+              "description": "...",
+              "tier": "weak"
+            }
+          ]
+        }
+      },
+      "narrativeText": "With a swift and sudden movement, you burst from the cover of the shadows, bringing your longsword down upon the nearest goblin with all your might. The goblin looks up, surprise and fear flashing across its face too late, as your blade descends in a deadly arc.\n\nRoll for attack to see if your blow finds its mark.",
+      "createdAt": "2026-03-21T23:25:24.244Z"
+    },
+    {
+      "turnNumber": 6,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "free-narration",
+      "status": "completed",
+      "mode": "full-gm-2pass",
+      "model": "gpt-4o",
+      "latencyMs": 6785,
+      "action": "I roll... 15?",
+      "resolvedSummary": "Improvised combat action: I roll... 15?",
+      "mechanics": [],
+      "promptMessages": [
+        {
+          "role": "system",
+          "content": "You are the Game Master of a tabletop-style fantasy RPG.\nYou adjudicate player actions like a skilled tabletop GM: narrate consequences, call for dice checks when the outcome is uncertain, and announce combat clearly.\nYou narrate in second-person perspective, speaking directly to the party.\nYou are authoritative about the world — you describe what happens as a consequence of player actions.\nYou respect the mechanics: when dice results are provided, narrate around those outcomes faithfully.\nKeep responses vivid and concise (2–5 sentences for normal actions, more for important moments).\nEnd each response with a beat that invites the next player action.\n\nIMPORTANT: Return ONLY narrative prose. Do NOT return JSON. A separate system handles game state updates.\n\n=== TABLETOP ADJUDICATION ===\nThink like a tabletop GM running a session at a table:\n\nCALLING FOR CHECKS:\n- When the outcome is uncertain and failure has interesting consequences, call for a check.\n- Name the check explicitly: \"Make a Perception check\", \"Roll a Stealth check\", \"Give me a Persuasion check.\"\"\n- If the action is trivial or routine (opening an unlocked door, walking down a road), just narrate the result.\n- Do NOT silently decide contested outcomes — if a player tries to sneak, lie, or persuade and there is resistance, call for the roll.\n\nSTARTING COMBAT:\n- Combat begins ONLY when hostilities are explicit: someone attacks, an ambush springs, or a creature charges.\n- When combat truly begins, announce it clearly with a phrase like \"Roll for initiative!\" or \"Combat begins!\" so the boundary is unmistakable.\n- Scouting, observing, reconnaissance, hearing rumors about enemies, and cautious dialogue NEVER start combat on their own.\n- A player saying \"I look for enemies\" or \"I scout ahead\" is gathering information, not starting a fight.\n\nDURING COMBAT:\n- Think in terms of turns, actions, bonus actions, reactions, movement, and positioning.\n- Narrate each combatant's actions with tactical clarity: who attacks whom, what weapon or ability is used, and what happens.\n- Reference engine-provided dice results faithfully. Do NOT invent hit/miss/damage beyond what the engine resolved.\n\nDIALOGUE & SOCIAL ENCOUNTERS:\n- When a player speaks to an NPC, roleplay the NPC's response in character.\n- If the player is trying to persuade, deceive, or intimidate and the NPC would resist, call for the appropriate check.\n- Low-stakes conversation (asking for directions, buying supplies, friendly banter) does not require a roll.\n- When stakes are high (convincing a guard to let you pass, lying to a noble, negotiating a hostage release), call for a check before resolving the outcome.\n\n=== DISCRETION RULES ===\nYOU MAY freely:\n- Infer the nearest enemy, closest ally, or default equipped weapon when context is obvious\n- Describe the environment, add sensory details, weather effects, ambient sounds\n- Advance NPC dialogue, create NPC reactions, and roleplay NPC personalities\n- Introduce new NPCs, locations, and quests when the story calls for it\n- Decide obvious movement paths (e.g., \"I go inside\" → enter the building)\n- Add dramatic tension, foreshadowing, and world flavor\n- Resolve trivial actions without a roll (picking up an object, sitting down, eating rations)\n\nYOU MUST NOT:\n- Silently choose between multiple materially different resource expenditures (healing spells vs potions, different spell slots)\n- Violate action economy, spell legality, slot availability, or rest rules\n- Override or contradict engine-provided mechanic results (if [Mechanics: ...] is present, those are FACTS)\n- Kill or permanently incapacitate a player character without mechanical justification\n- Grant magical items above the party's level range without quest justification\n- Start combat from scouting, observation, or cautious inquiry alone\n- Silently decide the outcome of a contested or high-stakes action without calling for a roll\n\nWHEN AMBIGUOUS:\n- If the player's intent is unclear but harmless, make a reasonable assumption and narrate\n- If the ambiguity could cost significant resources, ask a brief in-world clarifying question instead of acting\n\n=== CURRENT LOCATION ===\n[name: Outskirts of Caeara Ford][id: loc-146af3]\nType: wilderness\nDescription: Sparse woodlands and patches of dense underbrush, frequented by minor beasts and bandits.\nConnections: [name: Caeara Ford][id: 01KM9BCCWNMHJ0FJB2ZGQHG7AF]\nNPCs present: [name: Goblins][id: npc-ggthk6] (hostile, hateful)\n\n=== KNOWN LOCATIONS ===\n- [name: Caeara Ford][id: 01KM9BCCWNMHJ0FJB2ZGQHG7AF] (settlement) (visited: yes) → connects to: [name: Outskirts of Caeara Ford][id: loc-146af3]\n\n=== KNOWN NPCs (away from party) ===\nAt [name: Caeara Ford][id: 01KM9BCCWNMHJ0FJB2ZGQHG7AF]:\n  - [name: Jossara][id: 01KM9BCCX069ZDF562K050MYDR] (quest-giver, warm)\n  - [name: Fenara][id: 01KM9BCCX0ZF46JFR857CTN97V] (merchant, neutral)\n  - [name: Brenith][id: 01KM9BCCWZN7Z2VPNG499PWT1K] (neutral, warm)\n\n=== PARTY ===\n- [name: tweve][id: 01KM9BCMSXBKFQ6CPR3GBMB7HX] (Lv1 human fighter) — 12/12 HP | AC 18 | Gear: [name: Chain Mail][id: 01KM9BCMSWYT2S80RVNJC47NB6], [name: Longsword][id: 01KM9BCMSWT55Q0YPX1MEXKR7X], [name: Shield][id: 01KM9BCMSWBZE8PSS4Q61VXPEG], [name: Light Crossbow][id: 01KM9BCMSXTS3BN8KJ0NDGWQ2K]\n\n=== ACTIVE ENCOUNTER (Round 1) ===\n- [name: Goblins][id: npc-ggthk6] (npc): 14/14 HP, AC 11\n- [name: tweve][id: 01KM9BCMSXBKFQ6CPR3GBMB7HX] (character): 12/12 HP, AC 18\nUse the exact [id:] values above as characterId in hpChanges. Use encounterEnded in stateChanges when the encounter resolves.\n\n=== QUESTS ===\n- [name: Trouble Near Caeara Ford][id: 01KM9BCCX01P48XDQEVSSF7SJ9] (status: available): The people of Caeara Ford are worried. Aroria and Loreth contest influence around Galholm Spire. Someone needs to investigate and deal with the threat before it grows worse. | Objectives: objective(status: pending, text: Speak with the locals to learn more about the threat, id: 01KM9BCCX0TX61DP8QVF2D75GD); objective(status: pending, text: Investigate the source of the disturbance, id: 01KM9BCCX0YC5GHDPCMBFXEEDE); objective(status: pending, text: Resolve the threat, id: 01KM9BCCX023GHZ7GRZP10YCDN)\n\n=== TIME ===\nDay 1, morning. Weather: clear.\n"
+        },
+        {
+          "role": "assistant",
+          "content": "You begin in Caeara Ford, Caeara Ford is a village nestled in the lands of Fenmere Empire. Its people follow the traditions of the Fenara. The Caemar flows nearby. The Aryr Cult holds sway here. It is a place where adventurers might find work, supplies, and rumors.\n\nA notable detail stands out immediately: A village of about 15,034 people..\n\nBrenith, Fenara, Jossara are nearby, close enough to approach.\n\nA clear lead is already in front of you: Trouble Near Caeara Ford. The first step is simple — Speak with the locals to learn more about the threat.\n\nIt is day 1, morning, under clear skies.\n\nWhat do you do first?"
+        },
+        {
+          "role": "user",
+          "content": "I want to fight low level enemies"
+        },
+        {
+          "role": "assistant",
+          "content": "In search of a challenge, you leave the bustle of Caeara Ford behind, venturing towards its outskirts where wilderness encroaches. Knowing the village's proximity to the wildlands, you head along a dirt path winding through sparse woodlands and patches of dense underbrush, an area where travelers and villagers have reported sightings of minor beasts and bandits. \n\nAfter some time walking, rustling in a nearby thicket draws your attention, and you spot a band of goblins, testing the usual divide between their savage realm and the village. They have not yet noticed your approach, giving you the element of surprise should you choose to strike.\n\nIf you wish to engage, now is the time—your chance to thwart them before they cause further trouble. Do you wish to attack or take another action?"
+        },
+        {
+          "role": "user",
+          "content": "How many goblins? I ready my sword and crouch preparing to sneak up on them"
+        },
+        {
+          "role": "assistant",
+          "content": "Make a Stealth check."
+        },
+        {
+          "role": "user",
+          "content": "Make a Stealth check.\n[Mechanics: tweve: Stealth check (DC 12): 1d20 → 16 vs DC 12 ✓]"
+        },
+        {
+          "role": "assistant",
+          "content": "You crouch low among the underbrush, your keen eyes counting four goblins huddled by a crude campsite. Their sharp, guttural voices quarrel over some small prize, oblivious to your stealthy approach. The soft padding of your boots on the earth and the gentle rustle of leaves all blend seamlessly with the forest sounds, cloaking your advance.\n\nYour grip tightens on the hilt of your longsword, every measured step bringing you closer to the group without a hint of your presence. From here, you are in perfect position to choose how to initiate your attack.\n\nThe goblins, lost in their squabble, remain unaware, granting you a crucial advantage. What is your next move?"
+        },
+        {
+          "role": "user",
+          "content": "I strike furiously at the nearest goblin striking with all I have"
+        },
+        {
+          "role": "assistant",
+          "content": "With a swift and sudden movement, you burst from the cover of the shadows, bringing your longsword down upon the nearest goblin with all your might. The goblin looks up, surprise and fear flashing across its face too late, as your blade descends in a deadly arc.\n\nRoll for attack to see if your blow finds its mark."
+        },
+        {
+          "role": "user",
+          "content": "I roll... 15?"
+        }
+      ],
+      "rawAiResponse": "Your strike connects with precision, catching the goblin off-guard and striking true. The goblin lets out a pained yelp as your longsword cleaves through its defenses. It stumbles backward, the severity of your attack immediately apparent.\n\nThe other goblins, now aware of your presence, snarl and ready themselves for battle. Their intent clear, they scramble to retaliate against this unexpected assault.\n\nCombat begins! Roll for initiative.",
+      "gmProposedChanges": {
+        "encounterStarted": {
+          "creatures": [
+            {
+              "id": "npc-ggthk6",
+              "name": "Goblins",
+              "role": "hostile",
+              "locationId": "loc-146af3",
+              "disposition": -100,
+              "description": "Goblins ready themselves for battle",
+              "tier": "normal"
+            }
+          ]
+        }
+      },
+      "appliedStateChanges": {},
+      "narrativeText": "Your strike connects with precision, catching the goblin off-guard and striking true. The goblin lets out a pained yelp as your longsword cleaves through its defenses. It stumbles backward, the severity of your attack immediately apparent.\n\nThe other goblins, now aware of your presence, snarl and ready themselves for battle. Their intent clear, they scramble to retaliate against this unexpected assault.\n\nCombat begins! Roll for initiative.",
+      "createdAt": "2026-03-21T23:25:40.002Z"
+    },
+    {
+      "turnNumber": 7,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "free-narration",
+      "status": "completed",
+      "mode": "full-gm-2pass",
+      "model": "gpt-4o",
+      "latencyMs": 3812,
+      "action": "I roll... 17?",
+      "resolvedSummary": "Improvised combat action: I roll... 17?",
+      "mechanics": [],
+      "promptMessages": [
+        {
+          "role": "system",
+          "content": "You are the Game Master of a tabletop-style fantasy RPG.\nYou adjudicate player actions like a skilled tabletop GM: narrate consequences, call for dice checks when the outcome is uncertain, and announce combat clearly.\nYou narrate in second-person perspective, speaking directly to the party.\nYou are authoritative about the world — you describe what happens as a consequence of player actions.\nYou respect the mechanics: when dice results are provided, narrate around those outcomes faithfully.\nKeep responses vivid and concise (2–5 sentences for normal actions, more for important moments).\nEnd each response with a beat that invites the next player action.\n\nIMPORTANT: Return ONLY narrative prose. Do NOT return JSON. A separate system handles game state updates.\n\n=== TABLETOP ADJUDICATION ===\nThink like a tabletop GM running a session at a table:\n\nCALLING FOR CHECKS:\n- When the outcome is uncertain and failure has interesting consequences, call for a check.\n- Name the check explicitly: \"Make a Perception check\", \"Roll a Stealth check\", \"Give me a Persuasion check.\"\"\n- If the action is trivial or routine (opening an unlocked door, walking down a road), just narrate the result.\n- Do NOT silently decide contested outcomes — if a player tries to sneak, lie, or persuade and there is resistance, call for the roll.\n\nSTARTING COMBAT:\n- Combat begins ONLY when hostilities are explicit: someone attacks, an ambush springs, or a creature charges.\n- When combat truly begins, announce it clearly with a phrase like \"Roll for initiative!\" or \"Combat begins!\" so the boundary is unmistakable.\n- Scouting, observing, reconnaissance, hearing rumors about enemies, and cautious dialogue NEVER start combat on their own.\n- A player saying \"I look for enemies\" or \"I scout ahead\" is gathering information, not starting a fight.\n\nDURING COMBAT:\n- Think in terms of turns, actions, bonus actions, reactions, movement, and positioning.\n- Narrate each combatant's actions with tactical clarity: who attacks whom, what weapon or ability is used, and what happens.\n- Reference engine-provided dice results faithfully. Do NOT invent hit/miss/damage beyond what the engine resolved.\n\nDIALOGUE & SOCIAL ENCOUNTERS:\n- When a player speaks to an NPC, roleplay the NPC's response in character.\n- If the player is trying to persuade, deceive, or intimidate and the NPC would resist, call for the appropriate check.\n- Low-stakes conversation (asking for directions, buying supplies, friendly banter) does not require a roll.\n- When stakes are high (convincing a guard to let you pass, lying to a noble, negotiating a hostage release), call for a check before resolving the outcome.\n\n=== DISCRETION RULES ===\nYOU MAY freely:\n- Infer the nearest enemy, closest ally, or default equipped weapon when context is obvious\n- Describe the environment, add sensory details, weather effects, ambient sounds\n- Advance NPC dialogue, create NPC reactions, and roleplay NPC personalities\n- Introduce new NPCs, locations, and quests when the story calls for it\n- Decide obvious movement paths (e.g., \"I go inside\" → enter the building)\n- Add dramatic tension, foreshadowing, and world flavor\n- Resolve trivial actions without a roll (picking up an object, sitting down, eating rations)\n\nYOU MUST NOT:\n- Silently choose between multiple materially different resource expenditures (healing spells vs potions, different spell slots)\n- Violate action economy, spell legality, slot availability, or rest rules\n- Override or contradict engine-provided mechanic results (if [Mechanics: ...] is present, those are FACTS)\n- Kill or permanently incapacitate a player character without mechanical justification\n- Grant magical items above the party's level range without quest justification\n- Start combat from scouting, observation, or cautious inquiry alone\n- Silently decide the outcome of a contested or high-stakes action without calling for a roll\n\nWHEN AMBIGUOUS:\n- If the player's intent is unclear but harmless, make a reasonable assumption and narrate\n- If the ambiguity could cost significant resources, ask a brief in-world clarifying question instead of acting\n\n=== CURRENT LOCATION ===\n[name: Outskirts of Caeara Ford][id: loc-146af3]\nType: wilderness\nDescription: Sparse woodlands and patches of dense underbrush, frequented by minor beasts and bandits.\nConnections: [name: Caeara Ford][id: 01KM9BCCWNMHJ0FJB2ZGQHG7AF]\nNPCs present: [name: Goblins][id: npc-ggthk6] (hostile, hateful)\n\n=== KNOWN LOCATIONS ===\n- [name: Caeara Ford][id: 01KM9BCCWNMHJ0FJB2ZGQHG7AF] (settlement) (visited: yes) → connects to: [name: Outskirts of Caeara Ford][id: loc-146af3]\n\n=== KNOWN NPCs (away from party) ===\nAt [name: Caeara Ford][id: 01KM9BCCWNMHJ0FJB2ZGQHG7AF]:\n  - [name: Jossara][id: 01KM9BCCX069ZDF562K050MYDR] (quest-giver, warm)\n  - [name: Fenara][id: 01KM9BCCX0ZF46JFR857CTN97V] (merchant, neutral)\n  - [name: Brenith][id: 01KM9BCCWZN7Z2VPNG499PWT1K] (neutral, warm)\n\n=== PARTY ===\n- [name: tweve][id: 01KM9BCMSXBKFQ6CPR3GBMB7HX] (Lv1 human fighter) — 12/12 HP | AC 18 | Gear: [name: Chain Mail][id: 01KM9BCMSWYT2S80RVNJC47NB6], [name: Longsword][id: 01KM9BCMSWT55Q0YPX1MEXKR7X], [name: Shield][id: 01KM9BCMSWBZE8PSS4Q61VXPEG], [name: Light Crossbow][id: 01KM9BCMSXTS3BN8KJ0NDGWQ2K]\n\n=== ACTIVE ENCOUNTER (Round 1) ===\n- [name: Goblins][id: npc-ggthk6] (npc): 14/14 HP, AC 11\n- [name: tweve][id: 01KM9BCMSXBKFQ6CPR3GBMB7HX] (character): 12/12 HP, AC 18\nUse the exact [id:] values above as characterId in hpChanges. Use encounterEnded in stateChanges when the encounter resolves.\n\n=== QUESTS ===\n- [name: Trouble Near Caeara Ford][id: 01KM9BCCX01P48XDQEVSSF7SJ9] (status: available): The people of Caeara Ford are worried. Aroria and Loreth contest influence around Galholm Spire. Someone needs to investigate and deal with the threat before it grows worse. | Objectives: objective(status: pending, text: Speak with the locals to learn more about the threat, id: 01KM9BCCX0TX61DP8QVF2D75GD); objective(status: pending, text: Investigate the source of the disturbance, id: 01KM9BCCX0YC5GHDPCMBFXEEDE); objective(status: pending, text: Resolve the threat, id: 01KM9BCCX023GHZ7GRZP10YCDN)\n\n=== TIME ===\nDay 1, morning. Weather: clear.\n"
+        },
+        {
+          "role": "assistant",
+          "content": "You begin in Caeara Ford, Caeara Ford is a village nestled in the lands of Fenmere Empire. Its people follow the traditions of the Fenara. The Caemar flows nearby. The Aryr Cult holds sway here. It is a place where adventurers might find work, supplies, and rumors.\n\nA notable detail stands out immediately: A village of about 15,034 people..\n\nBrenith, Fenara, Jossara are nearby, close enough to approach.\n\nA clear lead is already in front of you: Trouble Near Caeara Ford. The first step is simple — Speak with the locals to learn more about the threat.\n\nIt is day 1, morning, under clear skies.\n\nWhat do you do first?"
+        },
+        {
+          "role": "user",
+          "content": "I want to fight low level enemies"
+        },
+        {
+          "role": "assistant",
+          "content": "In search of a challenge, you leave the bustle of Caeara Ford behind, venturing towards its outskirts where wilderness encroaches. Knowing the village's proximity to the wildlands, you head along a dirt path winding through sparse woodlands and patches of dense underbrush, an area where travelers and villagers have reported sightings of minor beasts and bandits. \n\nAfter some time walking, rustling in a nearby thicket draws your attention, and you spot a band of goblins, testing the usual divide between their savage realm and the village. They have not yet noticed your approach, giving you the element of surprise should you choose to strike.\n\nIf you wish to engage, now is the time—your chance to thwart them before they cause further trouble. Do you wish to attack or take another action?"
+        },
+        {
+          "role": "user",
+          "content": "How many goblins? I ready my sword and crouch preparing to sneak up on them"
+        },
+        {
+          "role": "assistant",
+          "content": "Make a Stealth check."
+        },
+        {
+          "role": "user",
+          "content": "Make a Stealth check.\n[Mechanics: tweve: Stealth check (DC 12): 1d20 → 16 vs DC 12 ✓]"
+        },
+        {
+          "role": "assistant",
+          "content": "You crouch low among the underbrush, your keen eyes counting four goblins huddled by a crude campsite. Their sharp, guttural voices quarrel over some small prize, oblivious to your stealthy approach. The soft padding of your boots on the earth and the gentle rustle of leaves all blend seamlessly with the forest sounds, cloaking your advance.\n\nYour grip tightens on the hilt of your longsword, every measured step bringing you closer to the group without a hint of your presence. From here, you are in perfect position to choose how to initiate your attack.\n\nThe goblins, lost in their squabble, remain unaware, granting you a crucial advantage. What is your next move?"
+        },
+        {
+          "role": "user",
+          "content": "I strike furiously at the nearest goblin striking with all I have"
+        },
+        {
+          "role": "assistant",
+          "content": "With a swift and sudden movement, you burst from the cover of the shadows, bringing your longsword down upon the nearest goblin with all your might. The goblin looks up, surprise and fear flashing across its face too late, as your blade descends in a deadly arc.\n\nRoll for attack to see if your blow finds its mark."
+        },
+        {
+          "role": "user",
+          "content": "I roll... 15?"
+        },
+        {
+          "role": "assistant",
+          "content": "Your strike connects with precision, catching the goblin off-guard and striking true. The goblin lets out a pained yelp as your longsword cleaves through its defenses. It stumbles backward, the severity of your attack immediately apparent.\n\nThe other goblins, now aware of your presence, snarl and ready themselves for battle. Their intent clear, they scramble to retaliate against this unexpected assault.\n\nCombat begins! Roll for initiative."
+        },
+        {
+          "role": "user",
+          "content": "I roll... 17?"
+        }
+      ],
+      "rawAiResponse": "With lightning reflexes, you seize the initiative, moving with the momentum of your opening strike. The goblin you attacked lies wounded before you, while the remaining three goblins begin to spread out, drawing their crude weapons in response.\n\nYou have the first move in this fresh round of combat. What's your action?",
+      "gmProposedChanges": {
+        "encounterStarted": {
+          "creatures": []
+        }
+      },
+      "appliedStateChanges": {},
+      "narrativeText": "With lightning reflexes, you seize the initiative, moving with the momentum of your opening strike. The goblin you attacked lies wounded before you, while the remaining three goblins begin to spread out, drawing their crude weapons in response.\n\nYou have the first move in this fresh round of combat. What's your action?",
+      "createdAt": "2026-03-21T23:25:52.351Z"
+    },
+    {
+      "turnNumber": 8,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "attack",
+      "status": "completed",
+      "mode": "mid-round",
+      "model": "server-executor",
+      "latencyMs": 0,
+      "action": "I attack the closest goblin!",
+      "resolvedSummary": "Attacked Goblins with Longsword — hit for 7 slashing damage | Enemies retaliate",
+      "mechanics": [
+        {
+          "type": "attack-roll",
+          "label": "tweve attacks Goblins with longsword",
+          "dice": {
+            "notation": "1d20",
+            "rolls": [
+              12
+            ],
+            "total": 12
+          },
+          "dc": 11,
+          "success": true
+        },
+        {
+          "type": "damage",
+          "label": "tweve deals 7 slashing damage to Goblins",
+          "dice": {
+            "notation": "1d8+3",
+            "rolls": [
+              4
+            ],
+            "total": 7
+          },
+          "success": true
+        }
+      ],
+      "promptMessages": [],
+      "rawAiResponse": "",
+      "gmProposedChanges": null,
+      "appliedStateChanges": {
+        "hpChanges": [
+          {
+            "characterId": "npc-ggthk6",
+            "oldHp": 14,
+            "newHp": 7,
+            "reason": "tweve's longsword attack"
+          }
+        ]
+      },
+      "narrativeText": "",
+      "createdAt": "2026-03-21T23:26:01.688Z"
+    },
+    {
+      "turnNumber": 9,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "attack",
+      "status": "completed",
+      "mode": "mid-round",
+      "model": "server-executor",
+      "latencyMs": 0,
+      "action": "I attack the closest goblin!",
+      "resolvedSummary": "Attacked Goblins with Longsword — hit for 7 slashing damage | Enemies retaliate",
+      "mechanics": [
+        {
+          "type": "attack-roll",
+          "label": "tweve attacks Goblins with longsword",
+          "dice": {
+            "notation": "1d20",
+            "rolls": [
+              9
+            ],
+            "total": 9
+          },
+          "dc": 11,
+          "success": true
+        },
+        {
+          "type": "damage",
+          "label": "tweve deals 7 slashing damage to Goblins",
+          "dice": {
+            "notation": "1d8+3",
+            "rolls": [
+              4
+            ],
+            "total": 7
+          },
+          "success": true
+        }
+      ],
+      "promptMessages": [],
+      "rawAiResponse": "",
+      "gmProposedChanges": null,
+      "appliedStateChanges": {
+        "hpChanges": [
+          {
+            "characterId": "npc-ggthk6",
+            "oldHp": 14,
+            "newHp": 7,
+            "reason": "tweve's longsword attack"
+          }
+        ]
+      },
+      "narrativeText": "",
+      "createdAt": "2026-03-21T23:26:14.250Z"
+    },
+    {
+      "turnNumber": 10,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "attack",
+      "status": "completed",
+      "mode": "mid-round",
+      "model": "server-executor",
+      "latencyMs": 0,
+      "action": "I attack the closest goblin!",
+      "resolvedSummary": "Attacked Goblins with Longsword — missed | Enemies retaliate",
+      "mechanics": [
+        {
+          "type": "attack-roll",
+          "label": "tweve attacks Goblins with longsword",
+          "dice": {
+            "notation": "1d20",
+            "rolls": [
+              5
+            ],
+            "total": 5
+          },
+          "dc": 11,
+          "success": false
+        }
+      ],
+      "promptMessages": [],
+      "rawAiResponse": "",
+      "gmProposedChanges": null,
+      "appliedStateChanges": {},
+      "narrativeText": "",
+      "createdAt": "2026-03-21T23:26:23.009Z"
+    },
+    {
+      "turnNumber": 11,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "attack",
+      "status": "completed",
+      "mode": "mid-round",
+      "model": "server-executor",
+      "latencyMs": 0,
+      "action": "I attack the closest goblin!",
+      "resolvedSummary": "Attacked Goblins with Longsword — hit for 4 slashing damage | Enemies retaliate",
+      "mechanics": [
+        {
+          "type": "attack-roll",
+          "label": "tweve attacks Goblins with longsword",
+          "dice": {
+            "notation": "1d20",
+            "rolls": [
+              14
+            ],
+            "total": 14
+          },
+          "dc": 11,
+          "success": true
+        },
+        {
+          "type": "damage",
+          "label": "tweve deals 4 slashing damage to Goblins",
+          "dice": {
+            "notation": "1d8+3",
+            "rolls": [
+              1
+            ],
+            "total": 4
+          },
+          "success": true
+        }
+      ],
+      "promptMessages": [],
+      "rawAiResponse": "",
+      "gmProposedChanges": null,
+      "appliedStateChanges": {
+        "hpChanges": [
+          {
+            "characterId": "npc-ggthk6",
+            "oldHp": 14,
+            "newHp": 10,
+            "reason": "tweve's longsword attack"
+          }
+        ]
+      },
+      "narrativeText": "",
+      "createdAt": "2026-03-21T23:26:27.674Z"
+    },
+    {
+      "turnNumber": 12,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "attack",
+      "status": "completed",
+      "mode": "mid-round",
+      "model": "server-executor",
+      "latencyMs": 0,
+      "action": "I attack the closest goblin!",
+      "resolvedSummary": "Attacked Goblins with Longsword — hit for 10 slashing damage | Enemies retaliate",
+      "mechanics": [
+        {
+          "type": "attack-roll",
+          "label": "tweve attacks Goblins with longsword",
+          "dice": {
+            "notation": "1d20",
+            "rolls": [
+              19
+            ],
+            "total": 19
+          },
+          "dc": 11,
+          "success": true
+        },
+        {
+          "type": "damage",
+          "label": "tweve deals 10 slashing damage to Goblins",
+          "dice": {
+            "notation": "1d8+3",
+            "rolls": [
+              7
+            ],
+            "total": 10
+          },
+          "success": true
+        }
+      ],
+      "promptMessages": [],
+      "rawAiResponse": "",
+      "gmProposedChanges": null,
+      "appliedStateChanges": {
+        "hpChanges": [
+          {
+            "characterId": "npc-ggthk6",
+            "oldHp": 14,
+            "newHp": 4,
+            "reason": "tweve's longsword attack"
+          }
+        ]
+      },
+      "narrativeText": "",
+      "createdAt": "2026-03-21T23:26:34.206Z"
+    },
+    {
+      "turnNumber": 13,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "attack",
+      "status": "completed",
+      "mode": "mid-round",
+      "model": "server-executor",
+      "latencyMs": 0,
+      "action": "I attack the closest goblin!",
+      "resolvedSummary": "Attacked Goblins with Longsword — hit for 5 slashing damage | Enemies retaliate",
+      "mechanics": [
+        {
+          "type": "attack-roll",
+          "label": "tweve attacks Goblins with longsword",
+          "dice": {
+            "notation": "1d20",
+            "rolls": [
+              12
+            ],
+            "total": 12
+          },
+          "dc": 11,
+          "success": true
+        },
+        {
+          "type": "damage",
+          "label": "tweve deals 5 slashing damage to Goblins",
+          "dice": {
+            "notation": "1d8+3",
+            "rolls": [
+              2
+            ],
+            "total": 5
+          },
+          "success": true
+        }
+      ],
+      "promptMessages": [],
+      "rawAiResponse": "",
+      "gmProposedChanges": null,
+      "appliedStateChanges": {
+        "hpChanges": [
+          {
+            "characterId": "npc-ggthk6",
+            "oldHp": 14,
+            "newHp": 9,
+            "reason": "tweve's longsword attack"
+          }
+        ]
+      },
+      "narrativeText": "",
+      "createdAt": "2026-03-21T23:26:36.468Z"
+    },
+    {
+      "turnNumber": 14,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "attack",
+      "status": "completed",
+      "mode": "mid-round",
+      "model": "server-executor",
+      "latencyMs": 0,
+      "action": "I attack the closest goblin!",
+      "resolvedSummary": "Attacked Goblins with Longsword — hit for 5 slashing damage | Enemies retaliate",
+      "mechanics": [
+        {
+          "type": "attack-roll",
+          "label": "tweve attacks Goblins with longsword",
+          "dice": {
+            "notation": "1d20",
+            "rolls": [
+              8
+            ],
+            "total": 8
+          },
+          "dc": 11,
+          "success": true
+        },
+        {
+          "type": "damage",
+          "label": "tweve deals 5 slashing damage to Goblins",
+          "dice": {
+            "notation": "1d8+3",
+            "rolls": [
+              2
+            ],
+            "total": 5
+          },
+          "success": true
+        }
+      ],
+      "promptMessages": [],
+      "rawAiResponse": "",
+      "gmProposedChanges": null,
+      "appliedStateChanges": {
+        "hpChanges": [
+          {
+            "characterId": "npc-ggthk6",
+            "oldHp": 14,
+            "newHp": 9,
+            "reason": "tweve's longsword attack"
+          }
+        ]
+      },
+      "narrativeText": "",
+      "createdAt": "2026-03-21T23:26:40.883Z"
+    },
+    {
+      "turnNumber": 15,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "attack",
+      "status": "completed",
+      "mode": "mid-round",
+      "model": "server-executor",
+      "latencyMs": 0,
+      "action": "I attack the closest goblin!",
+      "resolvedSummary": "Attacked Goblins with Longsword — fumble! | Enemies retaliate",
+      "mechanics": [
+        {
+          "type": "attack-roll",
+          "label": "tweve attacks Goblins with longsword",
+          "dice": {
+            "notation": "1d20",
+            "rolls": [
+              1
+            ],
+            "total": 1
+          },
+          "dc": 11,
+          "success": false
+        }
+      ],
+      "promptMessages": [],
+      "rawAiResponse": "",
+      "gmProposedChanges": null,
+      "appliedStateChanges": {},
+      "narrativeText": "",
+      "createdAt": "2026-03-21T23:26:45.377Z"
+    },
+    {
+      "turnNumber": 16,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "attack",
+      "status": "completed",
+      "mode": "mid-round",
+      "model": "server-executor",
+      "latencyMs": 0,
+      "action": "I attack the closest goblin!",
+      "resolvedSummary": "Attacked Goblins with Longsword — hit for 10 slashing damage | Enemies retaliate",
+      "mechanics": [
+        {
+          "type": "attack-roll",
+          "label": "tweve attacks Goblins with longsword",
+          "dice": {
+            "notation": "1d20",
+            "rolls": [
+              9
+            ],
+            "total": 9
+          },
+          "dc": 11,
+          "success": true
+        },
+        {
+          "type": "damage",
+          "label": "tweve deals 10 slashing damage to Goblins",
+          "dice": {
+            "notation": "1d8+3",
+            "rolls": [
+              7
+            ],
+            "total": 10
+          },
+          "success": true
+        }
+      ],
+      "promptMessages": [],
+      "rawAiResponse": "",
+      "gmProposedChanges": null,
+      "appliedStateChanges": {
+        "hpChanges": [
+          {
+            "characterId": "npc-ggthk6",
+            "oldHp": 14,
+            "newHp": 4,
+            "reason": "tweve's longsword attack"
+          }
+        ]
+      },
+      "narrativeText": "",
+      "createdAt": "2026-03-21T23:26:48.187Z"
+    },
+    {
+      "turnNumber": 16,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "attack",
+      "status": "completed",
+      "mode": "mid-round",
+      "model": "server-executor",
+      "latencyMs": 0,
+      "action": "I attack the closest goblin!",
+      "resolvedSummary": "Attacked Goblins with Longsword — hit for 7 slashing damage | Enemies retaliate",
+      "mechanics": [
+        {
+          "type": "attack-roll",
+          "label": "tweve attacks Goblins with longsword",
+          "dice": {
+            "notation": "1d20",
+            "rolls": [
+              8
+            ],
+            "total": 8
+          },
+          "dc": 11,
+          "success": true
+        },
+        {
+          "type": "damage",
+          "label": "tweve deals 7 slashing damage to Goblins",
+          "dice": {
+            "notation": "1d8+3",
+            "rolls": [
+              4
+            ],
+            "total": 7
+          },
+          "success": true
+        }
+      ],
+      "promptMessages": [],
+      "rawAiResponse": "",
+      "gmProposedChanges": null,
+      "appliedStateChanges": {
+        "hpChanges": [
+          {
+            "characterId": "npc-ggthk6",
+            "oldHp": 14,
+            "newHp": 7,
+            "reason": "tweve's longsword attack"
+          }
+        ]
+      },
+      "narrativeText": "",
+      "createdAt": "2026-03-21T23:26:51.041Z"
+    },
+    {
+      "turnNumber": 17,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "attack",
+      "status": "completed",
+      "mode": "mid-round",
+      "model": "server-executor",
+      "latencyMs": 0,
+      "action": "I attack the closest goblin!",
+      "resolvedSummary": "Attacked Goblins with Longsword — hit for 4 slashing damage | Enemies retaliate",
+      "mechanics": [
+        {
+          "type": "attack-roll",
+          "label": "tweve attacks Goblins with longsword",
+          "dice": {
+            "notation": "1d20",
+            "rolls": [
+              14
+            ],
+            "total": 14
+          },
+          "dc": 11,
+          "success": true
+        },
+        {
+          "type": "damage",
+          "label": "tweve deals 4 slashing damage to Goblins",
+          "dice": {
+            "notation": "1d8+3",
+            "rolls": [
+              1
+            ],
+            "total": 4
+          },
+          "success": true
+        }
+      ],
+      "promptMessages": [],
+      "rawAiResponse": "",
+      "gmProposedChanges": null,
+      "appliedStateChanges": {
+        "hpChanges": [
+          {
+            "characterId": "npc-ggthk6",
+            "oldHp": 14,
+            "newHp": 10,
+            "reason": "tweve's longsword attack"
+          }
+        ]
+      },
+      "narrativeText": "",
+      "createdAt": "2026-03-21T23:26:54.517Z"
+    },
+    {
+      "turnNumber": 18,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "attack",
+      "status": "completed",
+      "mode": "mid-round",
+      "model": "server-executor",
+      "latencyMs": 0,
+      "action": "I attack the closest goblin!",
+      "resolvedSummary": "Attacked Goblins with Longsword — hit for 7 slashing damage | Enemies retaliate",
+      "mechanics": [
+        {
+          "type": "attack-roll",
+          "label": "tweve attacks Goblins with longsword",
+          "dice": {
+            "notation": "1d20",
+            "rolls": [
+              12
+            ],
+            "total": 12
+          },
+          "dc": 11,
+          "success": true
+        },
+        {
+          "type": "damage",
+          "label": "tweve deals 7 slashing damage to Goblins",
+          "dice": {
+            "notation": "1d8+3",
+            "rolls": [
+              4
+            ],
+            "total": 7
+          },
+          "success": true
+        }
+      ],
+      "promptMessages": [],
+      "rawAiResponse": "",
+      "gmProposedChanges": null,
+      "appliedStateChanges": {
+        "hpChanges": [
+          {
+            "characterId": "npc-ggthk6",
+            "oldHp": 14,
+            "newHp": 7,
+            "reason": "tweve's longsword attack"
+          }
+        ]
+      },
+      "narrativeText": "",
+      "createdAt": "2026-03-21T23:26:56.840Z"
+    },
+    {
+      "turnNumber": 19,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "attack",
+      "status": "completed",
+      "mode": "mid-round",
+      "model": "server-executor",
+      "latencyMs": 0,
+      "action": "I attack the closest goblin!",
+      "resolvedSummary": "Attacked Goblins with Longsword — missed | Enemies retaliate",
+      "mechanics": [
+        {
+          "type": "attack-roll",
+          "label": "tweve attacks Goblins with longsword",
+          "dice": {
+            "notation": "1d20",
+            "rolls": [
+              2
+            ],
+            "total": 2
+          },
+          "dc": 11,
+          "success": false
+        }
+      ],
+      "promptMessages": [],
+      "rawAiResponse": "",
+      "gmProposedChanges": null,
+      "appliedStateChanges": {},
+      "narrativeText": "",
+      "createdAt": "2026-03-21T23:26:58.739Z"
+    },
+    {
+      "turnNumber": 20,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "attack",
+      "status": "completed",
+      "mode": "mid-round",
+      "model": "server-executor",
+      "latencyMs": 0,
+      "action": "I attack the closest goblin!",
+      "resolvedSummary": "Attacked Goblins with Longsword — hit for 4 slashing damage | Enemies retaliate",
+      "mechanics": [
+        {
+          "type": "attack-roll",
+          "label": "tweve attacks Goblins with longsword",
+          "dice": {
+            "notation": "1d20",
+            "rolls": [
+              15
+            ],
+            "total": 15
+          },
+          "dc": 11,
+          "success": true
+        },
+        {
+          "type": "damage",
+          "label": "tweve deals 4 slashing damage to Goblins",
+          "dice": {
+            "notation": "1d8+3",
+            "rolls": [
+              1
+            ],
+            "total": 4
+          },
+          "success": true
+        }
+      ],
+      "promptMessages": [],
+      "rawAiResponse": "",
+      "gmProposedChanges": null,
+      "appliedStateChanges": {
+        "hpChanges": [
+          {
+            "characterId": "npc-ggthk6",
+            "oldHp": 14,
+            "newHp": 10,
+            "reason": "tweve's longsword attack"
+          }
+        ]
+      },
+      "narrativeText": "",
+      "createdAt": "2026-03-21T23:27:05.037Z"
+    },
+    {
+      "turnNumber": 21,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "attack",
+      "status": "completed",
+      "mode": "mid-round",
+      "model": "server-executor",
+      "latencyMs": 0,
+      "action": "I attack the closest goblin!",
+      "resolvedSummary": "Attacked Goblins with Longsword — hit for 5 slashing damage | Enemies retaliate",
+      "mechanics": [
+        {
+          "type": "attack-roll",
+          "label": "tweve attacks Goblins with longsword",
+          "dice": {
+            "notation": "1d20",
+            "rolls": [
+              13
+            ],
+            "total": 13
+          },
+          "dc": 11,
+          "success": true
+        },
+        {
+          "type": "damage",
+          "label": "tweve deals 5 slashing damage to Goblins",
+          "dice": {
+            "notation": "1d8+3",
+            "rolls": [
+              2
+            ],
+            "total": 5
+          },
+          "success": true
+        }
+      ],
+      "promptMessages": [],
+      "rawAiResponse": "",
+      "gmProposedChanges": null,
+      "appliedStateChanges": {
+        "hpChanges": [
+          {
+            "characterId": "npc-ggthk6",
+            "oldHp": 14,
+            "newHp": 9,
+            "reason": "tweve's longsword attack"
+          }
+        ]
+      },
+      "narrativeText": "",
+      "createdAt": "2026-03-21T23:27:07.268Z"
+    }
+  ]
+}
