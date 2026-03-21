@@ -761,16 +761,29 @@ export function mutateClockAdvance(
 }
 
 export function mergeStateChanges(...changes: StateChange[]): StateChange {
+	const pushUnique = <T>(target: T[], values: T[], keyFn: (value: T) => string) => {
+		const seen = new Set(target.map(keyFn));
+		for (const value of values) {
+			const key = keyFn(value);
+			if (seen.has(key)) continue;
+			seen.add(key);
+			target.push(value);
+		}
+	};
+
 	const merged: StateChange = {};
 	for (const c of changes) {
-		if (c.hpChanges) (merged.hpChanges ??= []).push(...c.hpChanges);
-		if (c.itemsGained) (merged.itemsGained ??= []).push(...c.itemsGained);
-		if (c.itemsLost) (merged.itemsLost ??= []).push(...c.itemsLost);
+		if (c.hpChanges) pushUnique((merged.hpChanges ??= []), c.hpChanges, (hc) => `${hc.characterId}|${hc.oldHp}|${hc.newHp}|${hc.reason ?? ''}`);
+		if (c.itemsGained) pushUnique((merged.itemsGained ??= []), c.itemsGained, (ig) => `${ig.characterId}|${ig.item.id}`);
+		if (c.itemsLost) pushUnique((merged.itemsLost ??= []), c.itemsLost, (il) => `${il.characterId}|${il.itemId}|${il.quantity ?? 1}`);
+		if (c.itemsDropped) pushUnique((merged.itemsDropped ??= []), c.itemsDropped, (dr) => `${dr.characterId}|${dr.itemId}|${dr.locationId ?? ''}`);
+		if (c.itemsPickedUp) pushUnique((merged.itemsPickedUp ??= []), c.itemsPickedUp, (pu) => `${pu.characterId}|${pu.itemId}|${pu.locationId ?? ''}`);
+		if (c.locationItemsAdded) pushUnique((merged.locationItemsAdded ??= []), c.locationItemsAdded, (la) => `${la.locationId}|${la.item.id}`);
 		if (c.locationChange) merged.locationChange = c.locationChange;
-		if (c.npcChanges) (merged.npcChanges ??= []).push(...c.npcChanges);
-		if (c.questUpdates) (merged.questUpdates ??= []).push(...c.questUpdates);
-		if (c.conditionsApplied) (merged.conditionsApplied ??= []).push(...c.conditionsApplied);
-		if (c.xpAwarded) (merged.xpAwarded ??= []).push(...c.xpAwarded);
+		if (c.npcChanges) pushUnique((merged.npcChanges ??= []), c.npcChanges, (nc) => `${nc.npcId}|${nc.field}`);
+		if (c.questUpdates) pushUnique((merged.questUpdates ??= []), c.questUpdates, (qu) => `${qu.questId}|${qu.field}|${qu.objectiveId ?? ''}`);
+		if (c.conditionsApplied) pushUnique((merged.conditionsApplied ??= []), c.conditionsApplied, (ca) => `${ca.characterId}|${ca.condition}|${ca.applied}`);
+		if (c.xpAwarded) pushUnique((merged.xpAwarded ??= []), c.xpAwarded, (xp) => `${xp.characterId}|${xp.amount}`);
 		if (c.clockAdvance) merged.clockAdvance = c.clockAdvance;
 		if (c.spellSlotUsed) merged.spellSlotUsed = c.spellSlotUsed;
 		if (c.hitDiceUsed) merged.hitDiceUsed = c.hitDiceUsed;
@@ -778,6 +791,12 @@ export function mergeStateChanges(...changes: StateChange[]): StateChange {
 		if (c.featureUsed) merged.featureUsed = c.featureUsed;
 		if (c.encounterStarted) merged.encounterStarted = c.encounterStarted;
 		if (c.encounterEnded) merged.encounterEnded = c.encounterEnded;
+		if (c.deathSaveOutcome) merged.deathSaveOutcome = c.deathSaveOutcome;
+		if (c.npcsAdded) pushUnique((merged.npcsAdded ??= []), c.npcsAdded, (npc) => npc.id);
+		if (c.locationsAdded) pushUnique((merged.locationsAdded ??= []), c.locationsAdded, (loc) => loc.id);
+		if (c.questsAdded) pushUnique((merged.questsAdded ??= []), c.questsAdded, (quest) => quest.id);
+		if (c.sceneFactsAdded) pushUnique((merged.sceneFactsAdded ??= []), c.sceneFactsAdded, (fact) => fact);
+		if (c.companionPromoted) merged.companionPromoted = c.companionPromoted;
 	}
 	return merged;
 }

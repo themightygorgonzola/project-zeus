@@ -572,6 +572,25 @@ describe('mergeStateChanges', () => {
 		expect(merged.sceneFactsAdded).toHaveLength(1);
 		expect(merged.npcsAdded![0].name).toBe('Barkeep');
 	});
+
+	it('dedupes duplicate semantic entries while keeping engine-first precedence', async () => {
+		const { mergeStateChanges } = await import('./adventure-turn');
+		const engine = {
+			questUpdates: [{ questId: 'quest-1', field: 'status', oldValue: 'active', newValue: 'completed' }],
+			sceneFactsAdded: ['The door is unlocked'],
+			npcChanges: [{ npcId: 'npc-1', field: 'notes', oldValue: '', newValue: 'Owes the party a favor' }]
+		};
+		const gm = {
+			questUpdates: [{ questId: 'quest-1', field: 'status', oldValue: 'active', newValue: 'completed' }],
+			sceneFactsAdded: ['The door is unlocked'],
+			npcChanges: [{ npcId: 'npc-1', field: 'notes', oldValue: '', newValue: 'A conflicting note that should not override engine-first merge' }]
+		};
+		const merged = mergeStateChanges(engine as any, gm as any);
+		expect(merged.questUpdates).toHaveLength(1);
+		expect(merged.sceneFactsAdded).toEqual(['The door is unlocked']);
+		expect(merged.npcChanges).toHaveLength(1);
+		expect(merged.npcChanges![0].newValue).toBe('Owes the party a favor');
+	});
 });
 
 // ===========================================================================
@@ -4900,6 +4919,23 @@ describe('Phase 5: sanitizeStateChanges — pass-through and combined', () => {
 		expect(result.clockAdvance).toBe(clockAdv);
 		expect(result.spellSlotUsed).toBeDefined();
 		expect(result.companionPromoted).toBeDefined();
+	});
+
+	it('resolves labeled protocol refs for companionPromoted and encounterStarted creature locations', async () => {
+		const { sanitizeStateChanges } = await import('./adventure-turn');
+		const state = {
+			...makeMinimalState(),
+			npcs: [{ id: 'npc-1', name: 'Bjorik', role: 'ally', locationId: 'loc-1', disposition: 10, description: 'ally', notes: '', alive: true }],
+			locations: [{ id: 'loc-1', name: 'Town Square', type: 'settlement', description: 'square', features: [], connections: [], npcs: [], regionRef: null, visited: true }]
+		};
+		const result = sanitizeStateChanges({
+			companionPromoted: { npcId: '[name: Bjorik][id: npc-1]', statBlock: {} as any },
+			encounterStarted: {
+				creatures: [{ id: 'npc-gob', name: 'Goblin', role: 'hostile', locationId: '[name: Town Square][id: loc-1]', description: 'green menace', disposition: -100, notes: '', alive: true, tier: 'weak' as const }]
+			}
+		}, state as any, 'The goblin lunges at you and combat begins!');
+		expect(result.companionPromoted?.npcId).toBe('npc-1');
+		expect(result.encounterStarted?.creatures[0].locationId).toBe('loc-1');
 	});
 
 	it('returns empty object when all entries are invalid', async () => {

@@ -910,28 +910,46 @@ async function broadcastTurnEvents(
  * Engine changes take precedence (they are already-applied facts).
  * GM changes that don't conflict are added.
  */
+function mergeUniqueByKey<T>(engine: T[] | undefined, gm: T[] | undefined, keyFn: (value: T) => string): T[] | undefined {
+	const merged: T[] = [];
+	const seen = new Set<string>();
+	for (const value of engine ?? []) {
+		const key = keyFn(value);
+		if (seen.has(key)) continue;
+		seen.add(key);
+		merged.push(value);
+	}
+	for (const value of gm ?? []) {
+		const key = keyFn(value);
+		if (seen.has(key)) continue;
+		seen.add(key);
+		merged.push(value);
+	}
+	return merged.length > 0 ? merged : undefined;
+}
+
 export function mergeStateChanges(engine: StateChange, gm: StateChange): StateChange {
 	return {
-		hpChanges: [...(engine.hpChanges ?? []), ...(gm.hpChanges ?? [])],
-		conditionsApplied: [...(engine.conditionsApplied ?? []), ...(gm.conditionsApplied ?? [])],
-		xpAwarded: [...(engine.xpAwarded ?? []), ...(gm.xpAwarded ?? [])],
+		hpChanges: mergeUniqueByKey(engine.hpChanges, gm.hpChanges, (hc) => `${hc.characterId}|${hc.oldHp}|${hc.newHp}|${hc.reason ?? ''}`),
+		conditionsApplied: mergeUniqueByKey(engine.conditionsApplied, gm.conditionsApplied, (ca) => `${ca.characterId}|${ca.condition}|${ca.applied}`),
+		xpAwarded: mergeUniqueByKey(engine.xpAwarded, gm.xpAwarded, (xp) => `${xp.characterId}|${xp.amount}`),
 		locationChange: engine.locationChange ?? gm.locationChange,
-		questUpdates: [...(engine.questUpdates ?? []), ...(gm.questUpdates ?? [])],
-		npcChanges: [...(engine.npcChanges ?? []), ...(gm.npcChanges ?? [])],
+		questUpdates: mergeUniqueByKey(engine.questUpdates, gm.questUpdates, (qu) => `${qu.questId}|${qu.field}|${qu.objectiveId ?? ''}`),
+		npcChanges: mergeUniqueByKey(engine.npcChanges, gm.npcChanges, (nc) => `${nc.npcId}|${nc.field}`),
 		clockAdvance: engine.clockAdvance ?? gm.clockAdvance,
 		spellSlotUsed: engine.spellSlotUsed ?? gm.spellSlotUsed,
-		itemsLost: [...(engine.itemsLost ?? []), ...(gm.itemsLost ?? [])],
-		itemsGained: [...(engine.itemsGained ?? []), ...(gm.itemsGained ?? [])],
-		itemsDropped: [...(engine.itemsDropped ?? []), ...(gm.itemsDropped ?? [])],
-		itemsPickedUp: [...(engine.itemsPickedUp ?? []), ...(gm.itemsPickedUp ?? [])],
-		locationItemsAdded: [...(engine.locationItemsAdded ?? []), ...(gm.locationItemsAdded ?? [])],
+		itemsLost: mergeUniqueByKey(engine.itemsLost, gm.itemsLost, (il) => `${il.characterId}|${il.itemId}|${il.quantity ?? 1}`),
+		itemsGained: mergeUniqueByKey(engine.itemsGained, gm.itemsGained, (ig) => `${ig.characterId}|${ig.item.id}`),
+		itemsDropped: mergeUniqueByKey(engine.itemsDropped, gm.itemsDropped, (dr) => `${dr.characterId}|${dr.itemId}|${dr.locationId ?? ''}`),
+		itemsPickedUp: mergeUniqueByKey(engine.itemsPickedUp, gm.itemsPickedUp, (pu) => `${pu.characterId}|${pu.itemId}|${pu.locationId ?? ''}`),
+		locationItemsAdded: mergeUniqueByKey(engine.locationItemsAdded, gm.locationItemsAdded, (la) => `${la.locationId}|${la.item.id}`),
 		hitDiceUsed: engine.hitDiceUsed ?? gm.hitDiceUsed,
 		featureUsed: engine.featureUsed ?? gm.featureUsed,
 		// World-building additions (typically from GM only; engine doesn't create world content)
-		npcsAdded: [...(engine.npcsAdded ?? []), ...(gm.npcsAdded ?? [])],
-		locationsAdded: [...(engine.locationsAdded ?? []), ...(gm.locationsAdded ?? [])],
-		questsAdded: [...(engine.questsAdded ?? []), ...(gm.questsAdded ?? [])],
-		sceneFactsAdded: [...(engine.sceneFactsAdded ?? []), ...(gm.sceneFactsAdded ?? [])],
+		npcsAdded: mergeUniqueByKey(engine.npcsAdded, gm.npcsAdded, (npc) => npc.id),
+		locationsAdded: mergeUniqueByKey(engine.locationsAdded, gm.locationsAdded, (loc) => loc.id),
+		questsAdded: mergeUniqueByKey(engine.questsAdded, gm.questsAdded, (quest) => quest.id),
+		sceneFactsAdded: mergeUniqueByKey(engine.sceneFactsAdded, gm.sceneFactsAdded, (fact) => fact),
 		// Companion promotion
 		companionPromoted: engine.companionPromoted ?? gm.companionPromoted,
 		// Encounter lifecycle
@@ -1740,7 +1758,14 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 	if (sc.featureUsed) clean.featureUsed = sc.featureUsed;
 	if (sc.deathSaveResult) clean.deathSaveResult = sc.deathSaveResult;
 	if (sc.deathSaveOutcome) clean.deathSaveOutcome = sc.deathSaveOutcome;
-	if (sc.companionPromoted) clean.companionPromoted = sc.companionPromoted;
+	if (sc.companionPromoted) {
+		if (typeof sc.companionPromoted === 'object' && sc.companionPromoted && typeof sc.companionPromoted.npcId === 'string' && sc.companionPromoted.npcId) {
+			sc.companionPromoted.npcId = resolveEntityId(sc.companionPromoted.npcId, npcRefs, 'companionPromoted.npcId');
+			clean.companionPromoted = sc.companionPromoted;
+		} else {
+			console.warn('[sanitize] companionPromoted missing npcId — stripped');
+		}
+	}
 
 	// --- combatAction ---
 	if (sc.combatAction) {
@@ -1776,6 +1801,15 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 			});
 			if (clean.enemyCombatActions.length === 0) delete clean.enemyCombatActions;
 		}
+	}
+
+	if (clean.encounterStarted?.creatures) {
+		clean.encounterStarted.creatures = clean.encounterStarted.creatures.map((cr) => {
+			if (typeof cr.locationId === 'string' && cr.locationId) {
+				cr.locationId = resolveEntityId(cr.locationId, locationRefs, `encounterStarted.creatures[${cr.id}].locationId`, false);
+			}
+			return cr;
+		});
 	}
 
 	return clean;
@@ -2319,6 +2353,7 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 
 		// Also add the creatures as NPCs if they don't already exist, and attach stat blocks
 		for (const cr of creatures) {
+			const creatureLocationId = cr.locationId ?? state.partyLocationId ?? '';
 			// Generate a stat block from tier + party level
 			const tier = parseCreatureTier(cr.tier);
 			const statBlock = generateCreatureStatBlock(cr.name, tier, partyLevel);
@@ -2328,7 +2363,7 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 					id: cr.id,
 					name: cr.name,
 					role: cr.role ?? 'hostile',
-					locationId: state.partyLocationId ?? '',
+					locationId: creatureLocationId,
 					disposition: cr.disposition ?? -100,
 					description: cr.description ?? cr.name,
 					notes: '',
@@ -2341,6 +2376,7 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 				const existing = state.npcs.find((n) => n.id === cr.id);
 				if (existing) {
 					existing.lastInteractionTurn = turnNumber;
+					existing.locationId = creatureLocationId;
 					if (!existing.statBlock) existing.statBlock = statBlock;
 				}
 			}
