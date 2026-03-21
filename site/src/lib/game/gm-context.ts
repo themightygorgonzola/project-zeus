@@ -411,8 +411,8 @@ function buildSystemPrompt(state: GameState, worldBrief: string): string {
 	parts.push(`    "itemsDropped": [{"characterId": "exact-id-from-PARTY-id-field", "itemId": "exact-item-id-from-inventory"}] or omit,`);
 	parts.push(`    "itemsPickedUp": [{"characterId": "exact-id-from-PARTY-id-field", "itemId": "exact-item-id-from-ON-THE-GROUND"}] or omit,`);
 	parts.push(`    "locationItemsAdded": [{"locationId": "exact-location-id-from-visible-[id:-field]", "item": {"id": "item-<unique>", "name": "...", "category": "...", "description": "...", "value": N, "quantity": N}}] or omit,`);
-	parts.push(`    "locationChange": {"from": "exact-location-id-from-visible-[id:-field]-or-null", "to": "exact-location-id-from-visible-[id:-field]"} or omit,`);
-	parts.push(`    "npcChanges": [{"npcId": "exact-id-from-visible-[id:-field]", "field": "disposition|alive|hp|notes", "oldValue": X, "newValue": Y}] or omit,`);
+	parts.push(`    "locationChange": {"from": "exact-current-location-id-from-visible-[id:-field]-or-null", "to": "exact-location-id-from-visible-[id:-field]"} or omit,`);
+	parts.push(`    "npcChanges": [{"npcId": "exact-id-from-visible-[id:-field]", "field": "disposition|alive|hp", "oldValue": X, "newValue": Y} or {"npcId": "exact-id-from-visible-[id:-field]", "field": "notes", "newValue": Y}] or omit,`);
 	parts.push(`    "questUpdates": [{"questId": "exact-id-from-visible-[id:-field]", "field": "status", "oldValue": "active", "newValue": "available|active|completed|failed"} or {"questId": "exact-id-from-visible-[id:-field]", "field": "objective", "objectiveId": "exact-objective-id-from-objective(..., id: ...)", "oldValue": false, "newValue": true}] or omit,`);
 	parts.push(`    "conditionsApplied": [{"characterId": "exact-id-from-PARTY-id-field", "condition": "...", "applied": true|false}] or omit,`);
 	parts.push(`    "xpAwarded": [{"characterId": "exact-id-from-PARTY-id-field", "amount": N}] or omit,`);
@@ -439,6 +439,7 @@ function buildSystemPrompt(state: GameState, worldBrief: string): string {
 	parts.push(`- When an encounter has multiple enemies, create separate creatures entries for EACH enemy, not just a representative sample.`);
 	parts.push(`- Do NOT start and end an encounter in the same response. Combat should span multiple turns.`);
 	parts.push(`- During active combat the engine resolves all attacks, damage, and dice rolls mechanically. Do NOT specify attack targets or actions in stateChanges — the engine handles this authoritatively.`);
+	parts.push(`- Treat locationChange.from, questUpdates.oldValue, and npcChanges.oldValue as concurrency guards. When included, they MUST match the current state shown in the prompt or the write may be rejected.`);
 	parts.push(`- Only reference NPC IDs, quest IDs, location IDs, and item IDs that exist in the state shown above. Do not invent references to entities you haven't created via *Added fields.`);
 	parts.push(`- If the action has no mechanical effect, return an empty stateChanges object {}.`);
 	parts.push(`- When creating new NPCs/locations/quests, generate unique IDs prefixed with "npc-", "loc-", or "quest-".`);
@@ -517,7 +518,7 @@ export function buildStateExtractionPrompt(state: GameState): string {
 	parts.push(`    "itemsPickedUp": [{"characterId": "exact-id-from-CHARACTERS-id-field", "itemId": "exact-item-id-from-ground"}] or omit,`);
 	parts.push(`    "locationItemsAdded": [{"locationId": "exact-location-id-from-visible-[id:-field]", "item": {"id": "item-<unique>", "name": "...", "category": "...", "description": "...", "value": N, "quantity": N}}] or omit,`);
 	parts.push(`    "locationChange": {"from": "exact-current-location-id-or-null", "to": "exact-destination-location-id"} or omit,`);
-	parts.push(`    "npcChanges": [{"npcId": "exact-id-from-visible-[id:-field]", "field": "disposition|alive|hp|notes", "oldValue": X, "newValue": Y}] or omit,`);
+	parts.push(`    "npcChanges": [{"npcId": "exact-id-from-visible-[id:-field]", "field": "disposition|alive|hp", "oldValue": X, "newValue": Y} or {"npcId": "exact-id-from-visible-[id:-field]", "field": "notes", "newValue": Y}] or omit,`);
 	parts.push(`    "questUpdates": [{"questId": "exact-id-from-visible-[id:-field]", "field": "status|objective", ...}] or omit,`);
 	parts.push(`    "conditionsApplied": [{"characterId": "exact-id-from-CHARACTERS-id-field", "condition": "blinded|charmed|deafened|frightened|grappled|incapacitated|invisible|paralyzed|petrified|poisoned|prone|restrained|stunned|unconscious|exhaustion", "applied": true|false}] or omit,`);
 	parts.push(`    "xpAwarded": [{"characterId": "exact-id-from-CHARACTERS-id-field", "amount": N}] or omit,`);
@@ -536,6 +537,7 @@ export function buildStateExtractionPrompt(state: GameState): string {
 	parts.push(`During active combat the engine resolves all attacks, damage, and dice rolls authoritatively.`);
 	parts.push(`- Do NOT invent hit/miss results, damage numbers, or specify attack targets in stateChanges.`);
 	parts.push(`- You may still extract encounterStarted/encounterEnded, HP changes from non-engine sources, and condition changes.`);
+	parts.push(`- Treat locationChange.from, questUpdates.oldValue, and npcChanges.oldValue as concurrency guards. When included, they MUST match the current state shown below or the write may be rejected.`);
 
 	// Current game state snapshot for ID reference
 	parts.push(`=== CURRENT GAME STATE ===`);

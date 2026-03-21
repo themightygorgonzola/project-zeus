@@ -1303,6 +1303,9 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 			sc.locationChange.to = resolveEntityId(sc.locationChange.to, locationRefs, 'locationChange.to');
 			if (typeof sc.locationChange.from === 'string' && sc.locationChange.from) {
 				sc.locationChange.from = resolveEntityId(sc.locationChange.from, locationRefs, 'locationChange.from');
+			} else if (sc.locationChange.from !== undefined && sc.locationChange.from !== null) {
+				console.warn('[sanitize] locationChange.from must be a string or null when provided — stripped');
+				(sc.locationChange as { from?: string | null }).from = undefined;
 			}
 			clean.locationChange = sc.locationChange;
 		}
@@ -1340,8 +1343,9 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 						console.warn(`[sanitize] questUpdates[${i}].newValue="${String(qu.newValue)}" is not a valid quest status — stripped`);
 						return false;
 					}
-					if (typeof qu.oldValue !== 'string' && existingQuest) {
-						qu.oldValue = existingQuest.status;
+					if (qu.oldValue !== undefined && typeof qu.oldValue !== 'string') {
+						console.warn(`[sanitize] questUpdates[${i}].oldValue must be a string when field="status" — stripped`);
+						return false;
 					}
 				}
 				if (qu.field === 'objective') {
@@ -1354,8 +1358,9 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 						console.warn(`[sanitize] questUpdates[${i}].objectiveId="${qu.objectiveId}" is unknown for quest "${qu.questId}" — stripped`);
 						return false;
 					}
-					if (typeof qu.oldValue !== 'boolean') {
-						qu.oldValue = existingQuest?.objectives.find((objective) => objective.id === qu.objectiveId)?.done ?? false;
+					if (qu.oldValue !== undefined && typeof qu.oldValue !== 'boolean') {
+						console.warn(`[sanitize] questUpdates[${i}].oldValue must be a boolean when field="objective" — stripped`);
+						return false;
 					}
 					qu.newValue = !!qu.newValue;
 				}
@@ -1393,18 +1398,34 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] npcChanges[${i}].newValue for disposition is invalid — stripped`);
 					return false;
 				}
+				if (nc.field === 'disposition' && nc.oldValue !== undefined && (typeof nc.oldValue !== 'number' || !isFinite(nc.oldValue))) {
+					console.warn(`[sanitize] npcChanges[${i}].oldValue for disposition must be a finite number — stripped`);
+					return false;
+				}
 				if (nc.field === 'alive' && typeof nc.newValue !== 'boolean') {
 					console.warn(`[sanitize] npcChanges[${i}].newValue for alive must be boolean — stripped`);
+					return false;
+				}
+				if (nc.field === 'alive' && nc.oldValue !== undefined && typeof nc.oldValue !== 'boolean') {
+					console.warn(`[sanitize] npcChanges[${i}].oldValue for alive must be boolean — stripped`);
 					return false;
 				}
 				if (nc.field === 'hp' && (typeof nc.newValue !== 'number' || !isFinite(nc.newValue))) {
 					console.warn(`[sanitize] npcChanges[${i}].newValue for hp must be a finite number — stripped`);
 					return false;
 				}
+				if (nc.field === 'hp' && nc.oldValue !== undefined && (typeof nc.oldValue !== 'number' || !isFinite(nc.oldValue))) {
+					console.warn(`[sanitize] npcChanges[${i}].oldValue for hp must be a finite number — stripped`);
+					return false;
+				}
 				if (nc.field === 'notes') {
 					if (typeof nc.newValue !== 'string' || !nc.newValue.trim()) {
 						console.warn(`[sanitize] npcChanges[${i}].newValue for notes must be a non-empty string — stripped`);
 						return false;
+					}
+					if (nc.oldValue !== undefined) {
+						console.warn(`[sanitize] npcChanges[${i}].oldValue is not used for notes — removed`);
+						delete nc.oldValue;
 					}
 					nc.newValue = nc.newValue.trim();
 				}
@@ -2081,6 +2102,9 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 	// Location change (validate that the target location exists — now including
 	// locations that were just added above in Phase A)
 	if (changes.locationChange) {
+		if (changes.locationChange.from !== undefined && changes.locationChange.from !== state.partyLocationId) {
+			console.warn(`[applyGMStateChanges] locationChange.from="${changes.locationChange.from}" does not match current partyLocationId="${state.partyLocationId}" — skipped`);
+		} else {
 		const targetId = changes.locationChange.to;
 		let loc = state.locations.find((l) => l.id === targetId);
 
@@ -2114,6 +2138,7 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 		} else {
 			console.warn(`[applyGMStateChanges] locationChange.to="${targetId}" matches no known location — skipped`);
 		}
+		}
 	}
 
 	// Quest updates (can now reference quests added in Phase A)
@@ -2126,18 +2151,30 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 			}
 
 			if (qu.field === 'status' && typeof qu.newValue === 'string') {
+				if (qu.oldValue !== undefined && qu.oldValue !== quest.status) {
+					console.warn(`[applyGMStateChanges] questUpdate oldValue mismatch for questId="${qu.questId}" field="status" — skipped`);
+					continue;
+				}
+				const previousStatus = quest.status;
 				quest.status = qu.newValue as typeof quest.status;
 				// Quest reward auto-distribution on manual completion
-				if (quest.status === 'completed') {
+				if (previousStatus !== 'completed' && quest.status === 'completed') {
 					distributeQuestRewards(state, quest);
 				}
 			} else if (qu.field === 'objective' && qu.objectiveId) {
 				const obj = quest.objectives.find((o) => o.id === qu.objectiveId);
+				if (!obj) {
+					continue;
+				}
+				if (qu.oldValue !== undefined && qu.oldValue !== obj.done) {
+					console.warn(`[applyGMStateChanges] questUpdate oldValue mismatch for questId="${qu.questId}" objectiveId="${qu.objectiveId}" — skipped`);
+					continue;
+				}
 				if (obj) {
 					obj.done = !!qu.newValue;
 				}
 				// Auto-complete quest if all objectives are done
-				if (quest.objectives.length > 0 && quest.objectives.every((o) => o.done)) {
+				if (quest.status !== 'completed' && quest.objectives.length > 0 && quest.objectives.every((o) => o.done)) {
 					quest.status = 'completed';
 					// Distribute quest rewards to all party characters
 					distributeQuestRewards(state, quest);
@@ -2154,6 +2191,18 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 			const npc = state.npcs.find((n) => n.id === nc.npcId);
 			if (!npc) {
 				console.warn(`[applyGMStateChanges] npcChange references unknown npcId="${nc.npcId}" — skipped`);
+				continue;
+			}
+			if (nc.field === 'disposition' && nc.oldValue !== undefined && npc.disposition !== nc.oldValue) {
+				console.warn(`[applyGMStateChanges] npcChange oldValue mismatch for npcId="${nc.npcId}" field="disposition" — skipped`);
+				continue;
+			}
+			if (nc.field === 'alive' && nc.oldValue !== undefined && npc.alive !== nc.oldValue) {
+				console.warn(`[applyGMStateChanges] npcChange oldValue mismatch for npcId="${nc.npcId}" field="alive" — skipped`);
+				continue;
+			}
+			if (nc.field === 'hp' && nc.oldValue !== undefined && npc.statBlock && npc.statBlock.hp !== nc.oldValue) {
+				console.warn(`[applyGMStateChanges] npcChange oldValue mismatch for npcId="${nc.npcId}" field="hp" — skipped`);
 				continue;
 			}
 			// Track interaction timestamp

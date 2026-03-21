@@ -1385,6 +1385,34 @@ describe('Phase 0: applyGMStateChanges ID validation', () => {
 		);
 	});
 
+	it('skips stale locationChange when from does not match current party location', async () => {
+		process.env.PARTYKIT_HOST = 'party.local';
+		process.env.OPENAI_API_KEY = 'sk-test';
+		const state = makeBaseState();
+		mockLoadGameState.mockResolvedValue(state);
+		mockTwoPassResponse('You try to leave, but the state change is stale.', {
+				locationChange: { from: 'loc-old', to: 'loc-1' }
+			});
+
+		const { executeAdventureTurn } = await import('./adventure-turn');
+		await executeAdventureTurn(
+			{
+				adventureId: 'adv-1',
+				playerAction: 'I move',
+				actorUserId: 'user-1',
+				history: [{ role: 'system', content: 'GM prompt' }],
+				recentChat: []
+			},
+			{ purpose: 'interactive-chat', mode: 'inline', model: 'gpt-4o', stream: false }
+		);
+
+		const savedState = mockPersistTurnAndSaveState.mock.calls[0][2];
+		expect(savedState.partyLocationId).toBe('loc-1');
+		expect(console.warn).toHaveBeenCalledWith(
+			expect.stringContaining('locationChange.from="loc-old" does not match current partyLocationId')
+		);
+	});
+
 	it('skips questUpdate with unknown questId and warns', async () => {
 		process.env.PARTYKIT_HOST = 'party.local';
 		process.env.OPENAI_API_KEY = 'sk-test';
@@ -2793,6 +2821,54 @@ describe('Phase 2: companion HP tracking via npcChanges', () => {
 		const bjorik = savedState.npcs.find((n: NPC) => n.id === 'npc-comp');
 		expect(bjorik.statBlock.hp).toBe(0);
 		expect(bjorik.alive).toBe(false);
+	});
+
+	it('skips stale npcChanges when oldValue does not match current HP', async () => {
+		process.env.PARTYKIT_HOST = 'party.local';
+		process.env.OPENAI_API_KEY = 'sk-test';
+		const state = makeBaseState();
+		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		state.npcs = [{
+			id: 'npc-comp',
+			name: 'Bjorik',
+			role: 'companion',
+			locationId: 'loc-1',
+			disposition: 60,
+			description: 'A warrior',
+			notes: '',
+			alive: true,
+			statBlock: {
+				hp: 30, maxHp: 35, ac: 15,
+				abilities: { str: 16, dex: 12, con: 14, int: 10, wis: 10, cha: 8 },
+				speed: 30, cr: 2, attacks: [], savingThrows: [], skills: [],
+				resistances: [], immunities: [], vulnerabilities: [],
+				traits: [], actions: [], legendaryActions: []
+			}
+		}];
+		mockLoadGameState.mockResolvedValue(state);
+		mockTwoPassResponse('A stale HP update arrives.', {
+				npcChanges: [{ npcId: 'npc-comp', field: 'hp', oldValue: 99, newValue: 10 }]
+			});
+
+		const { executeAdventureTurn } = await import('./adventure-turn');
+		await executeAdventureTurn(
+			{
+				adventureId: 'adv-1',
+				playerAction: 'Check on Bjorik',
+				actorUserId: 'user-1',
+				history: [{ role: 'system', content: 'GM prompt' }],
+				recentChat: []
+			},
+			{ purpose: 'interactive-chat', mode: 'inline', model: 'gpt-4o', stream: false }
+		);
+
+		const savedState = mockPersistTurnAndSaveState.mock.calls[0][2];
+		const bjorik = savedState.npcs.find((n: NPC) => n.id === 'npc-comp');
+		expect(bjorik.statBlock.hp).toBe(30);
+		expect(warnSpy).toHaveBeenCalledWith(
+			expect.stringContaining('npcChange oldValue mismatch for npcId="npc-comp" field="hp"')
+		);
+		warnSpy.mockRestore();
 	});
 });
 
@@ -5205,6 +5281,33 @@ describe('Phase 5: quest reward auto-distribution', () => {
 		);
 
 		expect(state.npcs[0].disposition).toBe(55); // 30 + 25
+	});
+
+	it('skips stale questUpdates when oldValue does not match current objective state', async () => {
+		process.env.PARTYKIT_HOST = 'party.local';
+		process.env.OPENAI_API_KEY = 'sk-test';
+		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const state = makeQuestState({ xp: 200, gold: 75, items: [], reputationChanges: [] });
+		mockLoadGameState.mockResolvedValue(state);
+		mockTwoPassResponse('A stale completion arrives.', {
+				questUpdates: [{ questId: 'quest-main', field: 'objective', objectiveId: 'obj-1', oldValue: true, newValue: true }]
+			});
+
+		const { executeAdventureTurn } = await import('./adventure-turn');
+		await executeAdventureTurn(
+			{ adventureId: 'adv-1', playerAction: 'finish quest', actorUserId: 'user-1',
+			  history: [{ role: 'system', content: 'prompt' }], recentChat: [] },
+			{ purpose: 'interactive-chat', mode: 'inline', model: 'gpt-4o', stream: false }
+		);
+
+		expect(state.characters[0].xp).toBe(0);
+		expect(state.characters[0].gold).toBe(10);
+		expect(state.quests[0].status).toBe('active');
+		expect(state.quests[0].objectives[0].done).toBe(false);
+		expect(warnSpy).toHaveBeenCalledWith(
+			expect.stringContaining('questUpdate oldValue mismatch for questId="quest-main" objectiveId="obj-1"')
+		);
+		warnSpy.mockRestore();
 	});
 
 	it('distributes quest rewards on manual status=completed (not just objective-based)', async () => {
