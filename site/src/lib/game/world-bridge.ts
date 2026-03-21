@@ -46,7 +46,7 @@ export function seedStartingLocation(world: PrototypeWorld): Location {
 		connections: [],
 		npcs: [],
 		features: [
-			`A ${pick.group} of about ${pick.population} people.`,
+			`A ${pick.group} of about ${Math.round(pick.population * 1000).toLocaleString('en')} people.`,
 			ownerState ? `Under the rule of ${ownerState.fullName}.` : '',
 			culture ? `The locals follow ${culture.name} customs.` : ''
 		].filter(Boolean),

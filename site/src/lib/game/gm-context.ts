@@ -694,7 +694,7 @@ export function buildWorldBrief(
 			const ownerState = world.politics.states.find((s) => s.i === settlement.state);
 			const culture = world.societies.cultures.find((c) => c.i === settlement.culture);
 			parts.push(
-				`The party is in ${settlement.name}, a ${settlement.group} of ${settlement.population} people` +
+				`The party is in ${settlement.name}, a ${settlement.group} of ${Math.round(settlement.population * 1000).toLocaleString('en')} people` +
 					(ownerState ? ` in ${ownerState.fullName}` : '') +
 					(culture ? `, whose people follow ${culture.name} customs` : '') +
 					`.`
