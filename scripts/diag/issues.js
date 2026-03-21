@@ -99,7 +99,12 @@ for (const turn of all) {
 issue('Hallucinated location IDs in locationChange', locHallucinationIssues);
 
 // ── 6. Hallucinated character IDs in hpChanges ──────────────────────────────
-const validCharIds = new Set(Object.keys(chars));
+const validCharIds = new Set([
+  ...Object.keys(chars),
+  ...Object.keys(npcMap),
+  // Also include encounter combatant IDs from finalState
+  ...(doc.finalState?.activeEncounter?.combatants ?? []).map(c => c.id),
+]);
 const charHallucinationIssues = [];
 for (const turn of all) {
   for (const hp of (turn.appliedStateChanges?.hpChanges ?? [])) {

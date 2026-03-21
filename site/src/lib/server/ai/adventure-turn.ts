@@ -1217,7 +1217,10 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] hpChanges[${i}].characterId is not a non-empty string — stripped`);
 					return false;
 				}
-				hc.characterId = resolveEntityId(hc.characterId, state.characters, `hpChanges[${i}].characterId`);
+				// Resolve against characters first, then fall back to encounter combatants + NPCs
+				const combatants = state.activeEncounter?.combatants ?? [];
+				const allTargets: RefCandidate[] = [...state.characters, ...state.npcs, ...combatants];
+				hc.characterId = resolveEntityId(hc.characterId, allTargets, `hpChanges[${i}].characterId`);
 				if (typeof hc.newHp !== 'number' || !isFinite(hc.newHp)) {
 					console.warn(`[sanitize] hpChanges[${i}].newHp is not a finite number — stripped`);
 					return false;
@@ -1225,7 +1228,8 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 				// Auto-fill oldHp from current state if missing or wrong type
 				if (typeof hc.oldHp !== 'number') {
 					const char = state.characters.find((c) => c.id === hc.characterId);
-					hc.oldHp = char?.hp ?? 0;
+					const combatant = combatants.find((c) => c.id === hc.characterId);
+					hc.oldHp = char?.hp ?? combatant?.currentHp ?? 0;
 				}
 				if (typeof hc.reason !== 'string') {
 					hc.reason = '';
@@ -2067,7 +2071,19 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 			if (char) {
 				char.hp = Math.max(0, Math.min(hc.newHp, char.maxHp));
 			} else {
-				console.warn(`[applyGMStateChanges] hpChange references unknown characterId="${hc.characterId}" — skipped`);
+				// May be an encounter combatant (NPC). Update combatant HP directly.
+				const combatant = state.activeEncounter?.combatants.find((c) => c.id === hc.characterId);
+				if (combatant) {
+					combatant.currentHp = Math.max(0, Math.min(hc.newHp, combatant.maxHp));
+					if (combatant.currentHp === 0) {
+						combatant.defeated = true;
+						// Sync alive flag on NPC record
+						const npc = state.npcs.find((n) => n.id === combatant.referenceId || n.id === combatant.id);
+						if (npc) npc.alive = false;
+					}
+				} else {
+					console.warn(`[applyGMStateChanges] hpChange references unknown characterId="${hc.characterId}" — skipped`);
+				}
 			}
 		}
 	}
