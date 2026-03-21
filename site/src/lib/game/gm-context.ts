@@ -410,7 +410,7 @@ function buildSystemPrompt(state: GameState, worldBrief: string): string {
 	parts.push(`}`);
 	parts.push('');
 	parts.push(`=== CRITICAL RULES ===`);
-	parts.push(`IMPORTANT: For every "characterId" field, use the exact ID shown in brackets after the character name in the PARTY section above. Never use the character's name or the player's action text as the characterId.`);
+	parts.push(`IMPORTANT: For every "characterId" field, output ONLY the bare ID string that appears inside the brackets in the PARTY section — e.g. if the party entry reads "Alice[01ABC123]" then characterId must be "01ABC123", NOT "Alice[01ABC123]" and NOT "Alice". Never use a character's name, a name+bracket token, or any invented string as a characterId.`);
 	parts.push(`- Every NPC you mention by name for the FIRST TIME must be tracked via npcsAdded. Do not introduce named NPCs only in narrative.`);
 	parts.push(`- Every item gained or lost MUST appear in itemsGained/itemsLost. Do not mention acquiring or losing items only in narrative.`);
 	parts.push(`- When a companion NPC (shown in COMPANIONS) is in combat, include their combat actions in narrativeText and any HP/alive changes via npcChanges (use field: "hp" for companion HP changes).`);

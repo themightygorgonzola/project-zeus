@@ -1078,6 +1078,16 @@ export function parseStateExtractionResponse(raw: string): StateChange {
 // ---------------------------------------------------------------------------
 
 /**
+ * Strips a "Name[id]" display token to just the bare id.
+ * The AI sometimes copies the full party-section token (e.g. "555[01KM...]") instead
+ * of extracting only the bracketed ID portion.
+ */
+function normalizeCharacterId(raw: string): string {
+	const m = raw.match(/\[([^\]]+)\]$/);
+	return m ? m[1] : raw;
+}
+
+/**
  * Validate and sanitize the AI-produced stateChanges.
  * Strips entries with wrong types, logs warnings for each.
  * This runs AFTER parseGMResponse() and BEFORE mergeStateChanges().
@@ -1099,6 +1109,7 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] hpChanges[${i}].characterId is not a non-empty string — stripped`);
 					return false;
 				}
+				hc.characterId = normalizeCharacterId(hc.characterId);
 				if (typeof hc.newHp !== 'number' || !isFinite(hc.newHp)) {
 					console.warn(`[sanitize] hpChanges[${i}].newHp is not a finite number — stripped`);
 					return false;
@@ -1136,6 +1147,7 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] conditionsApplied[${i}].characterId is not a non-empty string — stripped`);
 					return false;
 				}
+				ca.characterId = normalizeCharacterId(ca.characterId);
 				if (!validConditions.has(ca.condition)) {
 					console.warn(`[sanitize] conditionsApplied[${i}].condition="${ca.condition}" is not a valid condition — stripped`);
 					return false;
@@ -1163,6 +1175,7 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] xpAwarded[${i}].characterId is not a non-empty string — stripped`);
 					return false;
 				}
+				xp.characterId = normalizeCharacterId(xp.characterId);
 				if (typeof xp.amount !== 'number' || !isFinite(xp.amount) || xp.amount < 0) {
 					console.warn(`[sanitize] xpAwarded[${i}].amount=${xp.amount} is not a valid positive number — stripped`);
 					return false;
@@ -1246,6 +1259,7 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] itemsGained[${i}].characterId is not a non-empty string — stripped`);
 					return false;
 				}
+				ig.characterId = normalizeCharacterId(ig.characterId);
 				if (!ig.item || typeof ig.item !== 'object') {
 					console.warn(`[sanitize] itemsGained[${i}].item is not an object — stripped`);
 					return false;
@@ -1284,6 +1298,7 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] itemsLost[${i}].characterId is not a non-empty string — stripped`);
 					return false;
 				}
+				il.characterId = normalizeCharacterId(il.characterId);
 				if (typeof il.itemId !== 'string' || !il.itemId) {
 					console.warn(`[sanitize] itemsLost[${i}].itemId is not a non-empty string — stripped`);
 					return false;
