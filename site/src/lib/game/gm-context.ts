@@ -147,6 +147,7 @@ function buildNarrativeSystemPrompt(state: GameState, worldBrief: string): strin
 	parts.push(`- NEVER write engine mechanic format strings in your narrative (e.g. "[Mechanics: ...]", "[Attack: ...]"). Narrate outcomes naturally.`);
 	parts.push(`- When a character is at or below 25% HP, remind them of available recovery options (Second Wind, healing potions, retreat, etc.).`);
 	parts.push(`- When combat resolves an objective related to an active quest (e.g. defeating bandits for a "clear the road" quest), include a questUpdates entry to advance or complete that quest.`);
+	parts.push(`- If the ACTIVE ENCOUNTER block appears in the game state, combat is ALREADY in progress. Do NOT emit encounterStarted again and do NOT write combat-declaration prose ("Combat begins!", "Roll for initiative!") — the fight is ongoing, just narrate the action.`);
 	parts.push('');
 	parts.push(`DIALOGUE & SOCIAL ENCOUNTERS:`);
 	parts.push(`- When a player speaks to an NPC, roleplay the NPC's response in character.`);
@@ -508,7 +509,7 @@ export function buildStateExtractionPrompt(state: GameState): string {
 	parts.push(`- Do NOT start combat for simple observation or reconnaissance unless hostilities actually begin, the party is discovered, or the narrative clearly commits to battle.`);
 	parts.push(`- Only use encounterStarted when the narrative contains an EXPLICIT attack, ambush, or charge — words like "attacks", "lunges", "combat begins", "roll for initiative". Scouting, observing, and cautious dialogue are NOT combat.`);
 	parts.push(`- Award small XP (10-50) for clever roleplay, exploration, or puzzle-solving.`);
-	parts.push(`- Award moderate XP (50-200) for combat victories and quest completions.`);
+	parts.push(`- Do NOT emit xpAwarded for enemy kills or combat victories — the game engine awards combat XP automatically via resolveEncounter. Only emit xpAwarded for roleplay, exploration, puzzle-solving, or social accomplishments.`);
 	parts.push('');
 
 	// Response format
@@ -633,12 +634,24 @@ export function buildStateExtractionPrompt(state: GameState): string {
  * @param state          Current GameState (before this turn's changes)
  * @param narrativeText  The narrative text produced by Pass 1
  * @param playerAction   The original player action text
+ * @param combatVictory  When true, injects a COMBAT VICTORY quest-completion
+ *                       check into the user message so the AI links defeated
+ *                       enemies to quest objectives.
  */
 export function assembleStateExtractionContext(
 	state: GameState,
 	narrativeText: string,
-	playerAction: string
+	playerAction: string,
+	combatVictory = false
 ): ChatMessageInput[] {
+	const combatVictoryPrefix = combatVictory
+		? `COMBAT VICTORY — QUEST CHECK REQUIRED:\n` +
+		  `Check every active/available quest objective against the enemies just defeated in combat. ` +
+		  `If ANY objective's text describes defeating, eliminating, stopping, or dealing with those enemies, ` +
+		  `mark it done with questUpdates (field: "objective", newValue: true). ` +
+		  `If ALL objectives for a quest are now done, also emit a questUpdates entry setting status to "completed". ` +
+		  `Do NOT skip this step even if the connection seems indirect.\n---\n`
+		: '';
 	return [
 		{
 			role: 'system',
@@ -646,7 +659,7 @@ export function assembleStateExtractionContext(
 		},
 		{
 			role: 'user',
-			content: `PLAYER ACTION: ${playerAction}\n\nNARRATIVE RESULT:\n${narrativeText}`
+			content: `${combatVictoryPrefix}PLAYER ACTION: ${playerAction}\n\nNARRATIVE RESULT:\n${narrativeText}`
 		}
 	];
 }

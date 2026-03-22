@@ -266,7 +266,10 @@ export async function executeAdventureTurn(
 	// fighting the rat" from losing the player's attack action.
 	let intentOverride: IntentType | undefined;
 	const regexIntent = classifyIntent(payload.playerAction);
-	if (regexIntent === 'free-narration' && currentState?.activeEncounter?.status === 'active') {
+	// Widen the AI intent override: catch both `free-narration` (e.g. "I try again!")
+	// AND `use-item` (e.g. "I use my sword on it") during active combat, since both
+	// regex paths lose the player's attack action if left uncorrected.
+	if ((regexIntent === 'free-narration' || regexIntent === 'use-item') && currentState?.activeEncounter?.status === 'active') {
 		const openaiKey = process.env.OPENAI_API_KEY;
 		if (openaiKey) {
 			intentOverride = await classifyIntentWithAI(payload.playerAction, true, openaiKey);
@@ -530,7 +533,8 @@ export async function executeAdventureTurn(
 				const stateExtractionMessages = assembleStateExtractionContext(
 					currentState,
 					narrativeText,
-					payload.playerAction
+					payload.playerAction,
+					true // combatVictory — injects quest-completion check and strips combat XP
 				);
 				const rawStateJson = await completeChatJSON({
 					apiKey: openaiKey,
@@ -540,6 +544,10 @@ export async function executeAdventureTurn(
 				const pass2LatencyMs = Date.now() - pass2Start;
 				const stateResponse = parseStateExtractionResponse(rawStateJson);
 				const sanitizedGmChanges = sanitizeStateChanges(stateResponse, currentState, narrativeText);
+				// Strip xpAwarded from AI proposals — the engine's resolveEncounter already
+				// computed authoritative combat XP. Allowing the AI to also award XP here
+				// causes double-awarding (e.g. 50 engine XP + 100 AI XP = 150 total).
+				delete sanitizedGmChanges.xpAwarded;
 				finalStateChanges = mergeStateChanges(resolvedTurn.stateChanges, sanitizedGmChanges);
 
 				if (debugTurns) {
