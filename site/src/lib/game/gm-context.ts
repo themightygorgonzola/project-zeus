@@ -134,7 +134,8 @@ function buildNarrativeSystemPrompt(state: GameState, worldBrief: string): strin
 	parts.push('');
 	parts.push(`STARTING COMBAT:`);
 	parts.push(`- Combat begins ONLY when hostilities are explicit: someone attacks, an ambush springs, or a creature charges.`);
-	parts.push(`- When combat truly begins, announce it clearly with a phrase like "Roll for initiative!" or "Combat begins!" so the boundary is unmistakable.`);
+	parts.push(`- When combat truly begins, announce it clearly with a phrase like "Combat begins!" or "Hostilities break out!" so the boundary is unmistakable.`);
+	parts.push(`- IMPORTANT: Do NOT say "Roll for initiative!" — initiative is automatically resolved by the engine. Never ask the player to roll initiative.`);
 	parts.push(`- Scouting, observing, reconnaissance, hearing rumors about enemies, and cautious dialogue NEVER start combat on their own.`);
 	parts.push(`- A player saying "I look for enemies" or "I scout ahead" is gathering information, not starting a fight.`);
 	parts.push('');

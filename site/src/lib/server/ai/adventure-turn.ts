@@ -1892,6 +1892,14 @@ async function persistResolvedTurnAndState(
 		pendingCheck: resolvedTurn.pendingCheck
 	};
 
+	// Apply engine-authoritative character updates (from turn-executor) BEFORE
+	// applyGMStateChanges so that XP awards, condition changes, and encounter
+	// resolution written into state.characters by applyGMStateChanges are not
+	// overwritten by the pre-capture snapshot from resolveTurn.
+	if (resolvedTurn.updatedCharacters) {
+		state.characters = resolvedTurn.updatedCharacters;
+	}
+
 	// Apply structured state changes from the GM
 	const enrichmentIntents = applyGMStateChanges(state, resolvedTurn.stateChanges, turnNumber);
 
@@ -1916,11 +1924,6 @@ async function persistResolvedTurnAndState(
 				npc.lastInteractionTurn = turnNumber;
 			}
 		}
-	}
-
-	// Apply engine-authoritative character updates (from turn-executor)
-	if (resolvedTurn.updatedCharacters) {
-		state.characters = resolvedTurn.updatedCharacters;
 	}
 
 	// Append to in-memory log (kept short — the full history lives in the DB)

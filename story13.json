@@ -1,0 +1,1145 @@
+{
+  "_schema": "zeus-adventure-export-v1",
+  "exportedAt": "2026-03-21T23:39:59.841Z",
+  "adventure": {
+    "id": "01KM9C6S1NPPTNRB16XY54H9EP",
+    "name": "13",
+    "status": "active",
+    "mode": "solo",
+    "createdAt": "2026-03-21T23:38:08.309Z"
+  },
+  "members": [
+    {
+      "userId": "01KKPVVHN3W3MS40ZJP8B3RM6V",
+      "username": "The Admin",
+      "role": "owner"
+    }
+  ],
+  "finalState": {
+    "version": 3,
+    "stateVersion": 3,
+    "characters": [
+      {
+        "id": "01KM9C714VGVGEW5HJQGS3GJGD",
+        "userId": "01KKPVVHN3W3MS40ZJP8B3RM6V",
+        "adventureId": "01KM9C6S1NPPTNRB16XY54H9EP",
+        "name": "thirteen",
+        "race": "human",
+        "classes": [
+          {
+            "name": "fighter",
+            "level": 1,
+            "hitDiceRemaining": 1
+          }
+        ],
+        "background": "soldier",
+        "alignment": "neutral-good",
+        "level": 1,
+        "abilities": {
+          "str": 16,
+          "dex": 14,
+          "con": 15,
+          "int": 11,
+          "wis": 13,
+          "cha": 9
+        },
+        "hp": 12,
+        "maxHp": 12,
+        "tempHp": 0,
+        "ac": 18,
+        "speed": 30,
+        "size": "Medium",
+        "proficiencyBonus": 2,
+        "skillProficiencies": [
+          "athletics",
+          "intimidation",
+          "acrobatics",
+          "animal-handling"
+        ],
+        "expertiseSkills": [],
+        "saveProficiencies": [
+          "str",
+          "con"
+        ],
+        "languages": [
+          "Common",
+          "Dwarvish"
+        ],
+        "armorProficiencies": [
+          "light",
+          "medium",
+          "heavy",
+          "shields"
+        ],
+        "weaponProficiencies": [
+          "simple",
+          "martial"
+        ],
+        "toolProficiencies": [
+          "gaming-set",
+          "vehicles-land"
+        ],
+        "classFeatures": [
+          {
+            "name": "Extra Language",
+            "level": 1,
+            "source": "race",
+            "description": "You can speak, read, and write one extra language of your choice."
+          },
+          {
+            "name": "Military Rank",
+            "level": 1,
+            "source": "background",
+            "description": "You have a military rank from your career as a soldier. Soldiers loyal to your former organization still recognize your authority and influence."
+          },
+          {
+            "name": "Fighting Style",
+            "level": 1,
+            "source": "class",
+            "sourceClass": "fighter",
+            "description": "You adopt a particular style of fighting as your specialty."
+          },
+          {
+            "name": "Second Wind",
+            "level": 1,
+            "source": "class",
+            "sourceClass": "fighter",
+            "description": "You have a limited well of stamina. On your turn, you can use a bonus action to regain hit points equal to 1d10 + your fighter level. Once used, you must finish a short or long rest."
+          }
+        ],
+        "feats": [],
+        "spellSlots": [],
+        "pactSlots": [],
+        "classSpells": [],
+        "deathSaves": {
+          "successes": 0,
+          "failures": 0
+        },
+        "inspiration": false,
+        "passivePerception": 11,
+        "inventory": [
+          {
+            "id": "01KM9C714TWPWCRBNAVVDYZBBF",
+            "name": "Chain Mail",
+            "category": "armor",
+            "description": "A set of chain mail.",
+            "value": 75,
+            "quantity": 1,
+            "weight": 55,
+            "rarity": "common",
+            "attunement": false,
+            "armorName": "chain-mail",
+            "baseAC": 16,
+            "magicBonus": 0,
+            "equipped": true,
+            "maxDexBonus": 0,
+            "stealthDisadvantage": true
+          },
+          {
+            "id": "01KM9C714T601GZ2KSV5MP2FVG",
+            "name": "Longsword",
+            "category": "weapon",
+            "description": "A longsword.",
+            "value": 15,
+            "quantity": 1,
+            "weight": 3,
+            "rarity": "common",
+            "attunement": false,
+            "weaponName": "longsword",
+            "damage": "1d8",
+            "damageType": "slashing",
+            "magicBonus": 0,
+            "properties": [
+              "versatile"
+            ],
+            "equipped": true,
+            "specialProperties": []
+          },
+          {
+            "id": "01KM9C714TFAP2CBHQNBJQ3JQW",
+            "name": "Shield",
+            "category": "armor",
+            "description": "A set of shield.",
+            "value": 10,
+            "quantity": 1,
+            "weight": 6,
+            "rarity": "common",
+            "attunement": false,
+            "armorName": "shield",
+            "baseAC": 2,
+            "magicBonus": 0,
+            "equipped": true,
+            "maxDexBonus": null,
+            "stealthDisadvantage": false
+          },
+          {
+            "id": "01KM9C714T4DAGWBMM7NT3REJQ",
+            "name": "Light Crossbow",
+            "category": "weapon",
+            "description": "A light crossbow.",
+            "value": 25,
+            "quantity": 1,
+            "weight": 5,
+            "rarity": "common",
+            "attunement": false,
+            "weaponName": "light-crossbow",
+            "damage": "1d8",
+            "damageType": "piercing",
+            "magicBonus": 0,
+            "properties": [
+              "ammunition",
+              "loading",
+              "range",
+              "two-handed"
+            ],
+            "range": "80/320",
+            "equipped": false,
+            "specialProperties": []
+          },
+          {
+            "id": "01KM9C714VC45VNWP9QH3SK57D",
+            "name": "Bolts (20)",
+            "category": "misc",
+            "description": "Starting equipment: Bolts (20).",
+            "value": 0,
+            "quantity": 20,
+            "weight": 0,
+            "rarity": "common",
+            "attunement": false,
+            "tags": [
+              "starting-equipment"
+            ]
+          },
+          {
+            "id": "01KM9C714VRV1MT8WFX86EG6N3",
+            "name": "Dungeoneer's Pack",
+            "category": "misc",
+            "description": "Starting equipment: Dungeoneer's Pack.",
+            "value": 0,
+            "quantity": 1,
+            "weight": 0,
+            "rarity": "common",
+            "attunement": false,
+            "tags": [
+              "starting-equipment"
+            ]
+          },
+          {
+            "id": "01KM9C714V9X7QKC4F8SY2Q54B",
+            "name": "Insignia of Rank",
+            "category": "misc",
+            "description": "Starting equipment: Insignia of Rank.",
+            "value": 0,
+            "quantity": 1,
+            "weight": 0,
+            "rarity": "common",
+            "attunement": false,
+            "tags": [
+              "starting-equipment"
+            ]
+          },
+          {
+            "id": "01KM9C714VMAX35DPBEHMA2CVT",
+            "name": "Trophy from a Fallen Enemy",
+            "category": "misc",
+            "description": "Starting equipment: Trophy from a Fallen Enemy.",
+            "value": 0,
+            "quantity": 1,
+            "weight": 0,
+            "rarity": "common",
+            "attunement": false,
+            "tags": [
+              "starting-equipment"
+            ]
+          },
+          {
+            "id": "01KM9C714VSCZ01GNEZTV1Y6ST",
+            "name": "Bone Dice or Deck of Cards",
+            "category": "misc",
+            "description": "Starting equipment: Bone Dice or Deck of Cards.",
+            "value": 0,
+            "quantity": 1,
+            "weight": 0,
+            "rarity": "common",
+            "attunement": false,
+            "tags": [
+              "starting-equipment"
+            ]
+          },
+          {
+            "id": "01KM9C714VF8W2MJXJK729C6YD",
+            "name": "Common Clothes",
+            "category": "misc",
+            "description": "Starting equipment: Common Clothes.",
+            "value": 0,
+            "quantity": 1,
+            "weight": 0,
+            "rarity": "common",
+            "attunement": false,
+            "tags": [
+              "starting-equipment"
+            ]
+          },
+          {
+            "id": "01KM9C714VRQY1EWCRCWWJRWE8",
+            "name": "Belt Pouch",
+            "category": "misc",
+            "description": "Starting equipment: Belt Pouch.",
+            "value": 0,
+            "quantity": 1,
+            "weight": 0,
+            "rarity": "common",
+            "attunement": false,
+            "tags": [
+              "starting-equipment"
+            ]
+          }
+        ],
+        "gold": 15,
+        "xp": 0,
+        "conditions": [],
+        "resistances": [],
+        "exhaustionLevel": 0,
+        "stable": false,
+        "dead": false,
+        "concentratingOn": null,
+        "featureUses": {
+          "Second Wind": {
+            "current": 1,
+            "max": 1,
+            "recoversOn": "short-rest"
+          }
+        },
+        "attunedItems": [],
+        "backstory": ""
+      }
+    ],
+    "npcs": [
+      {
+        "id": "01KM9C6S1N6FZNDDKAAT5ZBTFN",
+        "name": "Iraus",
+        "role": "neutral",
+        "locationId": "01KM9C6S1NFK7YF4V19TZPK5KX",
+        "disposition": 20,
+        "description": "The keeper of the local tavern. Friendly, well-informed, and always happy to share rumors over a drink.",
+        "notes": "Knows local gossip. Can point players toward quests. Has a soft spot for adventurers.",
+        "alive": true
+      },
+      {
+        "id": "01KM9C6S1NX3KNSKS4QYYBTNEQ",
+        "name": "Alden",
+        "role": "merchant",
+        "locationId": "01KM9C6S1NFK7YF4V19TZPK5KX",
+        "disposition": 0,
+        "description": "A traveling trader who deals in provisions, simple weapons, and the occasional curiosity.",
+        "notes": "Carries basic adventuring gear. Prices are fair but firm.",
+        "alive": true
+      },
+      {
+        "id": "01KM9C6S1NYPJD11PMHADDV339",
+        "name": "Gormric",
+        "role": "quest-giver",
+        "locationId": "01KM9C6S1NFK7YF4V19TZPK5KX",
+        "disposition": 10,
+        "description": "A worried elder who has been looking for capable souls to handle a growing problem.",
+        "notes": "Offers the starter quest. Knows about the local threat but is too old to deal with it personally.",
+        "alive": true
+      },
+      {
+        "id": "npc-001",
+        "name": "Goblin Scavenger",
+        "role": "hostile",
+        "locationId": "loc-001",
+        "disposition": -100,
+        "description": "Small, goblin-like creatures foraging and bickering over stolen goods.",
+        "notes": "",
+        "alive": false,
+        "statBlock": {
+          "hp": 0,
+          "maxHp": 14,
+          "ac": 11,
+          "abilities": {
+            "str": 8,
+            "dex": 14,
+            "con": 10,
+            "int": 10,
+            "wis": 10,
+            "cha": 10
+          },
+          "speed": 30,
+          "cr": 0.25,
+          "attacks": [
+            {
+              "name": "Scimitar",
+              "toHit": 3,
+              "damage": "1d4",
+              "damageType": "slashing"
+            },
+            {
+              "name": "Shortbow",
+              "toHit": 3,
+              "damage": "1d4",
+              "damageType": "piercing",
+              "range": "80/320 ft."
+            }
+          ],
+          "savingThrows": [
+            {
+              "ability": "con",
+              "bonus": 1
+            }
+          ],
+          "skills": [
+            {
+              "skill": "perception",
+              "bonus": 1
+            }
+          ],
+          "resistances": [],
+          "immunities": [],
+          "vulnerabilities": [],
+          "traits": [],
+          "actions": [
+            {
+              "name": "Scimitar",
+              "description": "Melee Weapon Attack: +3 to hit, 5 ft. reach, one target. Hit: 1d4 slashing damage.",
+              "attack": {
+                "name": "Scimitar",
+                "toHit": 3,
+                "damage": "1d4",
+                "damageType": "slashing"
+              }
+            },
+            {
+              "name": "Shortbow",
+              "description": "Melee or Ranged Weapon Attack: +3 to hit, 80/320 ft. reach, one target. Hit: 1d4 piercing damage.",
+              "attack": {
+                "name": "Shortbow",
+                "toHit": 3,
+                "damage": "1d4",
+                "damageType": "piercing",
+                "range": "80/320 ft."
+              }
+            }
+          ],
+          "legendaryActions": []
+        },
+        "lastInteractionTurn": 7
+      }
+    ],
+    "locations": [
+      {
+        "id": "01KM9C6S1NFK7YF4V19TZPK5KX",
+        "name": "Arara Gate",
+        "regionRef": 1,
+        "type": "settlement",
+        "description": "Arara Gate is a town nestled in the lands of Arholm Republic. Its people follow the traditions of the Beleth. The Caedun flows nearby. The Belyr Church holds sway here. It is a place where adventurers might find work, supplies, and rumors.",
+        "connections": [
+          "loc-001"
+        ],
+        "npcs": [
+          "01KM9C6S1N6FZNDDKAAT5ZBTFN",
+          "01KM9C6S1NX3KNSKS4QYYBTNEQ",
+          "01KM9C6S1NYPJD11PMHADDV339"
+        ],
+        "features": [
+          "A town of about 10,188 people.",
+          "Under the rule of Arholm Republic.",
+          "The locals follow Beleth customs."
+        ],
+        "visited": true
+      },
+      {
+        "id": "loc-001",
+        "name": "Forest Outskirts",
+        "type": "wilderness",
+        "description": "A forest fringes the town, its path well-traveled by hunters and those seeking solitude. The dense canopy filters sunlight to the forest floor.",
+        "connections": [
+          "01KM9C6S1NFK7YF4V19TZPK5KX"
+        ],
+        "npcs": [],
+        "features": [
+          "dense trees",
+          "chirping birds",
+          "rustling underbrush"
+        ],
+        "groundItems": [],
+        "regionRef": null,
+        "visited": true
+      }
+    ],
+    "quests": [
+      {
+        "id": "01KM9C6S1NGBM5YXCXAD0ZWS0P",
+        "name": "Trouble Near Arara Gate",
+        "giverNpcId": "01KM9C6S1NYPJD11PMHADDV339",
+        "status": "available",
+        "description": "The people of Arara Gate are worried. Loryr and Halyr contest influence around Lormere Watch. Someone needs to investigate and deal with the threat before it grows worse.",
+        "objectives": [
+          {
+            "id": "01KM9C6S1NFMBT4NECWQWS2TP6",
+            "text": "Speak with the locals to learn more about the threat",
+            "done": false
+          },
+          {
+            "id": "01KM9C6S1NX7G1M8DTRD23H8GJ",
+            "text": "Investigate the source of the disturbance",
+            "done": false
+          },
+          {
+            "id": "01KM9C6S1N1CEC9ZY7X0VPKT87",
+            "text": "Resolve the threat",
+            "done": false
+          }
+        ],
+        "rewards": {
+          "xp": 100,
+          "gold": 25,
+          "items": [],
+          "reputationChanges": [
+            {
+              "npcId": "01KM9C6S1NYPJD11PMHADDV339",
+              "delta": 10
+            }
+          ]
+        },
+        "recommendedLevel": 1,
+        "encounterTemplates": [
+          "soldier"
+        ]
+      }
+    ],
+    "conditionEffects": {
+      "blinded": {
+        "advantageOn": [],
+        "disadvantageOn": [
+          "attack-rolls",
+          "sight-based-ability-checks"
+        ],
+        "cantDo": [
+          "see"
+        ],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": [
+          "Attack rolls against the creature have advantage."
+        ]
+      },
+      "charmed": {
+        "advantageOn": [],
+        "disadvantageOn": [],
+        "cantDo": [
+          "attack-charmer",
+          "target-charmer-with-harmful-abilities"
+        ],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": [
+          "The charmer has advantage on social checks against the creature."
+        ]
+      },
+      "deafened": {
+        "advantageOn": [],
+        "disadvantageOn": [
+          "hearing-based-ability-checks"
+        ],
+        "cantDo": [
+          "hear"
+        ],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": []
+      },
+      "frightened": {
+        "advantageOn": [],
+        "disadvantageOn": [
+          "ability-checks-while-source-visible",
+          "attack-rolls-while-source-visible"
+        ],
+        "cantDo": [
+          "willingly-move-closer-to-source"
+        ],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": []
+      },
+      "grappled": {
+        "advantageOn": [],
+        "disadvantageOn": [],
+        "cantDo": [],
+        "autoFailSaves": [],
+        "speedMultiplier": 0,
+        "notes": [
+          "Speed becomes 0 and the creature cannot benefit from bonuses to speed."
+        ]
+      },
+      "incapacitated": {
+        "advantageOn": [],
+        "disadvantageOn": [],
+        "cantDo": [
+          "take-actions",
+          "take-reactions"
+        ],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": []
+      },
+      "invisible": {
+        "advantageOn": [
+          "attack-rolls"
+        ],
+        "disadvantageOn": [],
+        "cantDo": [],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": [
+          "Attack rolls against the creature have disadvantage.",
+          "The creature is heavily obscured for hiding purposes."
+        ]
+      },
+      "paralyzed": {
+        "advantageOn": [],
+        "disadvantageOn": [],
+        "cantDo": [
+          "move",
+          "speak"
+        ],
+        "autoFailSaves": [
+          "str",
+          "dex"
+        ],
+        "speedMultiplier": 0,
+        "notes": [
+          "The creature is incapacitated.",
+          "Attack rolls against the creature have advantage.",
+          "Hits from within 5 feet are critical hits."
+        ]
+      },
+      "petrified": {
+        "advantageOn": [],
+        "disadvantageOn": [],
+        "cantDo": [
+          "move",
+          "speak"
+        ],
+        "autoFailSaves": [
+          "str",
+          "dex"
+        ],
+        "speedMultiplier": 0,
+        "notes": [
+          "The creature is incapacitated.",
+          "It has resistance to all damage.",
+          "It is immune to poison and disease."
+        ]
+      },
+      "poisoned": {
+        "advantageOn": [],
+        "disadvantageOn": [
+          "attack-rolls",
+          "ability-checks"
+        ],
+        "cantDo": [],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": []
+      },
+      "prone": {
+        "advantageOn": [],
+        "disadvantageOn": [
+          "attack-rolls"
+        ],
+        "cantDo": [],
+        "autoFailSaves": [],
+        "speedMultiplier": 1,
+        "notes": [
+          "Movement to stand costs extra.",
+          "Melee attacks against the creature have advantage.",
+          "Ranged attacks against it have disadvantage."
+        ]
+      },
+      "restrained": {
+        "advantageOn": [],
+        "disadvantageOn": [
+          "attack-rolls"
+        ],
+        "cantDo": [],
+        "autoFailSaves": [
+          "dex"
+        ],
+        "speedMultiplier": 0,
+        "notes": [
+          "Attack rolls against the creature have advantage."
+        ]
+      },
+      "stunned": {
+        "advantageOn": [],
+        "disadvantageOn": [],
+        "cantDo": [
+          "move",
+          "speak"
+        ],
+        "autoFailSaves": [
+          "str",
+          "dex"
+        ],
+        "speedMultiplier": 0,
+        "notes": [
+          "The creature is incapacitated.",
+          "Attack rolls against the creature have advantage."
+        ]
+      },
+      "unconscious": {
+        "advantageOn": [],
+        "disadvantageOn": [],
+        "cantDo": [
+          "move",
+          "speak",
+          "take-actions",
+          "take-reactions"
+        ],
+        "autoFailSaves": [
+          "str",
+          "dex"
+        ],
+        "speedMultiplier": 0,
+        "notes": [
+          "The creature is unaware of its surroundings.",
+          "Attack rolls against the creature have advantage.",
+          "Hits from within 5 feet are critical hits."
+        ]
+      },
+      "exhaustion": {
+        "advantageOn": [],
+        "disadvantageOn": [
+          "ability-checks"
+        ],
+        "cantDo": [],
+        "autoFailSaves": [],
+        "speedMultiplier": 0.5,
+        "notes": [
+          "Higher exhaustion levels stack additional penalties."
+        ]
+      }
+    },
+    "partyLocationId": "loc-001",
+    "clock": {
+      "day": 1,
+      "timeOfDay": "morning",
+      "weather": "clear"
+    },
+    "worldSeed": "1774136286549-891538",
+    "nextTurnNumber": 8,
+    "sceneFacts": [],
+    "createdAt": 1774136288309,
+    "updatedAt": 1774136368490
+  },
+  "turns": [
+    {
+      "turnNumber": 1,
+      "actor": "gm",
+      "actorType": "gm",
+      "intent": "free-narration",
+      "status": "completed",
+      "mode": null,
+      "model": null,
+      "latencyMs": null,
+      "action": "",
+      "resolvedSummary": "Opening scene established",
+      "mechanics": [],
+      "promptMessages": [],
+      "rawAiResponse": null,
+      "gmProposedChanges": null,
+      "appliedStateChanges": {},
+      "narrativeText": "You begin in Arara Gate, Arara Gate is a town nestled in the lands of Arholm Republic. Its people follow the traditions of the Beleth. The Caedun flows nearby. The Belyr Church holds sway here. It is a place where adventurers might find work, supplies, and rumors.\n\nA notable detail stands out immediately: A town of about 10,188 people..\n\nIraus, Alden, Gormric are nearby, close enough to approach.\n\nA clear lead is already in front of you: Trouble Near Arara Gate. The first step is simple — Speak with the locals to learn more about the threat.\n\nIt is day 1, morning, under clear skies.\n\nWhat do you do first?",
+      "createdAt": "2026-03-21T23:38:08.650Z"
+    },
+    {
+      "turnNumber": 2,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "attack",
+      "status": "completed",
+      "mode": "full-gm-2pass",
+      "model": "gpt-4o",
+      "latencyMs": 9289,
+      "action": "I want to fight low level enemies in the forest",
+      "resolvedSummary": "",
+      "mechanics": [],
+      "promptMessages": [
+        {
+          "role": "system",
+          "content": "You are the Game Master of a tabletop-style fantasy RPG.\nYou adjudicate player actions like a skilled tabletop GM: narrate consequences, call for dice checks when the outcome is uncertain, and announce combat clearly.\nYou narrate in second-person perspective, speaking directly to the party.\nYou are authoritative about the world — you describe what happens as a consequence of player actions.\nYou respect the mechanics: when dice results are provided, narrate around those outcomes faithfully.\nKeep responses vivid and concise (2–5 sentences for normal actions, more for important moments).\nEnd each response with a beat that invites the next player action.\n\nIMPORTANT: Return ONLY narrative prose. Do NOT return JSON. A separate system handles game state updates.\n\n=== TABLETOP ADJUDICATION ===\nThink like a tabletop GM running a session at a table:\n\nCALLING FOR CHECKS:\n- When the outcome is uncertain and failure has interesting consequences, call for a check.\n- Name the check explicitly: \"Make a Perception check\", \"Roll a Stealth check\", \"Give me a Persuasion check.\"\"\n- If the action is trivial or routine (opening an unlocked door, walking down a road), just narrate the result.\n- Do NOT silently decide contested outcomes — if a player tries to sneak, lie, or persuade and there is resistance, call for the roll.\n\nSTARTING COMBAT:\n- Combat begins ONLY when hostilities are explicit: someone attacks, an ambush springs, or a creature charges.\n- When combat truly begins, announce it clearly with a phrase like \"Roll for initiative!\" or \"Combat begins!\" so the boundary is unmistakable.\n- Scouting, observing, reconnaissance, hearing rumors about enemies, and cautious dialogue NEVER start combat on their own.\n- A player saying \"I look for enemies\" or \"I scout ahead\" is gathering information, not starting a fight.\n\nDURING COMBAT:\n- Think in terms of turns, actions, bonus actions, reactions, movement, and positioning.\n- Narrate each combatant's actions with tactical clarity: who attacks whom, what weapon or ability is used, and what happens.\n- Reference engine-provided dice results faithfully. Do NOT invent hit/miss/damage beyond what the engine resolved.\n\nDIALOGUE & SOCIAL ENCOUNTERS:\n- When a player speaks to an NPC, roleplay the NPC's response in character.\n- If the player is trying to persuade, deceive, or intimidate and the NPC would resist, call for the appropriate check.\n- Low-stakes conversation (asking for directions, buying supplies, friendly banter) does not require a roll.\n- When stakes are high (convincing a guard to let you pass, lying to a noble, negotiating a hostage release), call for a check before resolving the outcome.\n\n=== DISCRETION RULES ===\nYOU MAY freely:\n- Infer the nearest enemy, closest ally, or default equipped weapon when context is obvious\n- Describe the environment, add sensory details, weather effects, ambient sounds\n- Advance NPC dialogue, create NPC reactions, and roleplay NPC personalities\n- Introduce new NPCs, locations, and quests when the story calls for it\n- Decide obvious movement paths (e.g., \"I go inside\" → enter the building)\n- Add dramatic tension, foreshadowing, and world flavor\n- Resolve trivial actions without a roll (picking up an object, sitting down, eating rations)\n\nYOU MUST NOT:\n- Silently choose between multiple materially different resource expenditures (healing spells vs potions, different spell slots)\n- Violate action economy, spell legality, slot availability, or rest rules\n- Override or contradict engine-provided mechanic results (if [Mechanics: ...] is present, those are FACTS)\n- Kill or permanently incapacitate a player character without mechanical justification\n- Grant magical items above the party's level range without quest justification\n- Start combat from scouting, observation, or cautious inquiry alone\n- Silently decide the outcome of a contested or high-stakes action without calling for a roll\n\nWHEN AMBIGUOUS:\n- If the player's intent is unclear but harmless, make a reasonable assumption and narrate\n- If the ambiguity could cost significant resources, ask a brief in-world clarifying question instead of acting\n\n=== CURRENT LOCATION ===\n[name: Arara Gate][id: 01KM9C6S1NFK7YF4V19TZPK5KX]\nType: settlement\nDescription: Arara Gate is a town nestled in the lands of Arholm Republic. Its people follow the traditions of the Beleth. The Caedun flows nearby. The Belyr Church holds sway here. It is a place where adventurers might find work, supplies, and rumors.\nFeatures: A town of about 10,188 people.; Under the rule of Arholm Republic.; The locals follow Beleth customs.\nNPCs present: [name: Iraus][id: 01KM9C6S1N6FZNDDKAAT5ZBTFN] (neutral, warm), [name: Alden][id: 01KM9C6S1NX3KNSKS4QYYBTNEQ] (merchant, neutral), [name: Gormric][id: 01KM9C6S1NYPJD11PMHADDV339] (quest-giver, warm)\n\n=== PARTY ===\n- [name: thirteen][id: 01KM9C714VGVGEW5HJQGS3GJGD] (Lv1 human fighter) — 12/12 HP | AC 18 | Gear: [name: Chain Mail][id: 01KM9C714TWPWCRBNAVVDYZBBF], [name: Longsword][id: 01KM9C714T601GZ2KSV5MP2FVG], [name: Shield][id: 01KM9C714TFAP2CBHQNBJQ3JQW], [name: Light Crossbow][id: 01KM9C714T4DAGWBMM7NT3REJQ]\n\n=== QUESTS ===\n- [name: Trouble Near Arara Gate][id: 01KM9C6S1NGBM5YXCXAD0ZWS0P] (status: available): The people of Arara Gate are worried. Loryr and Halyr contest influence around Lormere Watch. Someone needs to investigate and deal with the threat before it grows worse. | Objectives: objective(status: pending, text: Speak with the locals to learn more about the threat, id: 01KM9C6S1NFMBT4NECWQWS2TP6); objective(status: pending, text: Investigate the source of the disturbance, id: 01KM9C6S1NX7G1M8DTRD23H8GJ); objective(status: pending, text: Resolve the threat, id: 01KM9C6S1N1CEC9ZY7X0VPKT87)\n\n=== TIME ===\nDay 1, morning. Weather: clear.\n"
+        },
+        {
+          "role": "assistant",
+          "content": "You begin in Arara Gate, Arara Gate is a town nestled in the lands of Arholm Republic. Its people follow the traditions of the Beleth. The Caedun flows nearby. The Belyr Church holds sway here. It is a place where adventurers might find work, supplies, and rumors.\n\nA notable detail stands out immediately: A town of about 10,188 people..\n\nIraus, Alden, Gormric are nearby, close enough to approach.\n\nA clear lead is already in front of you: Trouble Near Arara Gate. The first step is simple — Speak with the locals to learn more about the threat.\n\nIt is day 1, morning, under clear skies.\n\nWhat do you do first?"
+        },
+        {
+          "role": "user",
+          "content": "I want to fight low level enemies in the forest"
+        }
+      ],
+      "rawAiResponse": "You leave the bustling streets of Arara Gate behind, journeying toward the forest that fringes the town. The path is well-traveled, worn down by those who wander its woods for hunting or simple solitude. The sunlight dapples the ground through a canopy of dense trees, and the air is filled with the sounds of distant chirping birds.\n\nAs you delve deeper, the underbrush rustles with unseen life, and you sense the presence of creatures. It isn't long before you spot a group of small, goblin-like creatures foraging and bickering over a stash of stolen goods.\n\nCombat begins! Roll for initiative!",
+      "gmProposedChanges": {
+        "locationsAdded": [
+          {
+            "id": "loc-001",
+            "name": "Forest Outskirts",
+            "type": "wilderness",
+            "description": "A forest fringes the town, its path well-traveled by hunters and those seeking solitude. The dense canopy filters sunlight to the forest floor.",
+            "connections": [
+              "01KM9C6S1NFK7YF4V19TZPK5KX"
+            ],
+            "features": [
+              "dense trees",
+              "chirping birds",
+              "rustling underbrush"
+            ],
+            "groundItems": []
+          }
+        ],
+        "locationChange": {
+          "from": "01KM9C6S1NFK7YF4V19TZPK5KX",
+          "to": "loc-001"
+        },
+        "encounterStarted": {
+          "creatures": [
+            {
+              "id": "npc-001",
+              "name": "Goblin Scavenger",
+              "role": "hostile",
+              "locationId": "loc-001",
+              "disposition": -100,
+              "description": "Small, goblin-like creatures foraging and bickering over stolen goods.",
+              "tier": "weak"
+            }
+          ]
+        }
+      },
+      "appliedStateChanges": {
+        "locationChange": {
+          "from": "01KM9C6S1NFK7YF4V19TZPK5KX",
+          "to": "loc-001"
+        },
+        "locationsAdded": [
+          {
+            "id": "loc-001",
+            "name": "Forest Outskirts",
+            "type": "wilderness",
+            "description": "A forest fringes the town, its path well-traveled by hunters and those seeking solitude. The dense canopy filters sunlight to the forest floor.",
+            "connections": [
+              "01KM9C6S1NFK7YF4V19TZPK5KX"
+            ],
+            "features": [
+              "dense trees",
+              "chirping birds",
+              "rustling underbrush"
+            ],
+            "groundItems": []
+          }
+        ],
+        "encounterStarted": {
+          "creatures": [
+            {
+              "id": "npc-001",
+              "name": "Goblin Scavenger",
+              "role": "hostile",
+              "locationId": "loc-001",
+              "disposition": -100,
+              "description": "Small, goblin-like creatures foraging and bickering over stolen goods.",
+              "tier": "weak"
+            }
+          ]
+        }
+      },
+      "narrativeText": "You leave the bustling streets of Arara Gate behind, journeying toward the forest that fringes the town. The path is well-traveled, worn down by those who wander its woods for hunting or simple solitude. The sunlight dapples the ground through a canopy of dense trees, and the air is filled with the sounds of distant chirping birds.\n\nAs you delve deeper, the underbrush rustles with unseen life, and you sense the presence of creatures. It isn't long before you spot a group of small, goblin-like creatures foraging and bickering over a stash of stolen goods.\n\nCombat begins! Roll for initiative!",
+      "createdAt": "2026-03-21T23:38:35.150Z"
+    },
+    {
+      "turnNumber": 3,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "free-narration",
+      "status": "completed",
+      "mode": "full-gm-2pass",
+      "model": "gpt-4o",
+      "latencyMs": 3104,
+      "action": "I roll a 17 I guess?",
+      "resolvedSummary": "Improvised combat action: I roll a 17 I guess?",
+      "mechanics": [],
+      "promptMessages": [
+        {
+          "role": "system",
+          "content": "You are the Game Master of a tabletop-style fantasy RPG.\nYou adjudicate player actions like a skilled tabletop GM: narrate consequences, call for dice checks when the outcome is uncertain, and announce combat clearly.\nYou narrate in second-person perspective, speaking directly to the party.\nYou are authoritative about the world — you describe what happens as a consequence of player actions.\nYou respect the mechanics: when dice results are provided, narrate around those outcomes faithfully.\nKeep responses vivid and concise (2–5 sentences for normal actions, more for important moments).\nEnd each response with a beat that invites the next player action.\n\nIMPORTANT: Return ONLY narrative prose. Do NOT return JSON. A separate system handles game state updates.\n\n=== TABLETOP ADJUDICATION ===\nThink like a tabletop GM running a session at a table:\n\nCALLING FOR CHECKS:\n- When the outcome is uncertain and failure has interesting consequences, call for a check.\n- Name the check explicitly: \"Make a Perception check\", \"Roll a Stealth check\", \"Give me a Persuasion check.\"\"\n- If the action is trivial or routine (opening an unlocked door, walking down a road), just narrate the result.\n- Do NOT silently decide contested outcomes — if a player tries to sneak, lie, or persuade and there is resistance, call for the roll.\n\nSTARTING COMBAT:\n- Combat begins ONLY when hostilities are explicit: someone attacks, an ambush springs, or a creature charges.\n- When combat truly begins, announce it clearly with a phrase like \"Roll for initiative!\" or \"Combat begins!\" so the boundary is unmistakable.\n- Scouting, observing, reconnaissance, hearing rumors about enemies, and cautious dialogue NEVER start combat on their own.\n- A player saying \"I look for enemies\" or \"I scout ahead\" is gathering information, not starting a fight.\n\nDURING COMBAT:\n- Think in terms of turns, actions, bonus actions, reactions, movement, and positioning.\n- Narrate each combatant's actions with tactical clarity: who attacks whom, what weapon or ability is used, and what happens.\n- Reference engine-provided dice results faithfully. Do NOT invent hit/miss/damage beyond what the engine resolved.\n\nDIALOGUE & SOCIAL ENCOUNTERS:\n- When a player speaks to an NPC, roleplay the NPC's response in character.\n- If the player is trying to persuade, deceive, or intimidate and the NPC would resist, call for the appropriate check.\n- Low-stakes conversation (asking for directions, buying supplies, friendly banter) does not require a roll.\n- When stakes are high (convincing a guard to let you pass, lying to a noble, negotiating a hostage release), call for a check before resolving the outcome.\n\n=== DISCRETION RULES ===\nYOU MAY freely:\n- Infer the nearest enemy, closest ally, or default equipped weapon when context is obvious\n- Describe the environment, add sensory details, weather effects, ambient sounds\n- Advance NPC dialogue, create NPC reactions, and roleplay NPC personalities\n- Introduce new NPCs, locations, and quests when the story calls for it\n- Decide obvious movement paths (e.g., \"I go inside\" → enter the building)\n- Add dramatic tension, foreshadowing, and world flavor\n- Resolve trivial actions without a roll (picking up an object, sitting down, eating rations)\n\nYOU MUST NOT:\n- Silently choose between multiple materially different resource expenditures (healing spells vs potions, different spell slots)\n- Violate action economy, spell legality, slot availability, or rest rules\n- Override or contradict engine-provided mechanic results (if [Mechanics: ...] is present, those are FACTS)\n- Kill or permanently incapacitate a player character without mechanical justification\n- Grant magical items above the party's level range without quest justification\n- Start combat from scouting, observation, or cautious inquiry alone\n- Silently decide the outcome of a contested or high-stakes action without calling for a roll\n\nWHEN AMBIGUOUS:\n- If the player's intent is unclear but harmless, make a reasonable assumption and narrate\n- If the ambiguity could cost significant resources, ask a brief in-world clarifying question instead of acting\n\n=== CURRENT LOCATION ===\n[name: Forest Outskirts][id: loc-001]\nType: wilderness\nDescription: A forest fringes the town, its path well-traveled by hunters and those seeking solitude. The dense canopy filters sunlight to the forest floor.\nFeatures: dense trees; chirping birds; rustling underbrush\nConnections: [name: Arara Gate][id: 01KM9C6S1NFK7YF4V19TZPK5KX]\nNPCs present: [name: Goblin Scavenger][id: npc-001] (hostile, hateful)\n\n=== KNOWN LOCATIONS ===\n- [name: Arara Gate][id: 01KM9C6S1NFK7YF4V19TZPK5KX] (settlement) (visited: yes) → connects to: [name: Forest Outskirts][id: loc-001]\n\n=== KNOWN NPCs (away from party) ===\nAt [name: Arara Gate][id: 01KM9C6S1NFK7YF4V19TZPK5KX]:\n  - [name: Gormric][id: 01KM9C6S1NYPJD11PMHADDV339] (quest-giver, warm)\n  - [name: Alden][id: 01KM9C6S1NX3KNSKS4QYYBTNEQ] (merchant, neutral)\n  - [name: Iraus][id: 01KM9C6S1N6FZNDDKAAT5ZBTFN] (neutral, warm)\n\n=== PARTY ===\n- [name: thirteen][id: 01KM9C714VGVGEW5HJQGS3GJGD] (Lv1 human fighter) — 12/12 HP | AC 18 | Gear: [name: Chain Mail][id: 01KM9C714TWPWCRBNAVVDYZBBF], [name: Longsword][id: 01KM9C714T601GZ2KSV5MP2FVG], [name: Shield][id: 01KM9C714TFAP2CBHQNBJQ3JQW], [name: Light Crossbow][id: 01KM9C714T4DAGWBMM7NT3REJQ]\n\n=== ACTIVE ENCOUNTER (Round 1) ===\n- [name: Goblin Scavenger][id: npc-001] (npc): 14/14 HP, AC 11\n- [name: thirteen][id: 01KM9C714VGVGEW5HJQGS3GJGD] (character): 12/12 HP, AC 18\nUse the exact [id:] values above as characterId in hpChanges. Use encounterEnded in stateChanges when the encounter resolves.\n\n=== QUESTS ===\n- [name: Trouble Near Arara Gate][id: 01KM9C6S1NGBM5YXCXAD0ZWS0P] (status: available): The people of Arara Gate are worried. Loryr and Halyr contest influence around Lormere Watch. Someone needs to investigate and deal with the threat before it grows worse. | Objectives: objective(status: pending, text: Speak with the locals to learn more about the threat, id: 01KM9C6S1NFMBT4NECWQWS2TP6); objective(status: pending, text: Investigate the source of the disturbance, id: 01KM9C6S1NX7G1M8DTRD23H8GJ); objective(status: pending, text: Resolve the threat, id: 01KM9C6S1N1CEC9ZY7X0VPKT87)\n\n=== TIME ===\nDay 1, morning. Weather: clear.\n"
+        },
+        {
+          "role": "assistant",
+          "content": "You begin in Arara Gate, Arara Gate is a town nestled in the lands of Arholm Republic. Its people follow the traditions of the Beleth. The Caedun flows nearby. The Belyr Church holds sway here. It is a place where adventurers might find work, supplies, and rumors.\n\nA notable detail stands out immediately: A town of about 10,188 people..\n\nIraus, Alden, Gormric are nearby, close enough to approach.\n\nA clear lead is already in front of you: Trouble Near Arara Gate. The first step is simple — Speak with the locals to learn more about the threat.\n\nIt is day 1, morning, under clear skies.\n\nWhat do you do first?"
+        },
+        {
+          "role": "user",
+          "content": "I want to fight low level enemies in the forest"
+        },
+        {
+          "role": "assistant",
+          "content": "You leave the bustling streets of Arara Gate behind, journeying toward the forest that fringes the town. The path is well-traveled, worn down by those who wander its woods for hunting or simple solitude. The sunlight dapples the ground through a canopy of dense trees, and the air is filled with the sounds of distant chirping birds.\n\nAs you delve deeper, the underbrush rustles with unseen life, and you sense the presence of creatures. It isn't long before you spot a group of small, goblin-like creatures foraging and bickering over a stash of stolen goods.\n\nCombat begins! Roll for initiative!"
+        },
+        {
+          "role": "user",
+          "content": "I roll a 17 I guess?"
+        }
+      ],
+      "rawAiResponse": "With a well-timed and steady resolve, you prepare yourself for battle. The goblin scavenger is caught off guard by your swift reaction, and you gain the advantage of acting first.\n\nIt's your turn; what do you do?",
+      "gmProposedChanges": {},
+      "appliedStateChanges": {},
+      "narrativeText": "With a well-timed and steady resolve, you prepare yourself for battle. The goblin scavenger is caught off guard by your swift reaction, and you gain the advantage of acting first.\n\nIt's your turn; what do you do?",
+      "createdAt": "2026-03-21T23:38:50.362Z"
+    },
+    {
+      "turnNumber": 4,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "attack",
+      "status": "completed",
+      "mode": "mid-round",
+      "model": "server-executor",
+      "latencyMs": 0,
+      "action": "I attack the closest goblin!",
+      "resolvedSummary": "Attacked Goblin Scavenger with Longsword — missed | Enemies retaliate",
+      "mechanics": [
+        {
+          "type": "attack-roll",
+          "label": "thirteen attacks Goblin Scavenger with longsword",
+          "dice": {
+            "notation": "1d20",
+            "rolls": [
+              5
+            ],
+            "total": 5
+          },
+          "dc": 11,
+          "success": false
+        }
+      ],
+      "promptMessages": [],
+      "rawAiResponse": "",
+      "gmProposedChanges": null,
+      "appliedStateChanges": {},
+      "narrativeText": "",
+      "createdAt": "2026-03-21T23:38:57.386Z"
+    },
+    {
+      "turnNumber": 5,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "attack",
+      "status": "completed",
+      "mode": "mid-round",
+      "model": "server-executor",
+      "latencyMs": 0,
+      "action": "I attack the closest goblin! (Why is it still my turn?)",
+      "resolvedSummary": "Attacked Goblin Scavenger with Longsword — hit for 4 slashing damage | Enemies retaliate",
+      "mechanics": [
+        {
+          "type": "attack-roll",
+          "label": "thirteen attacks Goblin Scavenger with longsword",
+          "dice": {
+            "notation": "1d20",
+            "rolls": [
+              7
+            ],
+            "total": 7
+          },
+          "dc": 11,
+          "success": true
+        },
+        {
+          "type": "damage",
+          "label": "thirteen deals 4 slashing damage to Goblin Scavenger",
+          "dice": {
+            "notation": "1d8+3",
+            "rolls": [
+              1
+            ],
+            "total": 4
+          },
+          "success": true
+        }
+      ],
+      "promptMessages": [],
+      "rawAiResponse": "",
+      "gmProposedChanges": null,
+      "appliedStateChanges": {
+        "hpChanges": [
+          {
+            "characterId": "npc-001",
+            "oldHp": 14,
+            "newHp": 10,
+            "reason": "thirteen's longsword attack"
+          }
+        ]
+      },
+      "narrativeText": "",
+      "createdAt": "2026-03-21T23:39:11.565Z"
+    },
+    {
+      "turnNumber": 6,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "attack",
+      "status": "completed",
+      "mode": "mid-round",
+      "model": "server-executor",
+      "latencyMs": 0,
+      "action": "I attack the closest goblin!",
+      "resolvedSummary": "Attacked Goblin Scavenger with Longsword — hit for 5 slashing damage | Enemies retaliate",
+      "mechanics": [
+        {
+          "type": "attack-roll",
+          "label": "thirteen attacks Goblin Scavenger with longsword",
+          "dice": {
+            "notation": "1d20",
+            "rolls": [
+              7
+            ],
+            "total": 7
+          },
+          "dc": 11,
+          "success": true
+        },
+        {
+          "type": "damage",
+          "label": "thirteen deals 5 slashing damage to Goblin Scavenger",
+          "dice": {
+            "notation": "1d8+3",
+            "rolls": [
+              2
+            ],
+            "total": 5
+          },
+          "success": true
+        }
+      ],
+      "promptMessages": [],
+      "rawAiResponse": "",
+      "gmProposedChanges": null,
+      "appliedStateChanges": {
+        "hpChanges": [
+          {
+            "characterId": "npc-001",
+            "oldHp": 10,
+            "newHp": 5,
+            "reason": "thirteen's longsword attack"
+          }
+        ]
+      },
+      "narrativeText": "",
+      "createdAt": "2026-03-21T23:39:17.562Z"
+    },
+    {
+      "turnNumber": 7,
+      "actor": "The Admin",
+      "actorType": "player",
+      "intent": "attack",
+      "status": "completed",
+      "mode": "narrator",
+      "model": "gpt-4o",
+      "latencyMs": 6090,
+      "action": "I attack the closest goblin!",
+      "resolvedSummary": "Attacked Goblin Scavenger with Longsword — hit for 5 slashing damage (defeated!)",
+      "mechanics": [
+        {
+          "type": "attack-roll",
+          "label": "thirteen attacks Goblin Scavenger with longsword",
+          "dice": {
+            "notation": "1d20",
+            "rolls": [
+              9
+            ],
+            "total": 9
+          },
+          "dc": 11,
+          "success": true
+        },
+        {
+          "type": "damage",
+          "label": "thirteen deals 5 slashing damage to Goblin Scavenger",
+          "dice": {
+            "notation": "1d8+3",
+            "rolls": [
+              2
+            ],
+            "total": 5
+          },
+          "success": true
+        }
+      ],
+      "promptMessages": [
+        {
+          "role": "system",
+          "content": "You are the Narrator of a text-based fantasy RPG adventure.\nThe game engine has ALREADY resolved the player's action mechanically.\nYour job is to narrate what happened in vivid second-person prose.\n\nRULES:\n- The mechanic results provided to you are FACTS. Do not contradict them.\n- If the player healed 7 HP, narrate them healing 7 HP. If a spell slot was used, mention the magical exertion.\n- If a healing potion was consumed, describe drinking it. If travel occurred, describe the journey.\n- Do NOT invent additional mechanical effects (no extra damage, no bonus healing, no status changes beyond what's given).\n- You MAY add sensory detail, NPC reactions, environmental flavor, and dramatic tension.\n- Keep responses vivid and concise (2–5 sentences for normal actions, more for important moments).\n- End each response with a beat that invites the next player action.\n- Return ONLY narrative prose. Do NOT return JSON.\n\n=== CURRENT LOCATION ===\nName: Forest Outskirts\nType: wilderness\nDescription: A forest fringes the town, its path well-traveled by hunters and those seeking solitude. The dense canopy filters sunlight to the forest floor.\n\n=== PARTY ===\n- [name: thirteen][id: 01KM9C714VGVGEW5HJQGS3GJGD] (Lv1 human fighter) — 12/12 HP | AC 18 | Gear: [name: Chain Mail][id: 01KM9C714TWPWCRBNAVVDYZBBF], [name: Longsword][id: 01KM9C714T601GZ2KSV5MP2FVG], [name: Shield][id: 01KM9C714TFAP2CBHQNBJQ3JQW], [name: Light Crossbow][id: 01KM9C714T4DAGWBMM7NT3REJQ]\n\n=== TIME ===\nDay 1, morning. Weather: clear.\n"
+        },
+        {
+          "role": "assistant",
+          "content": "You begin in Arara Gate, Arara Gate is a town nestled in the lands of Arholm Republic. Its people follow the traditions of the Beleth. The Caedun flows nearby. The Belyr Church holds sway here. It is a place where adventurers might find work, supplies, and rumors.\n\nA notable detail stands out immediately: A town of about 10,188 people..\n\nIraus, Alden, Gormric are nearby, close enough to approach.\n\nA clear lead is already in front of you: Trouble Near Arara Gate. The first step is simple — Speak with the locals to learn more about the threat.\n\nIt is day 1, morning, under clear skies.\n\nWhat do you do first?"
+        },
+        {
+          "role": "user",
+          "content": "I want to fight low level enemies in the forest"
+        },
+        {
+          "role": "assistant",
+          "content": "You leave the bustling streets of Arara Gate behind, journeying toward the forest that fringes the town. The path is well-traveled, worn down by those who wander its woods for hunting or simple solitude. The sunlight dapples the ground through a canopy of dense trees, and the air is filled with the sounds of distant chirping birds.\n\nAs you delve deeper, the underbrush rustles with unseen life, and you sense the presence of creatures. It isn't long before you spot a group of small, goblin-like creatures foraging and bickering over a stash of stolen goods.\n\nCombat begins! Roll for initiative!"
+        },
+        {
+          "role": "user",
+          "content": "I roll a 17 I guess?"
+        },
+        {
+          "role": "assistant",
+          "content": "With a well-timed and steady resolve, you prepare yourself for battle. The goblin scavenger is caught off guard by your swift reaction, and you gain the advantage of acting first.\n\nIt's your turn; what do you do?"
+        },
+        {
+          "role": "user",
+          "content": "I attack the closest goblin!\n[Mechanics: thirteen attacks Goblin Scavenger with longsword: 1d20 → 5 vs DC 11 ✗]"
+        },
+        {
+          "role": "user",
+          "content": "I attack the closest goblin! (Why is it still my turn?)\n[Mechanics: thirteen attacks Goblin Scavenger with longsword: 1d20 → 7 vs DC 11 ✓ | thirteen deals 4 slashing damage to Goblin Scavenger: 1d8+3 → 4 ✓]"
+        },
+        {
+          "role": "user",
+          "content": "I attack the closest goblin!\n[Mechanics: thirteen attacks Goblin Scavenger with longsword: 1d20 → 7 vs DC 11 ✓ | thirteen deals 5 slashing damage to Goblin Scavenger: 1d8+3 → 5 ✓]"
+        },
+        {
+          "role": "user",
+          "content": "The player said: \"I attack the closest goblin!\"\n\nRESOLVED ACTION: \"I attack the closest goblin!\"\nINTENT: attack\n\nMECHANIC RESULTS (these are FACTS — narrate around them):\n- ATTACK-ROLL: thirteen attacks Goblin Scavenger with longsword [1d20 → 9] (DC 11) (succeeded)\n- DAMAGE: thirteen deals 5 slashing damage to Goblin Scavenger [1d8+3 → 5] (succeeded)\n\nHP CHANGES:\n- thirteen's longsword attack: 5 → 0 HP\n\nNarrate what happens."
+        }
+      ],
+      "rawAiResponse": "With a determined grip on your longsword, you lunge forward, closing the distance between you and the nearest goblin. The creature, barely having time to raise its crude weapon in defense, is met with the fearsome swing of your blade. Your strike arcs down with precision, slicing through the goblin's leathery skin. It lets out a guttural cry and collapses to the forest floor, lifeless. The remaining goblins stagger back momentarily, taken aback by the swift demise of their companion.\n\nThe woodland remains tense and watchful, awaiting your next move. What do you do?",
+      "gmProposedChanges": null,
+      "appliedStateChanges": {
+        "hpChanges": [
+          {
+            "characterId": "npc-001",
+            "oldHp": 5,
+            "newHp": 0,
+            "reason": "thirteen's longsword attack"
+          }
+        ],
+        "encounterEnded": {
+          "outcome": "victory"
+        },
+        "xpAwarded": [
+          {
+            "characterId": "01KM9C714VGVGEW5HJQGS3GJGD",
+            "amount": 50
+          }
+        ]
+      },
+      "narrativeText": "With a determined grip on your longsword, you lunge forward, closing the distance between you and the nearest goblin. The creature, barely having time to raise its crude weapon in defense, is met with the fearsome swing of your blade. Your strike arcs down with precision, slicing through the goblin's leathery skin. It lets out a guttural cry and collapses to the forest floor, lifeless. The remaining goblins stagger back momentarily, taken aback by the swift demise of their companion.\n\nThe woodland remains tense and watchful, awaiting your next move. What do you do?",
+      "createdAt": "2026-03-21T23:39:28.489Z"
+    }
+  ]
+}

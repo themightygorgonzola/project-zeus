@@ -390,12 +390,16 @@ export function initEncounterTurnOrder(
 	// Walk the initiative order from the start, looking for the first human actor.
 	// If hostile NPCs appear before any human, we skip them — they'll be
 	// auto-resolved the first time a human submits an action.
-	for (const combatantId of encounter.initiativeOrder) {
+	// IMPORTANT: also sync turnIndex to the human's position so that
+	// autoAdvancePastNpcs() advances from the correct slot and doesn't skip enemies.
+	for (let i = 0; i < encounter.initiativeOrder.length; i++) {
+		const combatantId = encounter.initiativeOrder[i];
 		const combatant = encounter.combatants.find(c => c.id === combatantId);
 		if (!combatant || combatant.defeated) continue;
 
 		if (combatant.type === 'character') {
 			encounter.awaitingActorId = combatantId;
+			encounter.turnIndex = i;
 			return combatantId;
 		}
 
@@ -403,6 +407,7 @@ export function initEncounterTurnOrder(
 		const npc = npcs.find(n => n.id === combatant.referenceId);
 		if (npc && npc.role === 'companion') {
 			encounter.awaitingActorId = combatantId;
+			encounter.turnIndex = i;
 			return combatantId;
 		}
 	}

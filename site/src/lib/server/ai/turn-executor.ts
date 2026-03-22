@@ -442,9 +442,35 @@ export function resolveTurn(playerAction: string, state: GameState | null, actor
 				}
 				// Treat as improvised combat action — stays in initiative order,
 				// the AI narrator will describe it within the combat context.
+				// Still auto-advance past NPC turns so enemies get to act.
+				const improvisedEncounter = state.activeEncounter!;
+				const improvisedCombatantId =
+					improvisedEncounter.awaitingActorId ??
+					(improvisedEncounter.combatants.find(c => c.type === 'character' && c.referenceId === actor.id)?.id ?? actor.id);
+				if (!improvisedEncounter.roundActions) improvisedEncounter.roundActions = [];
+				improvisedEncounter.roundActions.push({
+					combatantId: improvisedCombatantId,
+					rawAction: playerAction,
+					mechanicResults: [],
+					stateChanges: {},
+					timestamp: Date.now()
+				});
+				const improvisedAdvance = autoAdvancePastNpcs(state, improvisedEncounter);
+				const improvisedStateChanges: StateChange = {};
+				if (improvisedAdvance.stateChanges.hpChanges) {
+					improvisedStateChanges.hpChanges = improvisedAdvance.stateChanges.hpChanges;
+				}
+				if (improvisedAdvance.stateChanges.encounterEnded) {
+					improvisedStateChanges.encounterEnded = improvisedAdvance.stateChanges.encounterEnded;
+				}
+				const updatedCharacters = syncCharacterHpFromCombatants(state);
 				return {
 					...base,
-					resolvedActionSummary: `Improvised combat action: ${playerAction}`
+					resolvedActionSummary: `Improvised combat action: ${playerAction}`,
+					mechanicResults: improvisedAdvance.mechanicResults,
+					stateChanges: improvisedStateChanges,
+					updatedCharacters,
+					roundComplete: improvisedAdvance.roundComplete
 				};
 			}
 
