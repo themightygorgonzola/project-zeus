@@ -806,6 +806,9 @@ export function autoAdvancePastNpcs(
 					const attackResult = resolveNpcAttack(state, npc, 0, targetCombatant, encounter);
 					const attackName = npc.statBlock.attacks[0].name;
 
+					// Track where this NPC's results start so we grab exactly theirs
+					const npcResultStart = mechanicResults.length;
+
 					mechanicResults.push(
 						attackToMechanicResult(
 							`${npc.name} attacks ${targetCombatant.name} with ${attackName}`,
@@ -831,12 +834,12 @@ export function autoAdvancePastNpcs(
 						});
 					}
 
-					// Store in roundActions
+					// Store in roundActions — slice from this NPC's start index
 					if (!encounter.roundActions) encounter.roundActions = [];
 					encounter.roundActions.push({
 						combatantId: next.id,
 						rawAction: `${npc.name} attacks`,
-						mechanicResults: mechanicResults.slice(-2), // last 1-2 results
+						mechanicResults: mechanicResults.slice(npcResultStart),
 						stateChanges: attackResult.damageResult ? {
 							hpChanges: [{
 								characterId: targetCombatant.referenceId,

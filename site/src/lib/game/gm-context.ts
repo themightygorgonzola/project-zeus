@@ -143,6 +143,9 @@ function buildNarrativeSystemPrompt(state: GameState, worldBrief: string): strin
 	parts.push(`- Think in terms of turns, actions, bonus actions, reactions, movement, and positioning.`);
 	parts.push(`- Narrate each combatant's actions with tactical clarity: who attacks whom, what weapon or ability is used, and what happens.`);
 	parts.push(`- Reference engine-provided dice results faithfully. Do NOT invent hit/miss/damage beyond what the engine resolved.`);
+	parts.push(`- NEVER write engine mechanic format strings in your narrative (e.g. "[Mechanics: ...]", "[Attack: ...]"). Narrate outcomes naturally.`);
+	parts.push(`- When a character is at or below 25% HP, remind them of available recovery options (Second Wind, healing potions, retreat, etc.).`);
+	parts.push(`- When combat resolves an objective related to an active quest (e.g. defeating bandits for a "clear the road" quest), include a questUpdates entry to advance or complete that quest.`);
 	parts.push('');
 	parts.push(`DIALOGUE & SOCIAL ENCOUNTERS:`);
 	parts.push(`- When a player speaks to an NPC, roleplay the NPC's response in character.`);

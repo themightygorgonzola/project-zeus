@@ -25,7 +25,7 @@ import type {
 import type { GameEvent } from '$lib/game/events';
 import type { PrototypeWorld } from '$lib/worldgen/prototype';
 import { canLevelUp, applyLevelUp } from '$lib/game/leveling';
-import { createEncounter, resolveEncounter, initEncounterTurnOrder } from '$lib/game/combat';
+import { createEncounter, resolveEncounter, initEncounterTurnOrder, syncCombatantsFromState } from '$lib/game/combat';
 import { generateCreatureStatBlock, averagePartyLevel, parseCreatureTier } from '$lib/game/creature-templates';
 import { skillCheck, abilityCheck, savingThrow } from '$lib/game/mechanics';
 import { SKILL_ABILITY_MAP } from '$lib/game/types';
@@ -233,7 +233,7 @@ export async function executeAdventureTurn(
 			});
 		}
 		const clarificationDebug = debugTurns ? buildClarificationDebug(resolvedTurn.stateChanges) : null;
-		await persistResolvedTurnAndState(payload, resolvedTurn, clarificationText, clarificationDebug);
+		await persistResolvedTurnAndState(payload, resolvedTurn, clarificationText, currentState, clarificationDebug);
 		return { narrativeText: clarificationText, model: 'server-executor' };
 	}
 
@@ -267,7 +267,7 @@ export async function executeAdventureTurn(
 			});
 		}
 
-		await persistResolvedTurnAndState(payload, resolvedTurn, rollPromptText, debugTurns ? {
+		await persistResolvedTurnAndState(payload, resolvedTurn, rollPromptText, currentState, debugTurns ? {
 			mode: 'awaiting-roll',
 			model: 'server-executor',
 			messages: [],
@@ -346,7 +346,7 @@ export async function executeAdventureTurn(
 		}
 
 		// Persist turn with empty narrative (no AI involvement)
-		await persistResolvedTurnAndState(payload, resolvedTurn, '', debugTurns ? {
+		await persistResolvedTurnAndState(payload, resolvedTurn, '', currentState, debugTurns ? {
 			mode: 'mid-round',
 			model: 'server-executor',
 			messages: [],
@@ -548,7 +548,7 @@ export async function executeAdventureTurn(
 			...resolvedTurn,
 			stateChanges: finalStateChanges
 		};
-		await persistResolvedTurnAndState(payload, finalResolvedTurn, narrativeText, debugData);
+		await persistResolvedTurnAndState(payload, finalResolvedTurn, narrativeText, currentState, debugData);
 
 		// Mark unconsumed chat as consumed by this turn
 		const chatIds = payload.recentChat.map((c) => c.id);
@@ -762,7 +762,7 @@ export async function resolveCheckAndResume(
 			engineResolvedCombat: false
 		} : null;
 
-		await persistResolvedTurnAndState(payload, resolvedTurn, narrativeText, debugData);
+		await persistResolvedTurnAndState(payload, resolvedTurn, narrativeText, state, debugData);
 		await broadcastTurnEvents(partyHost, adventureId, resolvedTurn, narrativeText, turnNumber);
 
 		return { narrativeText, model: profile.model };
@@ -1865,9 +1865,10 @@ async function persistResolvedTurnAndState(
 	payload: AdventureTurnPayload,
 	resolvedTurn: ResolvedTurn,
 	narrativeText: string,
+	currentState: GameState | null,
 	debugData?: TurnDebugData | null
 ): Promise<void> {
-	const state = await loadGameState(payload.adventureId);
+	const state = currentState ?? await loadGameState(payload.adventureId);
 	if (!state) return; // No game state yet — skip persistence (legacy adventure)
 
 	const turnNumber = state.nextTurnNumber;
@@ -1907,6 +1908,12 @@ async function persistResolvedTurnAndState(
 	// next round starts fresh. roundComplete===true means the AI just narrated the whole round.
 	if (resolvedTurn.roundComplete === true && state.activeEncounter) {
 		state.activeEncounter.roundActions = [];
+	}
+
+	// Sync combatant snapshots from the authoritative character/NPC data so that
+	// currentHp, conditions, defeated flags are consistent before we save.
+	if (state.activeEncounter) {
+		syncCombatantsFromState(state, state.activeEncounter);
 	}
 
 	// Trigger periodic world reaction every 5 turns
