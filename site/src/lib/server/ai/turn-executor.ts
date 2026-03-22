@@ -1,4 +1,4 @@
-import type { GameState, IntentType, MechanicResult, PlayerCharacter, StateChange, Item, GameClock, WeaponItem, GameId, NPC, ActiveEncounter, Combatant, PendingCombatAction, PendingCheck, AbilityName, SkillName } from '$lib/game/types';
+import type { GameState, IntentType, MechanicResult, PlayerCharacter, StateChange, Item, GameClock, WeaponItem, GameId, NPC, ActiveEncounter, Combatant, PendingCombatAction, PendingCheck, AbilityName, SkillName, CombatIntent } from '$lib/game/types';
 import { getAllKnownSpells, getAllPreparedSpells, getAllCantrips, SKILL_ABILITY_MAP } from '$lib/game/types';
 import { useConsumable, findItem } from '$lib/game/inventory';
 import { shortRest, longRest } from '$lib/game/rest';
@@ -297,7 +297,7 @@ function getHealTargetCount(state: GameState, actorUserId: string): number {
 	return state.characters.filter((character) => !character.dead && character.userId !== actorUserId).length;
 }
 
-export function resolveTurn(playerAction: string, state: GameState | null, actorUserId: string, intentOverride?: IntentType): ResolvedTurn {
+export function resolveTurn(playerAction: string, state: GameState | null, actorUserId: string, intentOverride?: IntentType, combatIntent?: CombatIntent): ResolvedTurn {
 	const intent = parseTurnIntent(playerAction, intentOverride);
 	const actor = state ? getActor(state, actorUserId) : undefined;
 	const base: ResolvedTurn = {
@@ -313,6 +313,65 @@ export function resolveTurn(playerAction: string, state: GameState | null, actor
 
 	if (!state) return base;
 	if (!actor) return base;
+
+	// -----------------------------------------------------------------------
+	// Combat classifier path: when a CombatIntent is provided by the dedicated
+	// LLM classifier, route directly by its type. This bypasses the regex
+	// waterfall entirely during active combat.
+	// -----------------------------------------------------------------------
+	if (combatIntent && state.activeEncounter?.status === 'active') {
+		switch (combatIntent.type) {
+			case 'attack':
+				return resolveCombatAttack(base, actor, state, intent, actorUserId, combatIntent.targetId, combatIntent.weaponItemId);
+			case 'cast-spell':
+				// If the classifier resolved a spell name, inject it into the intent
+				if (combatIntent.spellName) {
+					// Override the raw action to include the spell name for findSpellInAction
+					const spellAction = `cast ${combatIntent.spellName}`;
+					const spellIntent = parseTurnIntent(spellAction, 'cast-spell');
+					return resolveCastSpell(base, actor, state, spellIntent);
+				}
+				return resolveCastSpell(base, actor, state, { ...intent, primaryIntent: 'cast-spell' });
+			case 'use-item':
+				return resolveUseItem(base, actor, state);
+			case 'dodge':
+			case 'disengage':
+			case 'move':
+			case 'talk':
+			case 'flee': {
+				// Improvised combat action — stays in initiative order,
+				// the AI narrator will describe it within the combat context.
+				const enc = state.activeEncounter!;
+				const combatantId =
+					enc.awaitingActorId ??
+					(enc.combatants.find(c => c.type === 'character' && c.referenceId === actor.id)?.id ?? actor.id);
+				if (!enc.roundActions) enc.roundActions = [];
+				enc.roundActions.push({
+					combatantId,
+					rawAction: playerAction,
+					mechanicResults: [],
+					stateChanges: {},
+					timestamp: Date.now()
+				});
+				const advance = autoAdvancePastNpcs(state, enc);
+				const stateChanges: StateChange = {};
+				if (advance.stateChanges.hpChanges) stateChanges.hpChanges = advance.stateChanges.hpChanges;
+				if (advance.stateChanges.encounterEnded) stateChanges.encounterEnded = advance.stateChanges.encounterEnded;
+				const updatedCharacters = syncCharacterHpFromCombatants(state);
+				return {
+					...base,
+					resolvedActionSummary: `Combat action (${combatIntent.type}): ${playerAction}`,
+					mechanicResults: advance.mechanicResults,
+					stateChanges,
+					updatedCharacters,
+					roundComplete: advance.roundComplete
+				};
+			}
+			// query type is handled upstream in adventure-turn.ts — should never reach here
+			default:
+				return resolveCombatAttack(base, actor, state, intent, actorUserId, combatIntent.targetId, combatIntent.weaponItemId);
+		}
+	}
 
 	if (intent.mentionsHealing) {
 		const healingOptions = getAvailableHealingOptions(actor);
@@ -1149,7 +1208,9 @@ function resolveCombatAttack(
 	actor: PlayerCharacter,
 	state: GameState,
 	intent: ParsedTurnIntent,
-	actorUserId: string
+	actorUserId: string,
+	preResolvedTargetId?: string,
+	preResolvedWeaponItemId?: string
 ): ResolvedTurn {
 	const encounter = state.activeEncounter;
 	if (!encounter || encounter.status !== 'active') {
@@ -1180,14 +1241,34 @@ function resolveCombatAttack(
 	}
 
 	// --- PC attack resolution ---
-	// 1. Find target
-	const target = resolveAttackTarget(state, intent);
+	// 1. Find target — use pre-resolved targetId from combat classifier if available
+	let target: Combatant | null = null;
+	if (preResolvedTargetId) {
+		// Look up by referenceId (NPC id) first, then combatant id
+		target = encounter.combatants.find(c => !c.defeated && (c.referenceId === preResolvedTargetId || c.id === preResolvedTargetId)) ?? null;
+	}
+	if (!target) {
+		target = resolveAttackTarget(state, intent);
+	}
 	if (!target) {
 		return base;
 	}
 
-	// 2. Find weapon
-	const weapon = chooseAttackWeapon(actor, intent);
+	// 2. Find weapon — use pre-resolved weaponItemId from combat classifier if available
+	let weapon: WeaponItem;
+	if (preResolvedWeaponItemId) {
+		const found = actor.inventory.find(
+			(item): item is WeaponItem => item.category === 'weapon' && item.id === preResolvedWeaponItemId
+		);
+		if (found) {
+			autoEquipWeapon(actor, found);
+			weapon = found;
+		} else {
+			weapon = chooseAttackWeapon(actor, intent);
+		}
+	} else {
+		weapon = chooseAttackWeapon(actor, intent);
+	}
 
 	// 3. Resolve attack
 	const result = resolveAttack(state, actor, target, weapon, encounter);

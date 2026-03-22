@@ -5,8 +5,10 @@ import { notifyRoom } from './party';
 import { loadGameState, saveGameState, persistTurn, persistTurnAndSaveState, loadRecentTurns, loadUnconsumedChat, markChatConsumed } from '$lib/game/state';
 import type { ChatRecord } from '$lib/game/state';
 import { assembleGMContext, assembleNarrativeGMContext, assembleNarratorContext, assembleRoundNarratorContext, assembleStateExtractionContext } from '$lib/game/gm-context';
-import { resolveTurn, classifyIntent, type ResolvedTurn } from './turn-executor';
+import { resolveTurn, parseTurnIntent, type ResolvedTurn } from './turn-executor';
+import { classifyCombatIntent, buildClassifierInput } from './combat-classifier';
 import type {
+	CombatIntent,
 	Condition,
 	GameId,
 	GameState,
@@ -30,48 +32,6 @@ import { createEncounter, resolveEncounter, initEncounterTurnOrder, syncCombatan
 import { generateCreatureStatBlock, averagePartyLevel, parseCreatureTier } from '$lib/game/creature-templates';
 import { skillCheck, abilityCheck, savingThrow } from '$lib/game/mechanics';
 import { SKILL_ABILITY_MAP } from '$lib/game/types';
-
-// ---------------------------------------------------------------------------
-// AI-powered intent classification (fallback when regex is ambiguous)
-// ---------------------------------------------------------------------------
-
-const VALID_INTENTS: IntentType[] = [
-	'attack', 'move', 'talk', 'use-item', 'equip-item', 'drop-item',
-	'cast-spell', 'examine', 'rest', 'death-save', 'free-narration'
-];
-
-/**
- * Lightweight AI classification for player intent. Called only when the
- * regex fast-pass falls through to 'free-narration' during active combat,
- * where misclassification has the highest cost (player loses their attack).
- */
-async function classifyIntentWithAI(
-	action: string,
-	inCombat: boolean,
-	apiKey: string
-): Promise<IntentType> {
-	try {
-		const contextLine = inCombat
-			? 'The player is currently in active combat. Most combat inputs are attacks unless clearly otherwise.'
-			: '';
-		const response = await completeChat({
-			apiKey,
-			model: 'gpt-4o-mini',
-			messages: [
-				{
-					role: 'system',
-					content: `You classify D&D player action text into exactly one intent category. ${contextLine} Return ONLY one value from this list: ${VALID_INTENTS.join(', ')}. No explanation, no punctuation — just the single intent word.`
-				},
-				{ role: 'user', content: action }
-			]
-		});
-		const cleaned = response.trim().toLowerCase() as IntentType;
-		return VALID_INTENTS.includes(cleaned) ? cleaned : 'free-narration';
-	} catch (err) {
-		console.error('[classifyIntentWithAI] Failed, falling back to free-narration:', err);
-		return 'free-narration';
-	}
-}
 
 // ---------------------------------------------------------------------------
 // Public types (unchanged interface for existing callers)
@@ -260,23 +220,130 @@ export async function executeAdventureTurn(
 	const debugTurns = process.env.DEBUG_TURNS !== 'false'; // on by default
 	const currentState = await loadGameState(payload.adventureId);
 
-	// AI intent classification: when the regex fast-pass would fall through to
-	// 'free-narration' during active combat, ask a lightweight AI model to
-	// classify intent. This prevents natural phrasing like "I try again,
-	// fighting the rat" from losing the player's attack action.
+	// -----------------------------------------------------------------------
+	// Combat classifier: when there's an active encounter, use a dedicated
+	// LLM call to classify the player's intent into a structured CombatIntent.
+	// This replaces the fragile regex + AI-fallback approach entirely during combat.
+	// -----------------------------------------------------------------------
+	let combatIntent: CombatIntent | undefined;
 	let intentOverride: IntentType | undefined;
-	const regexIntent = classifyIntent(payload.playerAction);
-	// Widen the AI intent override: catch both `free-narration` (e.g. "I try again!")
-	// AND `use-item` (e.g. "I use my sword on it") during active combat, since both
-	// regex paths lose the player's attack action if left uncorrected.
-	if ((regexIntent === 'free-narration' || regexIntent === 'use-item') && currentState?.activeEncounter?.status === 'active') {
+	const inActiveCombat = currentState?.activeEncounter?.status === 'active';
+
+	if (inActiveCombat && currentState) {
 		const openaiKey = process.env.OPENAI_API_KEY;
 		if (openaiKey) {
-			intentOverride = await classifyIntentWithAI(payload.playerAction, true, openaiKey);
+			// Emit classifying phase event
+			if (partyHost) {
+				await broadcastGameEvent(partyHost, payload.adventureId, {
+					type: 'game:turn:classifying',
+					adventureId: payload.adventureId,
+					timestamp: Date.now()
+				});
+			}
+			const classifierInput = buildClassifierInput(payload.playerAction, currentState, payload.actorUserId);
+			combatIntent = await classifyCombatIntent(classifierInput, openaiKey, 'gpt-4o-mini');
+
+			// Query path: free action, does not consume a turn. Stream a lightweight
+			// response and return immediately without advancing initiative.
+			if (combatIntent.type === 'query') {
+				if (partyHost) {
+					await broadcastGameEvent(partyHost, payload.adventureId, {
+						type: 'game:turn:query',
+						adventureId: payload.adventureId,
+						timestamp: Date.now()
+					});
+					await notifyRoom(partyHost, payload.adventureId, {
+						type: 'ai:turn:start',
+						model: profile.model,
+						purpose: profile.purpose
+					});
+				}
+
+				// Build a lightweight context: just the active encounter + question
+				const enc = currentState.activeEncounter!;
+				const combatantList = enc.combatants
+					.filter(c => !c.defeated)
+					.map(c => `${c.name} (HP ${c.currentHp}/${c.maxHp}, AC ${c.ac})`)
+					.join(', ');
+				const queryMessages: ChatMessageInput[] = [
+					{
+						role: 'system',
+						content: `You are a D&D 5e GM answering a quick question during combat. Be concise (1-3 sentences). Active combatants: ${combatantList}. Current turn: ${enc.awaitingActorId ? enc.combatants.find(c => c.id === enc.awaitingActorId)?.name ?? 'unknown' : 'unknown'}.`
+					},
+					{ role: 'user', content: payload.playerAction }
+				];
+
+				let queryResponse = '';
+				if (profile.stream && partyHost) {
+					queryResponse = await streamChat(
+						{ apiKey: openaiKey, model: profile.model, messages: queryMessages },
+						async (chunk) => {
+							await notifyRoom(partyHost, payload.adventureId, {
+								type: 'ai:turn:chunk',
+								text: chunk
+							});
+						}
+					);
+				} else {
+					queryResponse = await completeChat({ apiKey: openaiKey, model: profile.model, messages: queryMessages });
+				}
+
+				if (partyHost) {
+					await notifyRoom(partyHost, payload.adventureId, {
+						type: 'ai:turn:end',
+						text: queryResponse,
+						model: profile.model
+					});
+				}
+
+				// Persist as a non-advancing turn (no state changes, no initiative step)
+				const queryResolvedTurn: ResolvedTurn = {
+					status: 'ready-for-narration',
+					intent: parseTurnIntent(payload.playerAction, 'free-narration'),
+					actorId: payload.actorUserId,
+					targets: [],
+					resourcesConsumed: [],
+					resolvedActionSummary: 'Query during combat (free action)',
+					mechanicResults: [],
+					stateChanges: {}
+				};
+				await persistResolvedTurnAndState(payload, queryResolvedTurn, queryResponse, currentState);
+
+				return { narrativeText: queryResponse, model: profile.model };
+			}
+
+			// Low confidence: ask for clarification
+			if (combatIntent.confidence === 'low') {
+				const clarifyText = `I'm not sure what you're trying to do. Could you rephrase your action? (e.g. "I attack the goblin with my sword" or "I cast Fire Bolt at the skeleton")`;
+				if (partyHost) {
+					await notifyRoom(partyHost, payload.adventureId, {
+						type: 'ai:turn:start',
+						model: 'server-executor',
+						purpose: profile.purpose
+					});
+					await notifyRoom(partyHost, payload.adventureId, {
+						type: 'ai:turn:end',
+						text: clarifyText,
+						model: 'server-executor'
+					});
+				}
+				const clarifyResolvedTurn: ResolvedTurn = {
+					status: 'needs-clarification',
+					intent: parseTurnIntent(payload.playerAction, 'free-narration'),
+					actorId: payload.actorUserId,
+					targets: [],
+					resourcesConsumed: [],
+					resolvedActionSummary: 'Low confidence combat intent — clarification requested',
+					mechanicResults: [],
+					stateChanges: {}
+				};
+				await persistResolvedTurnAndState(payload, clarifyResolvedTurn, clarifyText, currentState);
+				return { narrativeText: clarifyText, model: 'server-executor' };
+			}
 		}
 	}
 
-	const resolvedTurn = resolveTurn(payload.playerAction, currentState, payload.actorUserId, intentOverride);
+	const resolvedTurn = resolveTurn(payload.playerAction, currentState, payload.actorUserId, intentOverride, combatIntent);
 	if (resolvedTurn.status === 'needs-clarification') {
 		const clarificationText = resolvedTurn.clarification?.question ?? 'I need a little more detail before I can resolve that action.';
 		if (partyHost) {
@@ -529,6 +596,11 @@ export async function executeAdventureTurn(
 			// updates, NPC disposition changes, and other GM-level effects that
 			// the narrator alone cannot emit (it returns plain prose, not JSON).
 			if (resolvedTurn.stateChanges.encounterEnded?.outcome === 'victory' && currentState) {
+				await broadcastGameEvent(partyHost, payload.adventureId, {
+					type: 'game:turn:extracting',
+					adventureId: payload.adventureId,
+					timestamp: Date.now()
+				});
 				const pass2Start = Date.now();
 				const stateExtractionMessages = assembleStateExtractionContext(
 					currentState,
@@ -585,6 +657,11 @@ export async function executeAdventureTurn(
 		} else if (currentState) {
 			// Full GM mode — Pass 2: state extraction via JSON mode
 			narrativeText = rawResponse.trim();
+			await broadcastGameEvent(partyHost, payload.adventureId, {
+				type: 'game:turn:extracting',
+				adventureId: payload.adventureId,
+				timestamp: Date.now()
+			});
 			const pass2Start = Date.now();
 			const stateExtractionMessages = assembleStateExtractionContext(
 				currentState,
@@ -640,13 +717,6 @@ export async function executeAdventureTurn(
 			}
 		}
 
-		// Legacy narrative end
-		await notifyRoom(partyHost, payload.adventureId, {
-			type: 'ai:turn:end',
-			text: narrativeText,
-			model: profile.model
-		});
-
 		// Persist the turn and apply state changes
 		const finalResolvedTurn: ResolvedTurn = {
 			...resolvedTurn,
@@ -662,6 +732,14 @@ export async function executeAdventureTurn(
 
 		// Broadcast typed game events AFTER persistence
 		await broadcastTurnEvents(partyHost, payload.adventureId, finalResolvedTurn, narrativeText, turnNumber);
+
+		// ai:turn:end fires AFTER persistence + broadcast so the client can
+		// safely invalidateAll() immediately without a setTimeout race.
+		await notifyRoom(partyHost, payload.adventureId, {
+			type: 'ai:turn:end',
+			text: narrativeText,
+			model: profile.model
+		});
 
 		return { narrativeText, model: profile.model };
 	} catch (cause) {

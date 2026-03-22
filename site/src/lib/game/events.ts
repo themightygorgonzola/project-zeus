@@ -289,6 +289,27 @@ export interface WorldTimeAdvanceEvent extends BaseGameEvent<'world:time-advance
 }
 
 // ---------------------------------------------------------------------------
+// Turn phase events (pipeline progress — client shows status text)
+// ---------------------------------------------------------------------------
+
+/** Combat classifier is running (~150ms). Client shows "Reading your action…" */
+export interface TurnClassifyingEvent extends BaseGameEvent<'game:turn:classifying'> {}
+
+/** State-extraction pass 2 is running after narration. Client shows "Applying results…" */
+export interface TurnExtractingEvent extends BaseGameEvent<'game:turn:extracting'> {}
+
+/** Deterministic rewards computed. Client can briefly flash XP/quest/loot info. */
+export interface TurnRewardingEvent extends BaseGameEvent<'game:turn:rewarding'> {
+	xpAwarded?: { characterId: string; amount: number }[];
+	questsCompleted?: { questId: string; name: string }[];
+	objectivesCompleted?: { questId: string; objectiveId: string; text: string }[];
+	loot?: { characterId: string; itemName: string }[];
+}
+
+/** A combat query is being answered (no turn consumed). */
+export interface TurnQueryEvent extends BaseGameEvent<'game:turn:query'> {}
+
+// ---------------------------------------------------------------------------
 // Union type — everything the UI might receive
 // ---------------------------------------------------------------------------
 
@@ -318,7 +339,11 @@ export type GameEvent =
 	| InventoryRemovedEvent
 	| ClarificationRequestEvent
 	| WorldLocationUpdateEvent
-	| WorldTimeAdvanceEvent;
+	| WorldTimeAdvanceEvent
+	| TurnClassifyingEvent
+	| TurnExtractingEvent
+	| TurnRewardingEvent
+	| TurnQueryEvent;
 
 /**
  * Type guard for narrowing by event type.

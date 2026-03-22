@@ -130,6 +130,7 @@
 	let connected = $state(false);
 	let gmPendingId = $state<string | null>(null);
 	let gmThinking = $state(false);
+	let turnPhase = $state<'classifying' | 'narrating' | 'extracting' | 'rewarding' | 'query' | null>(null);
 	let lastGmTurnTs = $state(0); // timestamp of last GM message
 	let rollingCheck = $state(false); // true while a roll is being resolved
 
@@ -269,6 +270,7 @@
 			}
 
 			if (msg.type === 'ai:turn:start') {
+				turnPhase = 'narrating';
 				ensurePendingGmMessage();
 				await scrollChatToBottom();
 			}
@@ -288,6 +290,7 @@
 
 			if (msg.type === 'ai:turn:end') {
 				gmThinking = false;
+				turnPhase = null;
 				const text = String(msg.text ?? '');
 				const clarification = (msg as any).clarification as { reason: string; question: string; options: string[] } | undefined;
 
@@ -329,13 +332,14 @@
 					m.kind === 'party' ? { ...m, canRetroInvoke: false } : m
 				);
 				await scrollChatToBottom();
-				// Refresh server data (inventory, HP, etc.) — delay ensures the DB
-				// write from persistResolvedTurnAndState has fully completed.
-				setTimeout(() => invalidateAll(), 1000);
+				// Refresh server data (inventory, HP, etc.) — ai:turn:end now fires
+				// AFTER persistence, so we can invalidate immediately.
+				invalidateAll();
 			}
 
 			if (msg.type === 'ai:turn:error') {
 				gmThinking = false;
+				turnPhase = null;
 				const message = String(msg.message ?? 'The GM failed to respond.');
 				if (gmPendingId) {
 					messages = messages.map((m) =>
@@ -507,6 +511,20 @@
 					clarificationCategory: String(payload.category ?? 'other')
 				}];
 				await scrollChatToBottom();
+			}
+
+			// --- Combat classifier phase events ---
+			if (msg.type === 'game:turn:classifying') {
+				turnPhase = 'classifying';
+			}
+			if (msg.type === 'game:turn:extracting') {
+				turnPhase = 'extracting';
+			}
+			if (msg.type === 'game:turn:rewarding') {
+				turnPhase = 'rewarding';
+			}
+			if (msg.type === 'game:turn:query') {
+				turnPhase = 'query';
 			}
 		});
 	}
@@ -781,7 +799,19 @@
 							<span class="gm-name">Game Master</span>
 							<span class="gm-status">
 								{#if gmThinking}
-									Thinking…
+									{#if turnPhase === 'classifying'}
+										Classifying…
+									{:else if turnPhase === 'extracting'}
+										Updating world…
+									{:else if turnPhase === 'rewarding'}
+										Rewards…
+									{:else if turnPhase === 'query'}
+										Answering…
+									{:else if turnPhase === 'narrating'}
+										Narrating…
+									{:else}
+										Thinking…
+									{/if}
 								{:else if gmAwake}
 									Listening
 								{:else}

@@ -981,6 +981,48 @@ export interface ActiveEncounter {
 	 * Accumulates all resolved actions this round. Cleared after round-end narration.
 	 */
 	roundActions?: PendingCombatAction[];
+	/**
+	 * Quest objective IDs that are structurally linked to this encounter.
+	 * Set at encounter creation by matching creature names against quest objective text.
+	 * On victory, resolveEncounter auto-completes these — no AI inference needed.
+	 */
+	linkedObjectiveIds?: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Combat Intent — structured output from the per-turn LLM classifier
+// ---------------------------------------------------------------------------
+
+export type CombatIntentType =
+	| 'attack'
+	| 'cast-spell'
+	| 'use-item'
+	| 'move'
+	| 'dodge'
+	| 'disengage'
+	| 'flee'
+	| 'talk'
+	| 'query';
+
+/**
+ * Structured intent produced by the dedicated combat classifier LLM.
+ * Replaces regex-based intent classification during active combat.
+ * Resolves intent, target, weapon, and spell in a single call.
+ */
+export interface CombatIntent {
+	type: CombatIntentType;
+	/** Combatant reference ID resolved by the classifier from the encounter list. */
+	targetId?: string;
+	/** What the player said about the target, for narration context. */
+	targetDescription?: string;
+	/** Inventory item ID resolved for the weapon to use. */
+	weaponItemId?: string;
+	/** Spell name resolved from the actor's prepared/known spells. */
+	spellName?: string;
+	/** Fuzzy item description for use-item intent. */
+	itemHint?: string;
+	/** High = proceed, low = ask for clarification. */
+	confidence: 'high' | 'low';
 }
 
 // ---------------------------------------------------------------------------

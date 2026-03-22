@@ -21,6 +21,7 @@ import type {
 	GameState,
 	NPC,
 	PlayerCharacter,
+	Quest,
 	StateChange,
 	WeaponItem
 } from './types';
@@ -308,6 +309,46 @@ export function rollInitiative(
  * Rolls initiative for all PCs + creatures, builds sorted initiative order,
  * and returns a new encounter object plus a StateChange.
  */
+// ---------------------------------------------------------------------------
+// Encounter ↔ Quest Linking
+// ---------------------------------------------------------------------------
+
+/**
+ * Scan active quest objectives for mentions of creature names involved in this
+ * encounter. Returns objective IDs that plausibly relate to defeating these
+ * creatures — enabling deterministic quest advancement on victory without
+ * relying on AI extraction.
+ *
+ * Matching is case-insensitive and uses word boundaries so "kill the goblin
+ * scouts" matches creatures named "Goblin Scout" or "goblin".
+ */
+export function linkEncounterToQuests(
+	quests: Quest[],
+	creatures: NPC[]
+): string[] {
+	const linkedIds: string[] = [];
+	const creatureNames = creatures.map(c => c.name.toLowerCase());
+
+	for (const quest of quests) {
+		if (quest.status !== 'active') continue;
+		for (const obj of quest.objectives) {
+			if (obj.done) continue;
+			const objLower = obj.text.toLowerCase();
+			for (const name of creatureNames) {
+				// Match full name or individual words (e.g. "goblin" in "Goblin Archer")
+				const words = name.split(/\s+/);
+				const patterns = [name, ...words.filter(w => w.length > 3)];
+				if (patterns.some(p => objLower.includes(p))) {
+					linkedIds.push(obj.id);
+					break; // Don't double-link same objective
+				}
+			}
+		}
+	}
+
+	return [...new Set(linkedIds)]; // deduplicate
+}
+
 export function createEncounter(
 	state: GameState,
 	creatures: NPC[]
@@ -344,7 +385,8 @@ export function createEncounter(
 		initiativeOrder: combatants.map(c => c.id),
 		combatants,
 		status: 'active',
-		startedAt: Date.now()
+		startedAt: Date.now(),
+		linkedObjectiveIds: linkEncounterToQuests(state.quests, creatures)
 	};
 
 	// Populate combatant snapshots from authoritative game state.
@@ -865,6 +907,29 @@ export function resolveEncounter(
 					amount: xpPerCharacter
 				});
 			}
+		}
+	}
+
+	// Deterministic quest advancement: mark linked objectives as done on victory
+	if ((outcome === 'victory' || outcome === 'negotiated') && encounter.linkedObjectiveIds?.length) {
+		const questUpdates: StateChange['questUpdates'] = [];
+		for (const quest of state.quests) {
+			if (quest.status !== 'active') continue;
+			for (const obj of quest.objectives) {
+				if (obj.done) continue;
+				if (encounter.linkedObjectiveIds.includes(obj.id)) {
+					questUpdates.push({
+						questId: quest.id,
+						field: 'objectiveDone',
+						oldValue: false,
+						newValue: true,
+						objectiveId: obj.id
+					});
+				}
+			}
+		}
+		if (questUpdates.length > 0) {
+			stateChange.questUpdates = questUpdates;
 		}
 	}
 
