@@ -136,6 +136,7 @@ function buildNarrativeSystemPrompt(state: GameState, worldBrief: string): strin
 	parts.push(`- Combat begins ONLY when hostilities are explicit: someone attacks, an ambush springs, or a creature charges.`);
 	parts.push(`- When combat truly begins, announce it clearly with a phrase like "Combat begins!" or "Hostilities break out!" so the boundary is unmistakable.`);
 	parts.push(`- IMPORTANT: Do NOT say "Roll for initiative!" — initiative is automatically resolved by the engine. Never ask the player to roll initiative.`);
+	parts.push(`- Do NOT write combat-declaration prose ("Combat begins!", "Prepare yourself!", etc.) unless your state changes ALSO include a valid encounterStarted with named creatures. If enemies are present but the encounter isn't ready yet, describe the approach or discovery — save the combat announcement for the turn that includes encounterStarted.`);
 	parts.push(`- Scouting, observing, reconnaissance, hearing rumors about enemies, and cautious dialogue NEVER start combat on their own.`);
 	parts.push(`- A player saying "I look for enemies" or "I scout ahead" is gathering information, not starting a fight.`);
 	parts.push('');
@@ -1210,7 +1211,9 @@ export function assembleRoundNarratorContext(
 
 	// 4. The full round as facts → narrate as a cohesive scene
 	const roundSummary = formatRoundActionsSummary(state, roundActions);
-	const round = state.activeEncounter?.round ?? '?';
+	// encounter.round has already been incremented to the NEXT round by
+	// advanceTurn, so subtract 1 to label the round that just completed.
+	const round = Math.max(1, (state.activeEncounter?.round ?? 2) - 1);
 
 	messages.push({
 		role: 'user',

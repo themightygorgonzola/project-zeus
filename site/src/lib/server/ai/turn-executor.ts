@@ -79,7 +79,7 @@ const HEALING_SPELLS = new Set([
 	'goodberry'
 ]);
 
-function classifyIntent(action: string): IntentType {
+export function classifyIntent(action: string): IntentType {
 	const lower = action.toLowerCase();
 	// Only treat as "asking about possibility" when the person is NOT issuing a first-person battle action.
 	// e.g. "I see this is odd? I attack the brigand!" should still be classified as attack.
@@ -108,7 +108,7 @@ function classifyIntent(action: string): IntentType {
 	return 'free-narration';
 }
 
-export function parseTurnIntent(action: string): ParsedTurnIntent {
+export function parseTurnIntent(action: string, intentOverride?: IntentType): ParsedTurnIntent {
 	const lower = action.toLowerCase();
 	const targetHint = /\b(myself|my self|self|me)\b/.test(lower)
 		? 'self'
@@ -122,7 +122,7 @@ export function parseTurnIntent(action: string): ParsedTurnIntent {
 
 	return {
 		rawAction: action,
-		primaryIntent: classifyIntent(action),
+		primaryIntent: intentOverride ?? classifyIntent(action),
 		mentionsHealing: /\b(heal|healing|cure|restore|mend|revive)\b/.test(lower),
 		mentionsPotion: /\b(potion|elixir|draught|vial)\b/.test(lower),
 		mentionsPoison: /\b(poison|venom|toxin)\b/.test(lower),
@@ -297,8 +297,8 @@ function getHealTargetCount(state: GameState, actorUserId: string): number {
 	return state.characters.filter((character) => !character.dead && character.userId !== actorUserId).length;
 }
 
-export function resolveTurn(playerAction: string, state: GameState | null, actorUserId: string): ResolvedTurn {
-	const intent = parseTurnIntent(playerAction);
+export function resolveTurn(playerAction: string, state: GameState | null, actorUserId: string, intentOverride?: IntentType): ResolvedTurn {
+	const intent = parseTurnIntent(playerAction, intentOverride);
 	const actor = state ? getActor(state, actorUserId) : undefined;
 	const base: ResolvedTurn = {
 		status: 'ready-for-narration',
