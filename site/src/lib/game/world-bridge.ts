@@ -2,7 +2,8 @@
  * Project Zeus — World-to-Adventure Bridge
  *
  * Transforms the macro-level PrototypeWorld into adventure-scale content:
- * starting locations, local NPCs, quest hooks.
+ * starting locations, local NPCs, quest hooks, and a guided-sandbox quest
+ * graph seeded from faction conflicts, lore notes, and trade routes.
  *
  * Some of these are deterministic (seed-based), others are AI-assisted
  * (called at adventure start or on-demand as the party explores).
@@ -10,7 +11,7 @@
  */
 
 import { ulid } from 'ulid';
-import type { Location, NPC, Quest, QuestObjective, Item, GameState, GameId } from '$lib/game/types';
+import type { Location, NPC, Quest, QuestObjective, QuestObjectiveType, Item, GameState, GameId, EncounterTemplateTier } from '$lib/game/types';
 import type { PrototypeWorld } from '$lib/worldgen/prototype';
 import { getArmor, getGear, getWeapon } from '$lib/game/data';
 
@@ -88,55 +89,355 @@ function buildSettlementDescription(
 }
 
 // ---------------------------------------------------------------------------
-// Starter NPCs (deterministic, no AI call)
+// Nearby Location Pre-seeding
 // ---------------------------------------------------------------------------
 
+type SettlementEntry = PrototypeWorld['politics']['settlements'][0];
+type StateEntry = PrototypeWorld['politics']['states'][0];
+
 /**
- * Generate a small set of seed NPCs for the starting location.
- * These are basic archetypes the GM can reference immediately.
+ * Pre-seed 3-5 nearby settlements as game Locations, connected to the starting
+ * location. Uses euclidean distance between settlement coordinates.
+ * Each location starts unvisited — the party will discover them through travel.
  */
-export function seedStarterNPCs(
+export function seedNearbyLocations(
+	startLocation: Location,
+	world: PrototypeWorld,
+	maxCount = 4
+): Location[] {
+	const startSettlement = world.politics.settlements.find((s) => s.i === startLocation.regionRef);
+	if (!startSettlement) return [];
+
+	// Sort other settlements by distance from start
+	const others = world.politics.settlements
+		.filter((s) => s.i !== startSettlement.i)
+		.map((s) => ({
+			settlement: s,
+			dist: Math.hypot(s.x - startSettlement.x, s.y - startSettlement.y)
+		}))
+		.sort((a, b) => a.dist - b.dist)
+		.slice(0, maxCount);
+
+	return others.map(({ settlement }) => {
+		const ownerState = world.politics.states.find((s) => s.i === settlement.state);
+		const culture = world.societies.cultures.find((c) => c.i === settlement.culture);
+		const description = buildSettlementDescription(settlement, ownerState, culture, world);
+
+		const loc: Location = {
+			id: ulid(),
+			name: settlement.name,
+			regionRef: settlement.i,
+			type: 'settlement',
+			description,
+			connections: [startLocation.id], // connected to start
+			npcs: [],
+			features: [
+				`A ${settlement.group} of about ${Math.round(settlement.population * 1000).toLocaleString('en')} people.`,
+				ownerState ? `Under the rule of ${ownerState.fullName}.` : '',
+				culture ? `The locals follow ${culture.name} customs.` : ''
+			].filter(Boolean),
+			visited: false
+		};
+
+		return loc;
+	});
+}
+
+// ---------------------------------------------------------------------------
+// Quest Graph Seeding
+// ---------------------------------------------------------------------------
+
+/** Helper: build a typed QuestObjective. */
+function objective(
+	text: string,
+	type: QuestObjectiveType,
+	linkedEntityId?: GameId,
+	linkedEntityName?: string
+): QuestObjective {
+	return { id: ulid(), text, done: false, type, linkedEntityId, linkedEntityName };
+}
+
+/**
+ * Seed 3-5 quests derived from PrototypeWorld faction conflicts, lore,
+ * trade routes, and religious tensions. Each quest uses typed objectives
+ * with linkedEntityId for deterministic auto-tracking.
+ *
+ * Returns { quests, npcs } — caller adds both to GameState.
+ */
+export function seedQuestGraph(
+	startLocation: Location,
+	nearbyLocations: Location[],
+	world: PrototypeWorld,
+	startSettlement: SettlementEntry
+): { quests: Quest[]; npcs: NPC[] } {
+	const quests: Quest[] = [];
+	const npcs: NPC[] = [];
+
+	const startState = world.politics.states.find((s) => s.i === startSettlement.state);
+	const allLocations = [startLocation, ...nearbyLocations];
+
+	// -----------------------------------------------------------------------
+	// Quest 1 — Local Trouble (starter, always present)
+	// -----------------------------------------------------------------------
+	const questGiver = makeNpc(
+		startLocation.id, world, startSettlement, 'quest',
+		'quest-giver', 10,
+		'A worried elder who has been looking for capable souls to handle a growing problem.',
+		'Offers the starter quest. Knows about the local threat but is too old to deal with it personally.'
+	);
+	npcs.push(questGiver);
+
+	const loreHook = world.lore.notes.length > 0
+		? world.lore.notes[0].legend
+		: 'Strange creatures have been spotted in the surrounding wilds.';
+
+	quests.push({
+		id: ulid(),
+		name: `Trouble Near ${startSettlement.name}`,
+		giverNpcId: questGiver.id,
+		status: 'available',
+		description: `The people of ${startSettlement.name} are worried. ${loreHook} Someone needs to investigate and deal with the threat before it grows worse.`,
+		objectives: [
+			objective(`Speak with ${questGiver.name} to learn about the threat`, 'talk-to', questGiver.id, questGiver.name),
+			objective('Investigate the source of the disturbance', 'visit-location'),
+			objective('Defeat the creatures causing the disturbance', 'defeat-encounter')
+		],
+		rewards: { xp: 100, gold: startState ? 25 : 15, items: [], reputationChanges: [{ npcId: questGiver.id, delta: 10 }] },
+		recommendedLevel: 1,
+		encounterTemplates: ['soldier']
+	});
+
+	// -----------------------------------------------------------------------
+	// Quest 2 — Faction Conflict (if rival/enemy neighbor exists)
+	// -----------------------------------------------------------------------
+	const rivalRelation = findRivalRelation(startState, world);
+	if (rivalRelation && nearbyLocations.length > 0) {
+		const rivalState = world.politics.states.find((s) => s.i === rivalRelation.to);
+		const borderLocation = nearbyLocations[0]; // closest nearby settlement
+
+		const scout = makeNpc(
+			startLocation.id, world, startSettlement, 'scout',
+			'quest-giver', 5,
+			`A border scout who watches for ${rivalState?.name ?? 'foreign'} incursions.`,
+			`Reports to ${startState?.name ?? 'local'} leadership. Has firsthand knowledge of recent border skirmishes.`
+		);
+		npcs.push(scout);
+
+		quests.push({
+			id: ulid(),
+			name: `${rivalState?.name ?? 'Border'} Tensions`,
+			giverNpcId: scout.id,
+			status: 'available',
+			description: `${rivalRelation.type === 'enemy' ? 'Open hostilities' : 'Growing tensions'} between ${startState?.fullName ?? 'the local realm'} and ${rivalState?.fullName ?? 'a rival power'} threaten the border settlements. ${scout.name} needs someone to investigate.`,
+			objectives: [
+				objective(`Speak with ${scout.name} about the border situation`, 'talk-to', scout.id, scout.name),
+				objective(`Travel to ${borderLocation.name} to assess the situation`, 'visit-location', borderLocation.id, borderLocation.name),
+				objective('Deal with the hostile patrol', 'defeat-encounter')
+			],
+			rewards: {
+				xp: 150,
+				gold: 30,
+				items: [],
+				reputationChanges: [{ npcId: scout.id, delta: 15 }]
+			},
+			recommendedLevel: 2,
+			encounterTemplates: ['soldier', 'soldier'] as EncounterTemplateTier[]
+		});
+	}
+
+	// -----------------------------------------------------------------------
+	// Quest 3 — Religious/Cultural Tension (if different religion nearby)
+	// -----------------------------------------------------------------------
+	const religionQuest = buildReligionQuest(startLocation, nearbyLocations, world, startSettlement, startState);
+	if (religionQuest) {
+		npcs.push(religionQuest.npc);
+		quests.push(religionQuest.quest);
+	}
+
+	// -----------------------------------------------------------------------
+	// Quest 4 — Trade Route Escort / Merchant Problem
+	// -----------------------------------------------------------------------
+	if (nearbyLocations.length >= 2) {
+		const merchantDest = nearbyLocations[1]; // second-closest settlement
+		const merchant = makeNpc(
+			startLocation.id, world, startSettlement, 'merchant',
+			'merchant', 0,
+			'A traveling trader who deals in provisions, simple weapons, and the occasional curiosity.',
+			`Regularly travels to ${merchantDest.name}. Worried about bandit activity on the road.`
+		);
+		npcs.push(merchant);
+
+		quests.push({
+			id: ulid(),
+			name: `Safe Passage to ${merchantDest.name}`,
+			giverNpcId: merchant.id,
+			status: 'available',
+			description: `${merchant.name} needs to deliver goods to ${merchantDest.name} but the roads have become dangerous. The merchant is willing to pay for an escort.`,
+			objectives: [
+				objective(`Speak with ${merchant.name} about the journey`, 'talk-to', merchant.id, merchant.name),
+				objective(`Travel to ${merchantDest.name}`, 'visit-location', merchantDest.id, merchantDest.name),
+				objective('Fend off any ambush on the road', 'defeat-encounter')
+			],
+			rewards: {
+				xp: 100,
+				gold: 40,
+				items: [],
+				reputationChanges: [{ npcId: merchant.id, delta: 10 }]
+			},
+			recommendedLevel: 1,
+			encounterTemplates: ['minion', 'minion', 'soldier'] as EncounterTemplateTier[]
+		});
+	}
+
+	// -----------------------------------------------------------------------
+	// Quest 5 — Lore / Ancient Mystery (if enough lore notes)
+	// -----------------------------------------------------------------------
+	if (world.lore.notes.length >= 3 && nearbyLocations.length >= 3) {
+		const ruinsLocation = nearbyLocations[2]; // use a farther settlement
+		const loreNote = world.lore.notes[2]; // use a different note than quest 1
+
+		const scholar = makeNpc(
+			startLocation.id, world, startSettlement, 'scholar',
+			'neutral', 15,
+			'A traveling scholar researching ancient legends of this region.',
+			`Seeking proof of the "${loreNote.name}". Believes ${ruinsLocation.name} holds clues.`
+		);
+		npcs.push(scholar);
+
+		quests.push({
+			id: ulid(),
+			name: loreNote.name,
+			giverNpcId: scholar.id,
+			status: 'available',
+			description: `${scholar.name} is investigating an old legend: ${loreNote.legend} The scholar believes clues can be found near ${ruinsLocation.name}.`,
+			objectives: [
+				objective(`Speak with ${scholar.name} about the legend`, 'talk-to', scholar.id, scholar.name),
+				objective(`Investigate ${ruinsLocation.name} for clues`, 'visit-location', ruinsLocation.id, ruinsLocation.name),
+				objective('Recover the ancient artifact', 'find-item', undefined, 'Ancient Artifact')
+			],
+			rewards: {
+				xp: 200,
+				gold: 20,
+				items: [],
+				reputationChanges: [{ npcId: scholar.id, delta: 20 }]
+			},
+			recommendedLevel: 3,
+			encounterTemplates: ['elite'] as EncounterTemplateTier[]
+		});
+	}
+
+	// Also add a tavern keeper (non-quest NPC for atmosphere)
+	const tavernKeeper = makeNpc(
+		startLocation.id, world, startSettlement, 'tavern',
+		'neutral', 20,
+		'The keeper of the local tavern. Friendly, well-informed, and always happy to share rumors over a drink.',
+		'Knows local gossip. Can point players toward quests. Has a soft spot for adventurers.'
+	);
+	npcs.push(tavernKeeper);
+
+	return { quests, npcs };
+}
+
+// ---------------------------------------------------------------------------
+// Quest Graph Helpers
+// ---------------------------------------------------------------------------
+
+/** Find an enemy or rival relation for the starting state. */
+function findRivalRelation(
+	startState: StateEntry | undefined,
+	world: PrototypeWorld
+): PrototypeWorld['politics']['relations'][0] | undefined {
+	if (!startState) return undefined;
+	return world.politics.relations.find(
+		(r) => r.from === startState.i && (r.type === 'enemy' || r.type === 'rival')
+	);
+}
+
+/** Build a religion-tension quest if a nearby settlement has a different faith. */
+function buildReligionQuest(
+	startLocation: Location,
+	nearbyLocations: Location[],
+	world: PrototypeWorld,
+	startSettlement: SettlementEntry,
+	startState: StateEntry | undefined
+): { quest: Quest; npc: NPC } | null {
+	if (!startState) return null;
+
+	const startReligion = world.societies.religions.find((r) => r.i === startState.religion);
+	if (!startReligion) return null;
+
+	// Find a nearby location with a different state religion
+	for (const loc of nearbyLocations) {
+		const locSettlement = world.politics.settlements.find((s) => s.i === loc.regionRef);
+		if (!locSettlement) continue;
+		const locState = world.politics.states.find((s) => s.i === locSettlement.state);
+		if (!locState || locState.religion === startState.religion) continue;
+
+		const foreignReligion = world.societies.religions.find((r) => r.i === locState.religion);
+		if (!foreignReligion) continue;
+
+		const priest = makeNpc(
+			startLocation.id, world, startSettlement, 'priest',
+			'quest-giver', 5,
+			`A ${startReligion.name} priest concerned about the spread of ${foreignReligion.name} influence.`,
+			`Devout follower of ${startReligion.name}. Wants to understand — not necessarily oppose — the foreign faith.`
+		);
+
+		const quest: Quest = {
+			id: ulid(),
+			name: `Clash of Faiths`,
+			giverNpcId: priest.id,
+			status: 'available',
+			description: `The ${startReligion.name} and ${foreignReligion.name} have begun to clash in the border regions. ${priest.name} wants someone to investigate the situation in ${loc.name} before it escalates.`,
+			objectives: [
+				objective(`Speak with ${priest.name} about the religious tensions`, 'talk-to', priest.id, priest.name),
+				objective(`Visit ${loc.name} to observe the ${foreignReligion.name} presence`, 'visit-location', loc.id, loc.name),
+				objective('Report back on the situation', 'talk-to', priest.id, priest.name)
+			],
+			rewards: {
+				xp: 120,
+				gold: 20,
+				items: [],
+				reputationChanges: [{ npcId: priest.id, delta: 15 }]
+			},
+			recommendedLevel: 2,
+			encounterTemplates: ['soldier'] as EncounterTemplateTier[]
+		};
+
+		return { quest, npc: priest };
+	}
+
+	return null;
+}
+
+// ---------------------------------------------------------------------------
+// NPC Factory
+// ---------------------------------------------------------------------------
+
+/** Create an NPC from world data with a culture-hashed name. */
+function makeNpc(
 	locationId: GameId,
 	world: PrototypeWorld,
-	settlement: PrototypeWorld['politics']['settlements'][0]
-): NPC[] {
+	settlement: SettlementEntry,
+	roleKey: string,
+	npcRole: NPC['role'],
+	disposition: number,
+	description: string,
+	notes: string
+): NPC {
 	const culture = world.societies.cultures.find((c) => c.i === settlement.culture);
 	const cultureName = culture?.name ?? 'local';
 
-	const npcs: NPC[] = [
-		{
-			id: ulid(),
-			name: generateNpcName(cultureName, 'tavern'),
-			role: 'neutral',
-			locationId,
-			disposition: 20,
-			description: `The keeper of the local tavern. Friendly, well-informed, and always happy to share rumors over a drink.`,
-			notes: `Knows local gossip. Can point players toward quests. Has a soft spot for adventurers.`,
-			alive: true
-		},
-		{
-			id: ulid(),
-			name: generateNpcName(cultureName, 'merchant'),
-			role: 'merchant',
-			locationId,
-			disposition: 0,
-			description: `A traveling trader who deals in provisions, simple weapons, and the occasional curiosity.`,
-			notes: `Carries basic adventuring gear. Prices are fair but firm.`,
-			alive: true
-		},
-		{
-			id: ulid(),
-			name: generateNpcName(cultureName, 'quest'),
-			role: 'quest-giver',
-			locationId,
-			disposition: 10,
-			description: `A worried elder who has been looking for capable souls to handle a growing problem.`,
-			notes: `Offers the starter quest. Knows about the local threat but is too old to deal with it personally.`,
-			alive: true
-		}
-	];
-
-	return npcs;
+	return {
+		id: ulid(),
+		name: generateNpcName(cultureName, roleKey),
+		role: npcRole,
+		locationId,
+		disposition,
+		description,
+		notes,
+		alive: true
+	};
 }
 
 /**
@@ -159,48 +460,6 @@ function generateNpcName(cultureName: string, _role: string): string {
 	const suffix = suffixes[(absHash >> 4) % suffixes.length];
 
 	return prefix + suffix;
-}
-
-// ---------------------------------------------------------------------------
-// Starter Quest (deterministic template)
-// ---------------------------------------------------------------------------
-
-/**
- * Create a simple starter quest tied to the starting location.
- */
-export function seedStarterQuest(
-	giverNpcId: GameId,
-	locationId: GameId,
-	world: PrototypeWorld,
-	settlement: PrototypeWorld['politics']['settlements'][0]
-): Quest {
-	const state = world.politics.states.find((s) => s.i === settlement.state);
-
-	// Pick a threat from lore notes if available
-	const loreHook = world.lore.notes.length > 0
-		? world.lore.notes[0].legend
-		: 'Strange creatures have been spotted in the surrounding wilds.';
-
-	return {
-		id: ulid(),
-		name: `Trouble Near ${settlement.name}`,
-		giverNpcId,
-		status: 'available',
-		description: `The people of ${settlement.name} are worried. ${loreHook} Someone needs to investigate and deal with the threat before it grows worse.`,
-		objectives: [
-			{ id: ulid(), text: `Speak with the locals to learn more about the threat`, done: false },
-			{ id: ulid(), text: `Investigate the source of the disturbance`, done: false },
-			{ id: ulid(), text: `Resolve the threat`, done: false }
-		],
-		rewards: {
-			xp: 100,
-			gold: state ? 25 : 15,
-			items: [],
-			reputationChanges: [{ npcId: giverNpcId, delta: 10 }]
-		},
-		recommendedLevel: 1,
-		encounterTemplates: ['soldier']
-	};
 }
 
 // ---------------------------------------------------------------------------
@@ -385,9 +644,12 @@ export function starterEquipment(className: string): Item[] {
 // ---------------------------------------------------------------------------
 
 /**
- * Initialize the GameState with a starting location, NPCs, and quest
- * derived from the PrototypeWorld. Called when the adventure transitions
- * from lobby → active (after character creation).
+ * Initialize the GameState with a starting location, nearby settlements,
+ * NPCs, and a quest graph derived from the PrototypeWorld.
+ *
+ * Called when the adventure transitions from lobby → active (after character
+ * creation). Generates 3-5 quests from faction conflicts, lore, trade routes,
+ * and religious tensions — all with typed objectives for deterministic tracking.
  */
 export function bootstrapAdventureContent(
 	state: GameState,
@@ -398,21 +660,25 @@ export function bootstrapAdventureContent(
 	state.locations.push(startLocation);
 	state.partyLocationId = startLocation.id;
 
-	// 2. Seed NPCs
+	// 2. Pre-seed nearby settlements (unvisited, connected to start)
+	const nearbyLocations = seedNearbyLocations(startLocation, world, 4);
+	state.locations.push(...nearbyLocations);
+
+	// Wire connections from start location to nearby ones
+	startLocation.connections = nearbyLocations.map((l) => l.id);
+
+	// 3. Find the starting settlement for quest generation
 	const settlement = world.politics.settlements.find((s) => s.i === startLocation.regionRef)
 		?? world.politics.settlements[0];
-	const npcs = seedStarterNPCs(startLocation.id, world, settlement);
+
+	// 4. Seed the quest graph (quests + linked NPCs)
+	const { quests, npcs } = seedQuestGraph(startLocation, nearbyLocations, world, settlement);
 	state.npcs.push(...npcs);
+	state.quests.push(...quests);
 
-	// Wire NPC IDs into the location
-	startLocation.npcs = npcs.map((n) => n.id);
-
-	// 3. Seed starter quest
-	const questGiver = npcs.find((n) => n.role === 'quest-giver');
-	if (questGiver) {
-		const quest = seedStarterQuest(questGiver.id, startLocation.id, world, settlement);
-		state.quests.push(quest);
-	}
+	// Wire NPC IDs into the starting location
+	const startNpcIds = npcs.filter((n) => n.locationId === startLocation.id).map((n) => n.id);
+	startLocation.npcs = startNpcIds;
 
 	return state;
 }

@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
 	import { abilityModifier, getAllCantrips, getAllKnownSpells, getAllPreparedSpells, getTotalHitDiceRemaining } from '$lib/game';
 	import { CLASS_HIT_DIE } from '$lib/game/types';
 	import type { AbilityName, PlayerCharacter, SpellSlotPool, WeaponItem, ArmorItem } from '$lib/game/types';
@@ -9,7 +9,7 @@
 	interface QuestObjective { id: string; text: string; done: boolean; }
 	interface Quest { id: string; name: string; description: string; status: string; objectives: QuestObjective[]; }
 	interface Location { id: string; name: string; type: string; description: string; features: string[]; visited: boolean; }
-	interface NPC { id: string; name: string; role: string; description: string; alive: boolean; locationId?: string; }
+	interface NPC { id: string; name: string; role: string; description: string; alive: boolean; locationId?: string; archived?: boolean; statBlock?: { hp: number; maxHp: number; ac?: number }; }
 	interface GameClock { day: number; timeOfDay: string; weather: string; }
 	interface Member { userId: string; username: string; avatarUrl?: string | null; }
 
@@ -93,6 +93,10 @@
 	);
 	let localNpcs = $derived(
 		currentLocationId ? npcs.filter(n => n.locationId === currentLocationId) : npcs.slice(0, 5)
+	);
+
+	let companions = $derived(
+		npcs.filter(n => n.alive && !n.archived && (n.role === 'companion' || n.role === 'ally'))
 	);
 
 	let activeQuests = $derived(quests.filter(q => q.status === 'active' || q.status === 'available'));
@@ -312,68 +316,92 @@
 			{/if}
 
 		<!-- ─── PARTY ─── -->
-		{:else if activeTab === 'party'}
-			<div class="party-tab">
-				{#each members as member}
-					{@const pc = partyCharacters[member.userId] ?? null}
-					<div class="party-card">
-						<div class="party-card-header">
-							{#if member.avatarUrl}
-								<img src={member.avatarUrl} alt="" class="party-avatar" />
-							{:else}
-								<div class="party-avatar party-avatar-placeholder">
-									{member.username.charAt(0).toUpperCase()}
-								</div>
-							{/if}
-							<div class="party-identity">
-								<span class="party-username">
-									{member.username}
-									{#if member.userId === currentUserId}
-										<span class="you-tag">(you)</span>
-									{/if}
-								</span>
-								{#if pc}
-									<span class="party-char-line">{pc.name} · {classLine(pc)}</span>
-									<span class="party-race-line muted-sm">{fmt(pc.race)}{pc.subrace ? ` ${fmt(pc.subrace)}` : ''}</span>
-								{:else}
-									<span class="muted-sm">No character yet</span>
-								{/if}
-							</div>
-							{#if pc}
-								<div class="party-ac-badge">{pc.ac}<small>AC</small></div>
-							{/if}
-						</div>
-						{#if pc}
-							<div class="party-hp-section">
-								<div class="hp-bar-track">
-									<div class="hp-bar-fill" style="width:{hpPercent(pc)}%; background:{hpColor(pc)}"></div>
-								</div>
-								<span class="party-hp-text" style="color:{hpColor(pc)}">
-									{pc.hp}/{pc.maxHp} HP
-								</span>
-							</div>
-							{#if pc.conditions.length > 0}
-								<div class="pill-row mt-xs">
-									{#each pc.conditions as cond}
-										<span class="condition-pill sm" style="border-color:{conditionColor(cond)}; color:{conditionColor(cond)}">
-											{fmt(cond)}
-										</span>
-									{/each}
-								</div>
-							{/if}
-							<!-- Mini abilities row -->
-							<div class="mini-abilities">
-								{#each abilityOrder as ability}
-									<div class="mini-ab">
-										<span class="mini-ab-label">{abilityLabels[ability]}</span>
-										<span class="mini-ab-mod">{signed(abilityModifier(pc.abilities[ability]))}</span>
-									</div>
-								{/each}
-							</div>
-						{/if}
-					</div>
-				{/each}
-			</div>
+{:else if activeTab === 'party'}
+<div class="party-tab">
+{#each members as member}
+{@const pc = partyCharacters[member.userId] ?? null}
+<div class="party-card">
+<div class="party-card-header">
+{#if member.avatarUrl}
+<img src={member.avatarUrl} alt="" class="party-avatar" />
+{:else}
+<div class="party-avatar party-avatar-placeholder">
+{member.username.charAt(0).toUpperCase()}
+</div>
+{/if}
+<div class="party-identity">
+<span class="party-username">
+{member.username}
+{#if member.userId === currentUserId}
+<span class="you-tag">(you)</span>
+{/if}
+</span>
+{#if pc}
+<span class="party-char-line">{pc.name} · {classLine(pc)}</span>
+<span class="party-race-line muted-sm">{fmt(pc.race)}{pc.subrace ? ` ${fmt(pc.subrace)}` : ''}</span>
+{:else}
+<span class="muted-sm">No character yet</span>
+{/if}
+</div>
+{#if pc}
+<div class="party-ac-badge">{pc.ac}<small>AC</small></div>
+{/if}
+</div>
+{#if pc}
+<div class="party-hp-section">
+<div class="hp-bar-track">
+<div class="hp-bar-fill" style="width:{hpPercent(pc)}%; background:{hpColor(pc)}"></div>
+</div>
+<span class="party-hp-text" style="color:{hpColor(pc)}">{pc.hp}/{pc.maxHp} HP</span>
+</div>
+{#if pc.conditions.length > 0}
+<div class="pill-row mt-xs">
+{#each pc.conditions as cond}
+<span class="condition-pill sm" style="border-color:{conditionColor(cond)}; color:{conditionColor(cond)}">{fmt(cond)}</span>
+{/each}
+</div>
+{/if}
+<div class="mini-abilities">
+{#each abilityOrder as ability}
+<div class="mini-ab">
+<span class="mini-ab-label">{abilityLabels[ability]}</span>
+<span class="mini-ab-mod">{signed(abilityModifier(pc.abilities[ability]))}</span>
+</div>
+{/each}
+</div>
+{/if}
+</div>
+{/each}
+{#if companions.length > 0}
+<div class="companion-section-label">Companions</div>
+{#each companions as npc (npc.id)}
+<div class="party-card companion-card">
+<div class="party-card-header">
+<div class="party-avatar party-avatar-placeholder companion-av">
+{npc.name.charAt(0).toUpperCase()}
+</div>
+<div class="party-identity">
+<span class="party-username">{npc.name}</span>
+<span class="party-char-line companion-role-line">{npc.role}</span>
+</div>
+{#if npc.statBlock?.ac}
+<div class="party-ac-badge">{npc.statBlock.ac}<small>AC</small></div>
+{/if}
+</div>
+{#if npc.statBlock?.maxHp}
+{@const pct = Math.max(0, Math.round((npc.statBlock.hp / npc.statBlock.maxHp) * 100))}
+{@const col = pct > 60 ? '#4ade80' : pct > 25 ? '#f5c842' : '#f87171'}
+<div class="party-hp-section">
+<div class="hp-bar-track">
+<div class="hp-bar-fill" style="width:{pct}%; background:{col}"></div>
+</div>
+<span class="party-hp-text" style="color:{col}">{npc.statBlock.hp}/{npc.statBlock.maxHp} HP</span>
+</div>
+{/if}
+</div>
+{/each}
+{/if}
+</div>
 
 		<!-- ─── QUESTS ─── -->
 		{:else if activeTab === 'quests'}
@@ -918,6 +946,21 @@
 	}
 	.mini-ab-label { font-size: 0.55rem; color: var(--text-muted); text-transform: uppercase; }
 	.mini-ab-mod { font-size: 0.72rem; font-weight: 600; }
+
+	.companion-section-label {
+		font-size: 0.63rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--accent-2, #34d3a2);
+		margin: 0.75rem 0 0.4rem;
+	}
+	.companion-card { border-color: rgba(52, 211, 162, 0.15); }
+	.companion-av {
+		background: rgba(52, 211, 162, 0.15);
+		color: var(--accent-2, #34d3a2);
+	}
+	.companion-role-line { text-transform: capitalize; color: var(--accent-2, #34d3a2); }
 
 	/* ── Quests tab ── */
 	.quests-tab { display: flex; flex-direction: column; gap: 0.65rem; }

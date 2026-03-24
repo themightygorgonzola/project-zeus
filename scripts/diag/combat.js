@@ -25,11 +25,9 @@ for (const turn of all) {
   const sc = turn.appliedStateChanges;
   if (!sc) continue;
 
-  // Also check gmProposedChanges for encounterStarted (it may have been rescued)
-  const proposed = turn.gmProposedChanges ?? {};
-
-  const started = sc.encounterStarted ?? proposed.encounterStarted ?? null;
-  const ended   = sc.encounterEnded   ?? proposed.encounterEnded   ?? null;
+  // Only track encounters that were actually applied (not stripped proposals)
+  const started = sc.encounterStarted ?? null;
+  const ended   = sc.encounterEnded   ?? null;
 
   if (started) {
     if (openEncounter) {
@@ -64,13 +62,21 @@ if (openEncounter) {
   encounters.push(openEncounter);
 }
 
-// Also find turns with attack intent but no encounterStarted (missed combat framing)
-const attackTurnsWithoutEncounter = all.filter(t => {
-  if (t.intent !== 'attack') return false;
-  const sc = t.appliedStateChanges;
-  const started = sc?.encounterStarted ?? (t.gmProposedChanges ?? {}).encounterStarted;
-  return !started;
-});
+// Find attack turns that happened outside any open encounter
+// (an encounter is "open" from the turn with encounterStarted until
+// the turn with encounterEnded)
+const attackTurnsWithoutEncounter = [];
+{
+  let inEncounter = false;
+  for (const t of all) {
+    const sc = t.appliedStateChanges;
+    if (sc?.encounterStarted) inEncounter = true;
+    if (t.intent === 'attack' && !inEncounter) {
+      attackTurnsWithoutEncounter.push(t);
+    }
+    if (sc?.encounterEnded) inEncounter = false;
+  }
+}
 
 if (encounters.length === 0) {
   console.log('\n  No encounters found.');

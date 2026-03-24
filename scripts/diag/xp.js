@@ -42,6 +42,39 @@ if (xpTurns.length === 0) {
 }
 
 D.divider('Final XP totals: script vs finalState');
+
+// Detect quest completion XP not surfaced in turn xpAwarded (pre-fix exports).
+// Reconstruct by finding turns where a quest transitioned to 'completed' and
+// adding the quest's rewards.xp for each living character.
+const questRewardXp = {};
+for (const id of Object.keys(chars)) questRewardXp[id] = 0;
+const quests = doc.finalState?.quests ?? [];
+let questXpNotes = [];
+for (const turn of all) {
+  const qus = turn.appliedStateChanges?.questUpdates ?? [];
+  for (const qu of qus) {
+    if (qu.field !== 'status' || qu.newValue !== 'completed') continue;
+    const quest = quests.find(q => q.id === qu.questId);
+    if (!quest || !quest.rewards || !quest.rewards.xp) continue;
+    // Check if this quest's XP was already in xpAwarded for this turn
+    const turnXp = turn.appliedStateChanges?.xpAwarded ?? [];
+    // Heuristic: if total xpAwarded already accounts for quest XP, skip
+    // (post-fix exports will include quest XP in xpAwarded)
+    const alreadyCounted = turnXp.some(a => a.amount === quest.rewards.xp);
+    if (!alreadyCounted) {
+      for (const id of Object.keys(chars)) {
+        questRewardXp[id] += quest.rewards.xp;
+        runningTotals[id] = (runningTotals[id] ?? 0) + quest.rewards.xp;
+      }
+      questXpNotes.push(`  Turn #${String(turn.turnNumber).padStart(2,' ')}  +${String(quest.rewards.xp).padStart(4,' ')} XP  (quest reward: "${quest.name}")`);
+    }
+  }
+}
+if (questXpNotes.length > 0) {
+  D.divider('Quest Reward XP (not in per-turn xpAwarded)');
+  for (const note of questXpNotes) console.log(note);
+}
+
 let mismatch = false;
 for (const c of (doc.finalState?.characters ?? [])) {
   const computed = runningTotals[c.id] ?? 0;

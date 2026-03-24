@@ -121,6 +121,28 @@ export function getCombatantState(state: GameState, combatant: Combatant): Comba
 	}
 }
 
+/**
+ * Check if a combatant (PC only) has Relentless Endurance available.
+ * If so, set HP to 1 instead of 0 and consume the use.
+ * Returns the trait name if it fired, or undefined.
+ */
+function checkRelentlessEndurance(state: GameState, combatant: Combatant, currentHp: number): { hp: number; traitName?: string } {
+	if (currentHp > 0 || combatant.type !== 'character') return { hp: currentHp };
+	const pc = state.characters.find(c => c.id === combatant.referenceId);
+	if (!pc) return { hp: currentHp };
+
+	// Check for the Relentless Endurance racial feature with remaining uses
+	const hasFeature = pc.classFeatures?.some(
+		f => f.tag === 'relentless-endurance' || f.name === 'Relentless Endurance'
+	);
+	const uses = pc.featureUses?.['Relentless Endurance'];
+	if (hasFeature && uses && uses.current > 0) {
+		uses.current -= 1;
+		return { hp: 1, traitName: 'Relentless Endurance' };
+	}
+	return { hp: currentHp };
+}
+
 export function updateCombatantHp(state: GameState, combatant: Combatant, hp: number, tempHp: number, defeated: boolean) {
 	// Update the combatant snapshot (so combat functions see fresh values)
 	combatant.currentHp = hp;
@@ -235,6 +257,8 @@ export interface CombatAttackResult {
 	targetDefeated: boolean;
 	attackerAdvantageReason: string[];
 	damageType: string;
+	/** If a pre-death trait (e.g. Relentless Endurance) saved the target from defeat. */
+	traitSaved?: string;
 }
 
 /** Result of encounter resolution. */
@@ -665,6 +689,7 @@ export function resolveAttack(
 	// Apply damage to target combatant if hit
 	let damageResult: DamageApplicationResult | null = null;
 	let targetDefeated = false;
+	let traitSaved: string | undefined;
 
 	if (atkResult.hits) {
 		damageResult = applyDamage(
@@ -676,8 +701,13 @@ export function resolveAttack(
 			targetState.vulnerabilities
 		);
 
+		// Check pre-death racial traits (e.g. Relentless Endurance)
+		const preDeathCheck = checkRelentlessEndurance(state, target, damageResult.currentHp);
+		damageResult.currentHp = preDeathCheck.hp;
+
 		if (damageResult.currentHp <= 0) targetDefeated = true;
 		updateCombatantHp(state, target, damageResult.currentHp, Math.max(0, targetState.tempHp - damageResult.tempHpAbsorbed), targetDefeated);
+		traitSaved = preDeathCheck.traitName;
 	}
 
 	return {
@@ -685,7 +715,8 @@ export function resolveAttack(
 		damageResult,
 		targetDefeated,
 		attackerAdvantageReason: reasons,
-		damageType
+		damageType,
+		traitSaved
 	};
 }
 
@@ -751,6 +782,7 @@ export function resolveNpcAttack(
 	let damageDice: DiceResult | null = null;
 	let damageResult: DamageApplicationResult | null = null;
 	let targetDefeated = false;
+	let traitSaved: string | undefined;
 
 	if (hits) {
 		if (critical) {
@@ -771,8 +803,13 @@ export function resolveNpcAttack(
 			targetState.vulnerabilities
 		);
 
+		// Check pre-death racial traits (e.g. Relentless Endurance)
+		const preDeathCheck = checkRelentlessEndurance(state, target, damageResult.currentHp);
+		damageResult.currentHp = preDeathCheck.hp;
+
 		if (damageResult.currentHp <= 0) targetDefeated = true;
 		updateCombatantHp(state, target, damageResult.currentHp, Math.max(0, targetState.tempHp - damageResult.tempHpAbsorbed), targetDefeated);
+		traitSaved = preDeathCheck.traitName;
 	}
 
 	return {
@@ -791,7 +828,8 @@ export function resolveNpcAttack(
 		damageResult,
 		targetDefeated,
 		attackerAdvantageReason: reasons,
-		damageType: attack.damageType
+		damageType: attack.damageType,
+		traitSaved
 	};
 }
 
@@ -836,6 +874,10 @@ export function resolveCombatantDamage(
 		immunities,
 		vulnerabilities
 	);
+
+	// Check pre-death racial traits (e.g. Relentless Endurance)
+	const preDeathCheck = checkRelentlessEndurance(state, target, result.currentHp);
+	result.currentHp = preDeathCheck.hp;
 
 	let targetDefeated = result.currentHp <= 0;
 	updateCombatantHp(state, target, result.currentHp, Math.max(0, targetState.tempHp - result.tempHpAbsorbed), targetDefeated);
@@ -1000,20 +1042,38 @@ export function combatantTurnBudget(
 
 /**
  * Check if all combatants of a given type are defeated.
+ *
+ * When type === 'npc', excludes companion NPCs — companions fight alongside
+ * the party and should not prevent a victory check from succeeding.
  */
 export function allDefeated(state: GameState, encounter: ActiveEncounter, type: CombatantType): boolean {
 	return encounter.combatants
-		.filter(c => c.type === type)
+		.filter(c => {
+			if (c.type !== type) return false;
+			if (type === 'npc') {
+				const npc = state.npcs?.find(n => n.id === c.referenceId);
+				if (npc?.role === 'companion') return false;
+			}
+			return true;
+		})
 		.every(c => c.defeated);
 }
 
 /**
  * Get all living combatants of a given type.
+ *
+ * When type === 'npc', excludes companion NPCs (they fight for the party).
  */
 export function getLivingCombatants(state: GameState, encounter: ActiveEncounter, type?: CombatantType): Combatant[] {
-	return encounter.combatants.filter(c =>
-		!c.defeated && (type === undefined || c.type === type)
-	);
+	return encounter.combatants.filter(c => {
+		if (c.defeated) return false;
+		if (type !== undefined && c.type !== type) return false;
+		if (type === 'npc') {
+			const npc = state.npcs?.find(n => n.id === c.referenceId);
+			if (npc?.role === 'companion') return false;
+		}
+		return true;
+	});
 }
 
 /**

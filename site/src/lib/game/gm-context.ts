@@ -300,7 +300,7 @@ function buildGameStateContextBlock(state: GameState, worldBrief: string): strin
 	);
 	if (companions.length > 0) {
 		parts.push(`=== COMPANIONS ===`);
-		parts.push(`These NPCs are traveling with the party and participate in combat.`);
+		parts.push(`These NPCs are traveling with the party. Companions (role: companion) auto-join combat. Allies (role: ally) only join combat if explicitly listed in encounterStarted.creatures.`);
 		for (const c of companions) {
 			const interactionSummary = buildNpcInteractionSummary(c, state.sceneFacts ?? []);
 			const summaryStr = interactionSummary ? ` — ${interactionSummary}` : '';
@@ -309,7 +309,7 @@ function buildGameStateContextBlock(state: GameState, worldBrief: string): strin
 				const attackStr = attacks ? ` | Attacks: ${attacks}` : '';
 				parts.push(`- ${formatNameIdRef(c.name, c.id)} (${c.role}, ${dispositionLabel(c.disposition)}) — ${c.statBlock.hp}/${c.statBlock.maxHp} HP, AC ${c.statBlock.ac}${attackStr}${summaryStr}`);
 			} else {
-				parts.push(`- ${formatNameIdRef(c.name, c.id)} (${c.role}, ${dispositionLabel(c.disposition)})${summaryStr}`);
+				parts.push(`- ${formatNameIdRef(c.name, c.id)} (${c.role}, ${dispositionLabel(c.disposition)})${summaryStr} [NO STATS — use companionPromoted with just npcId to auto-assign a stat block]`);
 			}
 		}
 		parts.push('');
@@ -422,13 +422,14 @@ function buildSystemPrompt(state: GameState, worldBrief: string): string {
 	parts.push(`    "questUpdates": [{"questId": "exact-id-from-visible-[id:-field]", "field": "status", "oldValue": "active", "newValue": "available|active|completed|failed"} or {"questId": "exact-id-from-visible-[id:-field]", "field": "objective", "objectiveId": "exact-objective-id-from-objective(..., id: ...)", "oldValue": false, "newValue": true}] or omit,`);
 	parts.push(`    "conditionsApplied": [{"characterId": "exact-id-from-PARTY-id-field", "condition": "...", "applied": true|false}] or omit,`);
 	parts.push(`    "xpAwarded": [{"characterId": "exact-id-from-PARTY-id-field", "amount": N}] or omit,`);
+	parts.push(`    "goldChange": [{"characterId": "exact-id-from-PARTY-id-field", "delta": N, "reason": "..."}] or omit — use for direct gold payments/earnings/exchanges (positive delta = receive gold, negative = spend gold),`);
 	parts.push(`    "npcsAdded": [{"id": "npc-<unique>", "name": "...", "role": "merchant|quest-giver|hostile|neutral|ally|companion|boss", "locationId": "exact-location-id-from-visible-[id:-field]", "disposition": 0, "description": "..."}] or omit,`);
 	parts.push(`    "locationsAdded": [{"id": "loc-<unique>", "name": "...", "type": "settlement|wilderness|dungeon|interior|road", "description": "...", "connections": ["exact-location-id-from-visible-[id:-field]"], "features": ["..."], "groundItems": [{"id": "item-<unique>", "name": "...", "category": "...", "description": "...", "value": N, "quantity": N}]}] or omit,`);
 	parts.push(`    "questsAdded": [{"id": "quest-<unique>", "name": "...", "description": "...", "giverNpcId": "exact-npc-id-from-visible-[id:-field]-or-null", "objectives": [{"id": "obj-<unique>", "text": "..."}], "recommendedLevel": N}] or omit,`);
 	parts.push(`    "sceneFactsAdded": ["fact about the scene or world"] or omit,`);
 	parts.push(`    "encounterStarted": {"creatures": [{"id": "npc-<unique>", "name": "...", "role": "hostile", "locationId": "exact-location-id-from-visible-[id:-field]-or-omit-for-party-location", "disposition": -100, "description": "...", "tier": "weak|normal|tough|elite|boss"}]} or omit,`);
 	parts.push(`    "encounterEnded": {"outcome": "victory|defeat|flee|negotiated"} or omit,`);
-	parts.push(`    "companionPromoted": {"npcId": "exact-npc-id-from-visible-[id:-field]", "statBlock": {"hp": N, "maxHp": N, "ac": N, "speed": N, "cr": N, "abilities": {"str": N, ...}, "attacks": [{"name": "...", "toHit": N, "damage": "...", "damageType": "..."}], "savingThrows": [], "skills": [], "resistances": [], "immunities": [], "vulnerabilities": [], "traits": [], "actions": [], "legendaryActions": []}} or omit,`);
+	parts.push(`    "companionPromoted": [{"npcId": "exact-npc-id-from-visible-[id:-field]"}] or omit (array — include one entry per NPC to recruit; statBlock is optional, the engine auto-generates if omitted),`);
 	parts.push(`    "clockAdvance": {"from": {"day": N, "timeOfDay": "...", "weather": "..."}, "to": {"day": N, "timeOfDay": "...", "weather": "..."}} or omit`);
 	parts.push(`  },`);
 	parts.push(`  "gmNotes": "optional private reasoning"`);
@@ -441,7 +442,8 @@ function buildSystemPrompt(state: GameState, worldBrief: string): string {
 	parts.push(`- ITEM DROP/PICKUP RULES: Use itemsDropped (with itemId from inventory) when a character sets an item down — it lands at the current location shown as "On the ground" next turn. Use itemsPickedUp (with the exact itemId shown in "On the ground") when recovering a dropped item — this restores the ORIGINAL item id intact. Use itemsLost only for consumed/sold/stolen/destroyed items. Use itemsGained only for truly new items (purchases, loot, rewards). Use locationItemsAdded to place new items at any location (chest unlocked, enemy killed, GM loot).`);
 	parts.push(`- When a companion NPC (shown in COMPANIONS) is in combat, include their combat actions in narrativeText and any HP/alive changes via npcChanges (use field: "hp" for companion HP changes).`);
 	parts.push(`- Use npcChanges with field: "notes" to record important NPC interaction details (e.g. deals struck, secrets revealed, favors owed). The note text goes in newValue as a string.`);
-	parts.push(`- To formally recruit an NPC as a companion, use companionPromoted with the NPC's exact visible [id: ...] and a stat block. This changes their role to "companion" and they will auto-travel with the party.`);
+	parts.push(`- To formally recruit NPCs as companions, use companionPromoted with an ARRAY of entries — one per NPC, e.g. [{"npcId": "npc-001"}, {"npcId": "npc-002"}]. You may include a full statBlock per entry or omit it — the engine auto-generates stats if missing. This changes their role to "companion" and they will auto-travel with the party and auto-join combat.`);
+	parts.push(`- COMPANION vs ALLY: "companion" NPCs auto-join every encounter. "ally" NPCs only fight if you explicitly list them in encounterStarted.creatures (useful for temporary or situational allies). Do NOT change an NPC's role to companion/ally via npcChanges — always use companionPromoted.`);
 	parts.push(`- When an encounter has multiple enemies, create separate creatures entries for EACH enemy, not just a representative sample.`);
 	parts.push(`- Do NOT start and end an encounter in the same response. Combat should span multiple turns.`);
 	parts.push(`- During active combat the engine resolves all attacks, damage, and dice rolls mechanically. Do NOT specify attack targets or actions in stateChanges — the engine handles this authoritatively.`);
@@ -452,6 +454,7 @@ function buildSystemPrompt(state: GameState, worldBrief: string): string {
 	parts.push(`- Connect new locations to existing ones via the connections array.`);
 	parts.push(`- IMPORTANT: Always return valid JSON. The narrativeText field is required.`);
 	parts.push(`- Record important world details (NPC agreements, prices, promises, discoveries) as sceneFactsAdded so they persist across turns.`);
+	parts.push(`- GOLD PAYMENTS: When an NPC pays or rewards the party, ALWAYS use goldChange (not just sceneFactsAdded). The delta amount MUST match the active quest reward if a quest covers this payment — never invent a different amount. If no quest exists, base the amount on negotiated/agreed terms visible in the narrative.`);
 
 	return parts.join('\n');
 }
@@ -503,6 +506,7 @@ export function buildStateExtractionPrompt(state: GameState): string {
 	parts.push(`- For new entities, generate unique IDs with prefixes: "npc-", "loc-", "quest-", "obj-", "item-".`);
 	parts.push(`- Connect new locations to existing ones via the connections array.`);
 	parts.push(`- Record important world details as sceneFactsAdded — agreements, prices, discoveries, lore, NPC promises.`);
+	parts.push(`- GOLD PAYMENTS: When the narrative shows an NPC paying the party or the party spending gold, emit goldChange with the exact amount. Use positive delta for received gold, negative for spent gold.`);
 	parts.push(`- Use npcChanges with field "notes" to record significant NPC interaction details.`);
 	parts.push(`- If the narrative has NO mechanical effects, return {"stateChanges": {}}.`);
 	parts.push(`- Do NOT award XP or complete quest objectives for merely asking questions, hearing rumors, scouting from safety, or discussing possible plans.`);
@@ -528,13 +532,14 @@ export function buildStateExtractionPrompt(state: GameState): string {
 	parts.push(`    "questUpdates": [{"questId": "exact-id-from-visible-[id:-field]", "field": "status|objective", ...}] or omit,`);
 	parts.push(`    "conditionsApplied": [{"characterId": "exact-id-from-CHARACTERS-id-field", "condition": "blinded|charmed|deafened|frightened|grappled|incapacitated|invisible|paralyzed|petrified|poisoned|prone|restrained|stunned|unconscious|exhaustion", "applied": true|false}] or omit,`);
 	parts.push(`    "xpAwarded": [{"characterId": "exact-id-from-CHARACTERS-id-field", "amount": N}] or omit,`);
+	parts.push(`    "goldChange": [{"characterId": "exact-id-from-CHARACTERS-id-field", "delta": N, "reason": "..."}] or omit — use for direct gold payments, sales, or wages (positive = received, negative = spent),`);
 	parts.push(`    "npcsAdded": [{"id": "npc-<unique>", "name": "...", "role": "merchant|quest-giver|hostile|neutral|ally|companion|boss", "locationId": "exact-location-id-from-visible-[id:-field]", "disposition": 0, "description": "..."}] or omit,`);
 	parts.push(`    "locationsAdded": [{"id": "loc-<unique>", "name": "...", "type": "settlement|wilderness|dungeon|interior|road", "description": "...", "connections": ["exact-location-id-from-visible-[id:-field]"], "features": ["..."], "groundItems": [{"id": "item-<unique>", "name": "...", "category": "...", "description": "...", "value": N, "quantity": N}]}] or omit,`);
 	parts.push(`    "questsAdded": [{"id": "quest-<unique>", "name": "...", "description": "...", "giverNpcId": "exact-npc-id-from-visible-[id:-field]-or-null", "objectives": [{"id": "obj-<unique>", "text": "..."}], "recommendedLevel": N}] or omit,`);
 	parts.push(`    "sceneFactsAdded": ["important fact to remember"] or omit,`);
 	parts.push(`    "encounterStarted": {"creatures": [{"id": "npc-<unique>", "name": "...", "role": "hostile", "locationId": "exact-location-id-from-visible-[id:-field]-or-omit-for-party-location", "disposition": -100, "description": "...", "tier": "weak|normal|tough|elite|boss"}]} or omit,`);
 	parts.push(`    "encounterEnded": {"outcome": "victory|defeat|flee|negotiated"} or omit,`);
-	parts.push(`    "companionPromoted": {"npcId": "exact-npc-id-from-visible-[id:-field]", "statBlock": {...}} or omit,`);
+	parts.push(`    "companionPromoted": [{"npcId": "exact-npc-id-from-visible-[id:-field]"}] or omit (array — one entry per NPC; statBlock optional),`);
 	parts.push(`    "clockAdvance": {"from": {"day": N, "timeOfDay": "...", "weather": "..."}, "to": {"day": N, "timeOfDay": "...", "weather": "..."}} or omit`);
 	parts.push(`  }`);
 	parts.push(`}`);
@@ -1203,7 +1208,8 @@ export function assembleRoundNarratorContext(
 	world: PrototypeWorld | null,
 	roundActions: PendingCombatAction[],
 	recentTurns: TurnRecord[],
-	recentChat: ChatRecord[] = []
+	recentChat: ChatRecord[] = [],
+	encounterOutcome?: { outcome: string; reason?: string }
 ): ChatMessageInput[] {
 	const messages: ChatMessageInput[] = [];
 
@@ -1228,12 +1234,52 @@ export function assembleRoundNarratorContext(
 	// advanceTurn, so subtract 1 to label the round that just completed.
 	const round = Math.max(1, (state.activeEncounter?.round ?? 2) - 1);
 
+	// Build the outcome instruction block
+	let outcomeBlock = '';
+	if (encounterOutcome) {
+		if (encounterOutcome.outcome === 'victory') {
+			outcomeBlock = '\n\n⚔️ ENCOUNTER OUTCOME: VICTORY — The heroes have won! Narrate their triumph, describe fallen enemies, and transition out of combat.';
+		} else if (encounterOutcome.outcome === 'defeat') {
+			outcomeBlock = '\n\n💀 ENCOUNTER OUTCOME: DEFEAT — The heroes have fallen. Narrate their defeat dramatically. They may be captured, left for dead, or rescued — but the fight is over.';
+		}
+	}
+
+	// Build low-HP warning block for PCs in danger
+	let lowHpBlock = '';
+	if (!encounterOutcome) {
+		const warnings: string[] = [];
+		for (const pc of state.characters) {
+			if (pc.hp <= 0) continue; // already down, different handling
+			const ratio = pc.hp / pc.maxHp;
+			if (ratio <= 0.3) {
+				const resources: string[] = [];
+				// Check healing features
+				const secondWind = pc.featureUses?.['Second Wind'];
+				if (secondWind && secondWind.current > 0) resources.push('Second Wind');
+				const layOnHands = pc.featureUses?.['Lay on Hands'];
+				if (layOnHands && layOnHands.current > 0) resources.push('Lay on Hands');
+				// Check healing potions
+				const potions = pc.inventory?.filter(i => i.type === 'potion' && /heal/i.test(i.name));
+				if (potions && potions.length > 0) resources.push(`${potions.length} healing potion(s)`);
+				const hint = resources.length > 0
+					? ` (available: ${resources.join(', ')})`
+					: '';
+				warnings.push(`⚠️ ${pc.name} is at ${pc.hp}/${pc.maxHp} HP${hint}`);
+			}
+		}
+		if (warnings.length > 0) {
+			lowHpBlock = '\n\n' + warnings.join('\n') + '\nThe narrator should subtly remind the player about their perilous state through vivid description (bloodied, staggering, etc.) without breaking character.';
+		}
+	}
+
 	messages.push({
 		role: 'user',
 		content: [
 			`Combat round ${round} just completed.`,
 			'',
 			roundSummary,
+			outcomeBlock,
+			lowHpBlock,
 			'',
 			'Narrate this round as a cohesive, vivid combat scene. Weave all the actions together — do not just list them. End with a beat that invites the next round of actions.'
 		].join('\n')

@@ -457,7 +457,8 @@ const FEATURE_USE_DEFS: Record<string, { maxUsesAtLevel: (level: number, chaMod?
 	'Ki':                 { maxUsesAtLevel: (l) => l, recoversOn: 'short-rest' },
 	'Stroke of Luck':     { maxUsesAtLevel: () => 1, recoversOn: 'short-rest' },
 	'Sorcerous Restoration': { maxUsesAtLevel: () => 4, recoversOn: 'short-rest' },
-	'Signature Spells':   { maxUsesAtLevel: () => 1, recoversOn: 'short-rest' }
+	'Signature Spells':   { maxUsesAtLevel: () => 1, recoversOn: 'short-rest' },
+	'Relentless Endurance': { maxUsesAtLevel: () => 1, recoversOn: 'long-rest' }
 };
 
 /**

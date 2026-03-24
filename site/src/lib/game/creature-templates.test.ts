@@ -201,6 +201,29 @@ describe('Creature Template System (Phase 8a)', () => {
 				const rangedAttack = sb.attacks.find(a => a.range);
 				expect(rangedAttack).toBeDefined();
 			});
+
+			it('Stout Dwarf gets melee attacks (not generic Strike/Slam)', () => {
+				const sb = generateCreatureStatBlock('Stout Dwarf', 'weak', 3);
+				const names = sb.attacks.map(a => a.name);
+				expect(names.includes('Strike') && names.includes('Slam')).toBe(false);
+			});
+
+			it('Agile Elf gets dex-oriented attacks', () => {
+				const sb = generateCreatureStatBlock('Agile Elf', 'weak', 3);
+				expect(sb.attacks.some(a => a.name === 'Shortsword' || a.name === 'Shortbow')).toBe(true);
+			});
+
+			it('Robed Human gets caster attacks', () => {
+				const sb = generateCreatureStatBlock('Robed Human', 'weak', 3);
+				expect(sb.attacks.some(a => a.name === 'Arcane Blast')).toBe(true);
+			});
+
+			it('elf companion with description gets Longbow', () => {
+				const sb = generateCreatureStatBlock('Nimble Elf keen-eyed ranger', 'weak', 3);
+				// "nimble" or "elf" should match — either gives ranged attacks
+				const hasRanged = sb.attacks.some(a => a.range);
+				expect(hasRanged).toBe(true);
+			});
 		});
 
 		describe('ability scores respond to creature name', () => {

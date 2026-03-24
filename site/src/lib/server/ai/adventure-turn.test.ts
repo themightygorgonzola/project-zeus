@@ -4888,13 +4888,14 @@ describe('Phase 5: sanitizeStateChanges — questsAdded validation', () => {
 		expect(result.questsAdded).toBeUndefined();
 	});
 
-	it('defaults missing objectives to empty array', async () => {
+	it('defaults missing objectives to single fallback objective', async () => {
 		const { sanitizeStateChanges } = await import('./adventure-turn');
 		const result = sanitizeStateChanges({
 			questsAdded: [{ id: 'q-1', name: 'Find the Gem', description: 'find it' } as any]
 		}, makeMinimalState() as any);
 		expect(result.questsAdded).toHaveLength(1);
-		expect(result.questsAdded![0].objectives).toEqual([]);
+		expect(result.questsAdded![0].objectives).toHaveLength(1);
+		expect(result.questsAdded![0].objectives[0].text).toBe('Complete: Find the Gem');
 	});
 });
 
@@ -4990,7 +4991,7 @@ describe('Phase 5: sanitizeStateChanges — pass-through and combined', () => {
 		const result = sanitizeStateChanges({
 			clockAdvance: clockAdv,
 			spellSlotUsed: { characterId: 'pc-1', level: 1, spellName: 'cure-wounds' },
-			companionPromoted: { npcId: 'npc-1', statBlock: {} as any }
+			companionPromoted: [{ npcId: 'npc-1', statBlock: {} as any }]
 		}, makeMinimalState() as any);
 		expect(result.clockAdvance).toBe(clockAdv);
 		expect(result.spellSlotUsed).toBeDefined();
@@ -5005,12 +5006,12 @@ describe('Phase 5: sanitizeStateChanges — pass-through and combined', () => {
 			locations: [{ id: 'loc-1', name: 'Town Square', type: 'settlement', description: 'square', features: [], connections: [], npcs: [], regionRef: null, visited: true }]
 		};
 		const result = sanitizeStateChanges({
-			companionPromoted: { npcId: '[name: Bjorik][id: npc-1]', statBlock: {} as any },
+			companionPromoted: [{ npcId: '[name: Bjorik][id: npc-1]', statBlock: {} as any }],
 			encounterStarted: {
 				creatures: [{ id: 'npc-gob', name: 'Goblin', role: 'hostile', locationId: '[name: Town Square][id: loc-1]', description: 'green menace', disposition: -100, notes: '', alive: true, tier: 'weak' as const }]
 			}
 		}, state as any, 'The goblin lunges at you and combat begins!');
-		expect(result.companionPromoted?.npcId).toBe('npc-1');
+		expect(result.companionPromoted?.[0]?.npcId).toBe('npc-1');
 		expect(result.encounterStarted?.creatures[0].locationId).toBe('loc-1');
 	});
 

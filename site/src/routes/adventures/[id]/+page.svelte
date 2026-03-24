@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
 	import { onMount, onDestroy, tick, untrack } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
 	import PartySocket from 'partysocket';
@@ -46,7 +46,7 @@
 	let gameState = $derived(data.gameState as {
 		locations?: Array<{ id: string; name: string; type: string; description: string; features: string[]; visited: boolean }>;
 		quests?: Array<{ id: string; name: string; description: string; status: string; objectives: Array<{ id: string; text: string; done: boolean }> }>;
-		npcs?: Array<{ id: string; name: string; role: string; description: string; alive: boolean }>;
+		npcs?: Array<{ id: string; name: string; role: string; description: string; alive: boolean; archived?: boolean; statBlock?: { hp: number; maxHp: number; ac?: number } }>;
 		partyLocationId?: string | null;
 		clock?: { day: number; timeOfDay: string; weather: string };
 		activeEncounter?: ActiveEncounter;
@@ -63,12 +63,68 @@
 		}
 	});
 
+	let companions = $derived(
+		(gameState?.npcs ?? []).filter((n) => n.alive && !n.archived && (n.role === 'companion' || n.role === 'ally'))
+	);
+
+	// Combat turn info for the chat input banner
+	let combatTurnInfo = $derived.by(() => {
+		if (!combatEncounter) return null;
+		const awaitId = localAwaitingId ?? combatEncounter.awaitingActorId;
+		if (!awaitId) return { kind: 'resolving' as const, name: '', round: combatEncounter.round };
+		const combatant = combatEncounter.combatants.find(c => c.id === awaitId);
+		if (!combatant) return { kind: 'resolving' as const, name: '', round: combatEncounter.round };
+
+		if (combatant.type === 'character') {
+			// Check if this PC belongs to the current user
+			const pc = Object.values(partyCharacters).find(c => c.id === combatant.referenceId);
+			const isMyTurn = pc?.userId === currentUserId;
+			return {
+				kind: isMyTurn ? 'your-turn' as const : 'ally-turn' as const,
+				name: combatant.name,
+				hp: combatant.currentHp,
+				maxHp: combatant.maxHp,
+				ac: combatant.ac,
+				round: combatEncounter.round,
+			};
+		}
+
+		// NPC combatant — check if companion
+		const npc = (gameState?.npcs ?? []).find(n => n.id === combatant.referenceId);
+		if (npc?.role === 'companion') {
+			return {
+				kind: 'companion-turn' as const,
+				name: combatant.name,
+				hp: combatant.currentHp,
+				maxHp: combatant.maxHp,
+				ac: combatant.ac,
+				round: combatEncounter.round,
+			};
+		}
+
+		// Hostile NPC
+		return {
+			kind: 'enemy-turn' as const,
+			name: combatant.name,
+			hp: combatant.currentHp,
+			maxHp: combatant.maxHp,
+			ac: combatant.ac,
+			round: combatEncounter.round,
+		};
+	});
+
 	let currentLocation = $derived(
 		gameState?.locations?.find((l) => l.id === gameState?.partyLocationId) ?? null
 	);
 	let activeQuests = $derived(
 		(gameState?.quests ?? []).filter((q) => q.status === 'active' || q.status === 'available')
 	);
+
+	// Lock body scroll while on adventure page
+	$effect(() => {
+		document.body.style.overflow = 'hidden';
+		return () => { document.body.style.overflow = ''; };
+	});
 
 	$effect(() => {
 		// Merge: server data fills gaps, live PartyKit events take precedence.
@@ -271,7 +327,8 @@
 
 			if (msg.type === 'ai:turn:start') {
 				turnPhase = 'narrating';
-				ensurePendingGmMessage();
+				gmThinking = true;
+				// Bubble is created on the first chunk so dice-roll cards land first.
 				await scrollChatToBottom();
 			}
 
@@ -349,6 +406,7 @@
 					);
 					gmPendingId = null;
 				} else {
+					// Bubble was never created (error before first chunk) — append error directly
 					messages = [...messages, {
 						id: `gm-error-${Date.now()}`,
 						kind: 'error',
@@ -542,7 +600,9 @@
 	/** Invoke the GM with a player action */
 	async function invokeGM(playerAction: string) {
 		if (!currentCharacter || !socket) return;
-		ensurePendingGmMessage();
+		// Don't create the bubble here — wait for the first ai:turn:chunk so that
+		// any game:dice-roll cards land BEFORE the narrative bubble.
+		gmThinking = true;
 		await scrollChatToBottom();
 		const res = await fetch(`/api/adventure/${adventureId}/turn`, {
 			method: 'POST',
@@ -604,7 +664,8 @@
 			m.id === msgId ? { ...m, text: `🎲 Rolling ${check.reason}…`, pendingRollCheck: undefined } : m
 		);
 
-		ensurePendingGmMessage();
+		// Bubble deferred to first chunk; just show thinking state
+		gmThinking = true;
 		await scrollChatToBottom();
 
 		try {
@@ -757,23 +818,18 @@
 	<title>{data.adventure.name}</title>
 </svelte:head>
 
-<div class="page-container">
+<div class="adv-root">
 	<div class="adventure-screen">
 		<!-- Header -->
 		<div class="adventure-header">
-			<div>
-				<h1>{data.adventure.name}</h1>
-				<div class="header-meta">
-					<span class="badge badge-{data.adventure.mode}">
-						{data.adventure.mode}
-					</span>
-					<span class="badge badge-active">Active</span>
-					{#if gameState?.clock}
-						<span class="clock-pill">Day {gameState.clock.day} · {gameState.clock.timeOfDay} · {gameState.clock.weather}</span>
-					{/if}
-				</div>
+			<h1>{data.adventure.name}</h1>
+			<div class="header-meta">
+				<span class="badge badge-{data.adventure.mode}">{data.adventure.mode}</span>
+				{#if gameState?.clock}
+					<span class="clock-pill">Day {gameState.clock.day} · {gameState.clock.timeOfDay} · {gameState.clock.weather}</span>
+				{/if}
+				<span class="connection-dot" class:live={connected} title={connected ? 'Live' : 'Connecting…'}></span>
 			</div>
-			<span class="connection-dot" class:live={connected} title={connected ? 'Live' : 'Connecting…'}></span>
 		</div>
 
 		<div class="adventure-grid">
@@ -868,6 +924,23 @@
 									</div>
 								</div>
 							{/each}
+						{#if companions.length > 0}
+							<div class="companions-divider"></div>
+							{#each companions as npc (npc.id)}
+								<div class="party-member">
+									<div class="avatar companion-avatar">{npc.name.charAt(0).toUpperCase()}</div>
+									<div class="member-info">
+										<span class="member-name">{npc.name} <span class="companion-tag">{npc.role}</span></span>
+										{#if npc.statBlock?.maxHp}
+											<div class="member-hp-bar">
+												<div class="hp-fill companion-hp" style="width: {Math.round((npc.statBlock.hp / npc.statBlock.maxHp) * 100)}%"></div>
+												<span class="hp-text">{npc.statBlock.hp}/{npc.statBlock.maxHp}</span>
+											</div>
+										{/if}
+									</div>
+								</div>
+							{/each}
+						{/if}
 						</div>
 					</div>
 				</GlassPanel>
@@ -878,23 +951,8 @@
 			<div class="main-column">
 				<GlassPanel>
 					<div class="main-chat-panel">
-						<div class="chat-header chat-header-main">
-							<div>
-								<h2>Adventure</h2>
-								<p class="text-muted chat-subtitle">
-									{#if isSolo}
-										Type your action — the GM is always listening.
-									{:else}
-										Chat with the party. Type <span class="mention-hint">@gm</span> or click the GM card to invoke the Game Master.
-									{/if}
-								</p>
-								{#if !currentCharacter}
-									<p class="creation-warning">⚠ Create your character to unlock GM actions.</p>
-								{/if}
-							</div>
-						</div>
 						<div class="chat-messages main-chat-messages" bind:this={chatEl}>
-							{#if messages.length === 0}
+							{#if messages.length === 0 && !gmThinking}
 								<p class="chat-empty text-muted">
 									No messages yet…<br />
 									{#if isSolo}
@@ -962,16 +1020,57 @@
 									{/if}
 								</div>
 							{/each}
+							{#if gmThinking && !gmPendingId}
+								<div class="gm-pending-indicator">
+									<span class="thinking-dot"></span>
+									<span class="thinking-dot"></span>
+									<span class="thinking-dot"></span>
+								</div>
+							{/if}
 						</div>
+						{#if combatTurnInfo}
+							<div class="combat-turn-banner" class:turn-yours={combatTurnInfo.kind === 'your-turn'} class:turn-companion={combatTurnInfo.kind === 'companion-turn'} class:turn-ally={combatTurnInfo.kind === 'ally-turn'} class:turn-enemy={combatTurnInfo.kind === 'enemy-turn'} class:turn-resolving={combatTurnInfo.kind === 'resolving'}>
+								<span class="turn-round">R{combatTurnInfo.round}</span>
+								{#if combatTurnInfo.kind === 'your-turn'}
+									<span class="turn-icon">⚔</span>
+									<span class="turn-label"><strong>Your turn</strong> — {combatTurnInfo.name}</span>
+									<span class="turn-stats">{combatTurnInfo.hp}/{combatTurnInfo.maxHp} HP · AC {combatTurnInfo.ac}</span>
+								{:else if combatTurnInfo.kind === 'companion-turn'}
+									<span class="turn-icon">🛡</span>
+									<span class="turn-label"><strong>{combatTurnInfo.name}'s turn</strong></span>
+									<span class="turn-stats">{combatTurnInfo.hp}/{combatTurnInfo.maxHp} HP · AC {combatTurnInfo.ac}</span>
+								{:else if combatTurnInfo.kind === 'ally-turn'}
+									<span class="turn-icon">⏳</span>
+									<span class="turn-label">Waiting for <strong>{combatTurnInfo.name}</strong></span>
+								{:else if combatTurnInfo.kind === 'enemy-turn'}
+									<span class="turn-icon">💀</span>
+									<span class="turn-label"><strong>{combatTurnInfo.name}</strong> is acting…</span>
+								{:else}
+									<span class="turn-icon">⏳</span>
+									<span class="turn-label">Round resolving…</span>
+								{/if}
+							</div>
+						{/if}
 						<form class="chat-form main-chat-form" onsubmit={sendChat}>
 							<input
 								class="chat-input main-chat-input"
 								class:gm-input={gmAwake || hasGmMention(chatInput)}
+								class:combat-input-enemy={combatTurnInfo?.kind === 'enemy-turn' || combatTurnInfo?.kind === 'resolving'}
 								type="text"
 								placeholder={
-									isSolo
-										? (currentCharacter ? 'Describe your action…' : 'Create your character first')
-										: (gmAwake ? 'GM is listening — describe your action…' : 'Type a message… or @gm <action>')
+									combatTurnInfo
+										? combatTurnInfo.kind === 'your-turn'
+											? "It's your turn — describe your action…"
+											: combatTurnInfo.kind === 'companion-turn'
+												? `Direct ${combatTurnInfo.name}'s action…`
+												: combatTurnInfo.kind === 'ally-turn'
+													? `Waiting for ${combatTurnInfo.name}…`
+													: combatTurnInfo.kind === 'enemy-turn'
+														? `${combatTurnInfo.name} is acting…`
+														: 'Round resolving…'
+										: isSolo
+											? (currentCharacter ? 'Describe your action…' : 'Create your character first')
+											: (gmAwake ? 'GM is listening — describe your action…' : 'Type a message… or @gm <action>')
 								}
 								bind:value={chatInput}
 								maxlength={500}
@@ -1016,28 +1115,46 @@
 <Toast />
 
 <style>
+	/* ===== Page root — full-width, no centering cap ===== */
+	.adv-root {
+		width: 100%;
+		padding: 0 1.25rem;
+	}
+
 	/* ===== Layout ===== */
 	.adventure-screen {
+		height: calc(100dvh - 3.5rem);
 		display: flex;
 		flex-direction: column;
-		gap: 1.5rem;
+		gap: 0;
+		padding: 0.3rem 0 0;
+		overflow: hidden;
 	}
 
 	.adventure-header {
 		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
+		align-items: center;
+		gap: 0.85rem;
+		padding: 0 0 0.4rem;
+		flex-shrink: 0;
+		min-width: 0;
 	}
 
 	.adventure-header h1 {
-		margin: 0 0 0.5rem;
+		margin: 0;
+		font-size: 1rem;
+		font-weight: 700;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		flex-shrink: 1;
 	}
 
 	.header-meta {
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
-		flex-wrap: wrap;
+		gap: 0.5rem;
+		flex-wrap: nowrap;
 	}
 
 	.clock-pill {
@@ -1051,29 +1168,44 @@
 
 	.adventure-grid {
 		display: grid;
-		grid-template-columns: 220px minmax(0, 1fr) 420px;
-		gap: 1.25rem;
+		grid-template-columns: 240px minmax(0, 1fr) 460px;
+		gap: 0.85rem;
+		flex: 1;
+		min-height: 0;
 		align-items: start;
+		overflow: hidden;
 	}
 
 	.side-column {
 		display: flex;
 		flex-direction: column;
-		gap: 1.25rem;
+		gap: 0.85rem;
 	}
 
 	.journal-sidebar {
 		position: sticky;
-		top: 1rem;
-		max-height: calc(100vh - 2rem);
-		overflow: hidden;
+		top: 0.5rem;
+		max-height: calc(100dvh - 4.5rem);
+		overflow-y: auto;
+		overflow-x: hidden;
 	}
 
 	.main-column {
 		display: flex;
 		flex-direction: column;
-		gap: 1.25rem;
+		gap: 0.85rem;
 		min-width: 0;
+		align-self: stretch;
+		height: 100%;
+		overflow: hidden;
+	}
+
+	/* Stretch the GlassPanel inside main column to fill all height */
+	.main-column > :global(.glass-panel) {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
 	}
 
 	.panel-inner {
@@ -1275,6 +1407,36 @@
 		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 	}
 
+	/* ===== Companions in party panel ===== */
+	.companions-divider {
+		height: 1px;
+		background: var(--border);
+		margin: 0.35rem 0;
+		opacity: 0.5;
+	}
+
+	.companion-avatar {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: rgba(52, 211, 162, 0.15);
+		color: var(--accent-2);
+		font-weight: 700;
+		font-size: 0.8rem;
+	}
+
+	.companion-tag {
+		font-size: 0.68rem;
+		font-weight: 600;
+		text-transform: capitalize;
+		color: var(--accent-2);
+		opacity: 0.85;
+	}
+
+	.companion-hp {
+		background: linear-gradient(90deg, #34d3a2, #34d3a2);
+	}
+
 	/* ===== Location panel ===== */
 	.location-name {
 		display: block;
@@ -1397,9 +1559,10 @@
 	.main-chat-panel {
 		display: flex;
 		flex-direction: column;
-		gap: 0.85rem;
-		padding: 1rem 1.15rem 1.15rem;
-		min-height: 72vh;
+		gap: 0.65rem;
+		padding: 0.85rem 1rem 1rem;
+		flex: 1;
+		min-height: 0;
 	}
 
 	.chat-header {
@@ -1408,25 +1571,9 @@
 		justify-content: space-between;
 	}
 
-	.chat-header-main h2 {
-		margin: 0 0 0.15rem;
-		font-size: 1.1rem;
-	}
-
-	.chat-subtitle {
-		margin: 0;
-		font-size: 0.88rem;
-	}
-
 	.mention-hint {
 		color: #f5c842;
 		font-weight: 600;
-	}
-
-	.creation-warning {
-		margin-top: 0.35rem;
-		font-size: 0.82rem;
-		color: #f5c842;
 	}
 
 	/* ===== Chat messages ===== */
@@ -1441,7 +1588,6 @@
 	}
 
 	.main-chat-messages {
-		min-height: 420px;
 		max-height: none;
 		padding-right: 0.15rem;
 	}
@@ -1677,6 +1823,15 @@
 		background: rgba(255, 200, 80, 0.12);
 	}
 
+	/* Freestanding GM-thinking dots shown before first chunk arrives */
+	.gm-pending-indicator {
+		display: flex;
+		gap: 4px;
+		align-items: center;
+		padding: 0.45rem 0.8rem;
+		margin-top: 0.1rem;
+	}
+
 	/* Thinking animation */
 	.gm-thinking-anim {
 		display: flex;
@@ -1710,6 +1865,76 @@
 	}
 
 	/* ===== Chat input ===== */
+
+	/* ── Combat turn banner ── */
+	.combat-turn-banner {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.45rem 0.75rem;
+		border-radius: 10px;
+		font-size: 0.85rem;
+		border-left: 3px solid var(--border);
+		background: rgba(255, 255, 255, 0.04);
+		margin-bottom: 0.35rem;
+		animation: banner-slide-in 0.25s ease-out;
+	}
+	@keyframes banner-slide-in {
+		from { opacity: 0; transform: translateY(6px); }
+		to   { opacity: 1; transform: translateY(0); }
+	}
+	.combat-turn-banner.turn-yours {
+		border-left-color: #4ade80;
+		background: rgba(74, 222, 128, 0.08);
+	}
+	.combat-turn-banner.turn-companion {
+		border-left-color: #60a5fa;
+		background: rgba(96, 165, 250, 0.08);
+	}
+	.combat-turn-banner.turn-ally {
+		border-left-color: #a78bfa;
+		background: rgba(167, 139, 250, 0.06);
+	}
+	.combat-turn-banner.turn-enemy {
+		border-left-color: #f87171;
+		background: rgba(248, 113, 113, 0.06);
+	}
+	.combat-turn-banner.turn-resolving {
+		border-left-color: #fbbf24;
+		background: rgba(251, 191, 36, 0.06);
+	}
+	.turn-round {
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		background: rgba(255, 255, 255, 0.1);
+		padding: 0.1rem 0.35rem;
+		border-radius: 4px;
+		flex-shrink: 0;
+	}
+	.turn-icon {
+		font-size: 0.95rem;
+		flex-shrink: 0;
+	}
+	.turn-label {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.turn-stats {
+		font-size: 0.78rem;
+		opacity: 0.7;
+		flex-shrink: 0;
+		white-space: nowrap;
+	}
+
+	.chat-input.combat-input-enemy {
+		opacity: 0.6;
+		border-color: rgba(248, 113, 113, 0.25);
+	}
+
 	.chat-form {
 		display: flex;
 		gap: 0.4rem;
@@ -1772,6 +1997,12 @@
 	}
 
 	/* ===== Responsive ===== */
+	@media (max-width: 1400px) {
+		.adventure-grid {
+			grid-template-columns: 220px minmax(0, 1fr) 420px;
+		}
+	}
+
 	@media (max-width: 1300px) {
 		.adventure-grid {
 			grid-template-columns: 200px minmax(0, 1fr) 380px;
@@ -1789,16 +2020,32 @@
 	}
 
 	@media (max-width: 768px) {
+		.adv-root {
+			padding: 0 0.5rem;
+		}
+
+		.adventure-screen {
+			height: auto;
+			overflow: visible;
+		}
+
 		.adventure-grid {
 			grid-template-columns: 1fr;
+			overflow: visible;
+		}
+
+		.main-column {
+			align-self: auto;
+			height: auto;
+			overflow: visible;
+		}
+
+		.main-column > :global(.glass-panel) {
+			flex: none;
 		}
 
 		.left-sidebar {
 			order: 1;
-		}
-
-		.main-column {
-			order: 0;
 		}
 
 		.main-chat-panel {

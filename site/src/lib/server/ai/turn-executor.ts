@@ -827,6 +827,22 @@ export function getActorForCombatTurn(
  * Returns all NPC mechanic results + state changes plus a `roundComplete` flag
  * (true when the round number incremented, meaning the full initiative loop wrapped).
  */
+/**
+ * Get valid targets for hostile NPC attacks: PCs and companion NPCs that are alive.
+ */
+function getHostileNpcTargets(state: GameState, encounter: ActiveEncounter): Combatant[] {
+	return encounter.combatants.filter(c => {
+		if (c.defeated) return false;
+		if (c.type === 'character') return true;
+		// Include companion NPCs as valid targets
+		if (c.type === 'npc') {
+			const npc = state.npcs.find(n => n.id === c.referenceId);
+			return npc?.role === 'companion';
+		}
+		return false;
+	});
+}
+
 export function autoAdvancePastNpcs(
 	state: GameState,
 	encounter: ActiveEncounter
@@ -858,10 +874,10 @@ export function autoAdvancePastNpcs(
 
 			// Hostile NPC — auto-resolve their attack
 			if (!encounterEnded && npc?.statBlock && npc.statBlock.attacks.length > 0) {
-				// Pick a PC target (distribute round-robin by iteration count)
-				const pcTargets = encounter.combatants.filter(c => c.type === 'character' && !c.defeated);
-				if (pcTargets.length > 0) {
-					const targetCombatant = pcTargets[iters % pcTargets.length];
+				// Pick a target from PCs and companion NPCs (round-robin)
+				const friendlyTargets = getHostileNpcTargets(state, encounter);
+				if (friendlyTargets.length > 0) {
+					const targetCombatant = friendlyTargets[iters % friendlyTargets.length];
 					const attackResult = resolveNpcAttack(state, npc, 0, targetCombatant, encounter);
 					const attackName = npc.statBlock.attacks[0].name;
 
@@ -880,6 +896,15 @@ export function autoAdvancePastNpcs(
 							type: 'damage',
 							label: `${npc.name} deals ${attackResult.attackResult.totalDamage} ${attackResult.damageType} damage to ${targetCombatant.name}`,
 							dice: attackResult.attackResult.damage,
+							success: true
+						});
+					}
+
+					// Announce if a pre-death trait saved the target
+					if (attackResult.traitSaved) {
+						mechanicResults.push({
+							type: 'info',
+							label: `${targetCombatant.name} activates ${attackResult.traitSaved}! Drops to 1 HP instead of 0.`,
 							success: true
 						});
 					}
@@ -910,9 +935,16 @@ export function autoAdvancePastNpcs(
 						timestamp: Date.now()
 					});
 
-					// Check if all PCs down
+					// Check if all PCs down → defeat
 					if (allDefeated(state, encounter, 'character')) {
 						encounterEnded = { outcome: 'defeat' };
+						encounter.awaitingActorId = null;
+						break;
+					}
+					// Check if all hostile NPCs down → victory
+					// (can happen via reactive damage like thorns, retribution effects, etc.)
+					if (allDefeated(state, encounter, 'npc')) {
+						encounterEnded = { outcome: 'victory' };
 						encounter.awaitingActorId = null;
 						break;
 					}
@@ -1378,9 +1410,9 @@ export function resolveEnemyTurns(
 		return npc && npc.role !== 'companion';
 	});
 
-	// Get living PC combatants as potential targets
-	const pcTargets = encounter.combatants.filter(c => c.type === 'character' && !c.defeated);
-	if (pcTargets.length === 0 || enemies.length === 0) {
+	// Get living PC combatants and companion NPCs as potential targets
+	const friendlyTargets = getHostileNpcTargets(state, encounter);
+	if (friendlyTargets.length === 0 || enemies.length === 0) {
 		return { mechanicResults, stateChanges: {} };
 	}
 
@@ -1389,9 +1421,9 @@ export function resolveEnemyTurns(
 		const npc = state.npcs.find(n => n.id === enemyCombatant.referenceId);
 		if (!npc?.statBlock || npc.statBlock.attacks.length === 0) continue;
 
-		// Distribute targets across PCs (round-robin)
-		const targetIndex = i % pcTargets.length;
-		const selectedTarget = pcTargets[targetIndex];
+		// Distribute targets across friendlies (round-robin)
+		const targetIndex = i % friendlyTargets.length;
+		const selectedTarget = friendlyTargets[targetIndex];
 
 		// Use first attack from stat block
 		const attackResult = resolveNpcAttack(state, npc, 0, selectedTarget, encounter);
@@ -1412,6 +1444,15 @@ export function resolveEnemyTurns(
 				dice: attackResult.attackResult.damage,
 				success: true
 			});
+
+			// Announce if a pre-death trait saved the target
+			if (attackResult.traitSaved) {
+				mechanicResults.push({
+					type: 'info',
+					label: `${selectedTarget.name} activates ${attackResult.traitSaved}! Drops to 1 HP instead of 0.`,
+					success: true
+				});
+			}
 
 			// Track HP change for the PC target
 			if (attackResult.damageResult) {

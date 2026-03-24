@@ -683,10 +683,18 @@ export interface Location {
 
 export type QuestStatus = 'available' | 'active' | 'completed' | 'failed';
 
+export type QuestObjectiveType = 'talk-to' | 'visit-location' | 'defeat-encounter' | 'find-item' | 'escort' | 'custom';
+
 export interface QuestObjective {
 	id: GameId;
 	text: string;
 	done: boolean;
+	/** Machine-readable objective type for deterministic auto-tracking. */
+	type?: QuestObjectiveType;
+	/** Entity ID this objective is linked to (NPC id, location id, item name). */
+	linkedEntityId?: GameId;
+	/** Human-readable name of the linked entity (for AI context). */
+	linkedEntityName?: string;
 }
 
 export interface QuestRewardReputationChange {
@@ -837,6 +845,8 @@ export interface StateChange {
 	questUpdates?: Array<{ questId: GameId; field: string; oldValue: unknown; newValue: unknown; objectiveId?: GameId }>;
 	conditionsApplied?: Array<{ characterId: GameId; condition: Condition; applied: boolean }>;
 	xpAwarded?: Array<{ characterId: GameId; amount: number }>;
+	/** Direct gold transfer to one or more characters (payments, found coins, sales proceeds). */
+	goldChange?: Array<{ characterId: GameId; delta: number; reason: string }>;
 	clockAdvance?: { from: GameClock; to: GameClock };
 	spellSlotUsed?: { characterId: GameId; level: number; spellName: string };
 	hitDiceUsed?: { characterId: GameId; amount: number };
@@ -853,8 +863,8 @@ export interface StateChange {
 	 *  Retained for backward-compatible deserialization of old TurnRecords. Not consumed by gameplay code. */
 	enemyCombatActions?: Array<{ npcId: GameId; targetId: GameId; attackIndex?: number }>;
 
-	/** Promote an existing NPC to companion status (travels + fights with the party). */
-	companionPromoted?: { npcId: GameId; statBlock: CreatureStatBlock };
+	/** Promote one or more existing NPCs to companion status (travels + fights with the party). */
+	companionPromoted?: Array<{ npcId: GameId; statBlock?: CreatureStatBlock | null }>;
 
 	// --- World-building additions (Step 7) ---
 	/** NPCs the GM introduced into the world this turn. */

@@ -1049,6 +1049,43 @@ describe('allDefeated', () => {
 
 		expect(allDefeated(state, enc, 'npc')).toBe(false);
 	});
+
+	it('excludes companion NPCs — returns true when only companions are alive', () => {
+		const companionState: GameState = {
+			...state,
+			npcs: [
+				{ id: 'hostile-1', name: 'Bandit', role: 'hostile', description: '', alive: false, archived: false } as NPC,
+				{ id: 'comp-1', name: 'Stout Dwarf', role: 'companion', description: '', alive: true, archived: false } as NPC,
+			]
+		};
+
+		const enc = makeEncounter([
+			makeCombatant({ id: 'pc-1', type: 'character' }),
+			makeCombatant({ id: 'cbt-hostile', referenceId: 'hostile-1', type: 'npc', defeated: true }),
+			makeCombatant({ id: 'cbt-comp', referenceId: 'comp-1', type: 'npc', defeated: false })
+		]);
+
+		// Hostile NPC is defeated, companion is alive — should return true (victory)
+		expect(allDefeated(companionState, enc, 'npc')).toBe(true);
+	});
+
+	it('returns false when a hostile NPC is still alive alongside a companion', () => {
+		const companionState: GameState = {
+			...state,
+			npcs: [
+				{ id: 'hostile-1', name: 'Bandit', role: 'hostile', description: '', alive: true, archived: false } as NPC,
+				{ id: 'comp-1', name: 'Stout Dwarf', role: 'companion', description: '', alive: true, archived: false } as NPC,
+			]
+		};
+
+		const enc = makeEncounter([
+			makeCombatant({ id: 'pc-1', type: 'character' }),
+			makeCombatant({ id: 'cbt-hostile', referenceId: 'hostile-1', type: 'npc', defeated: false }),
+			makeCombatant({ id: 'cbt-comp', referenceId: 'comp-1', type: 'npc', defeated: false })
+		]);
+
+		expect(allDefeated(companionState, enc, 'npc')).toBe(false);
+	});
 });
 
 describe('getLivingCombatants', () => {
@@ -1078,6 +1115,26 @@ describe('getLivingCombatants', () => {
 
 		const living = getLivingCombatants(state, enc);
 		expect(living).toHaveLength(2);
+	});
+
+	it('excludes companion NPCs when type is npc', () => {
+		const companionState: GameState = {
+			...state,
+			npcs: [
+				{ id: 'hostile-1', name: 'Bandit', role: 'hostile', description: '', alive: true, archived: false } as NPC,
+				{ id: 'comp-1', name: 'Stout Dwarf', role: 'companion', description: '', alive: true, archived: false } as NPC,
+			]
+		};
+
+		const enc = makeEncounter([
+			makeCombatant({ id: 'pc-1', type: 'character' }),
+			makeCombatant({ id: 'cbt-hostile', referenceId: 'hostile-1', type: 'npc' }),
+			makeCombatant({ id: 'cbt-comp', referenceId: 'comp-1', type: 'npc' })
+		]);
+
+		const livingNPCs = getLivingCombatants(companionState, enc, 'npc');
+		expect(livingNPCs).toHaveLength(1);
+		expect(livingNPCs[0].id).toBe('cbt-hostile');
 	});
 });
 

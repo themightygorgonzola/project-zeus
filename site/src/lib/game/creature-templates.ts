@@ -151,6 +151,20 @@ const CREATURE_KEYWORDS: Array<{ pattern: RegExp; attacks: AttackFlavour[] }> = 
 
 	// Plants
 	{ pattern: /treant|plant|vine|twig.*blight/i, attacks: [{ name: 'Slam', damageType: 'bludgeoning' }] },
+
+	// Appearance / adjective descriptors (lower priority — matched when class keywords above don't)
+	{ pattern: /robed|caster|spell|mystic/i, attacks: [{ name: 'Arcane Blast', damageType: 'force', range: '120 ft.' }] },
+	{ pattern: /stout|armored|shielded|bulky/i, attacks: [{ name: 'Longsword', damageType: 'slashing' }, { name: 'Shield Bash', damageType: 'bludgeoning' }] },
+	{ pattern: /agile|swift|nimble|lithe/i, attacks: [{ name: 'Shortsword', damageType: 'piercing' }, { name: 'Shortbow', damageType: 'piercing', range: '80/320 ft.' }] },
+
+	// Race-based fallbacks (very low priority — only if nothing else matches)
+	{ pattern: /\belf\b|elven/i, attacks: [{ name: 'Longbow', damageType: 'piercing', range: '150/600 ft.' }, { name: 'Shortsword', damageType: 'piercing' }] },
+	{ pattern: /\bdwarf\b|dwarven/i, attacks: [{ name: 'Warhammer', damageType: 'bludgeoning' }, { name: 'Handaxe', damageType: 'slashing', range: '20/60 ft.' }] },
+	{ pattern: /\bhuman\b|mercenary|sellsword/i, attacks: [{ name: 'Longsword', damageType: 'slashing' }, { name: 'Light Crossbow', damageType: 'piercing', range: '80/320 ft.' }] },
+	{ pattern: /\bhalfling\b/i, attacks: [{ name: 'Shortsword', damageType: 'piercing' }, { name: 'Sling', damageType: 'bludgeoning', range: '30/120 ft.' }] },
+	{ pattern: /\bgnome\b/i, attacks: [{ name: 'Dagger', damageType: 'piercing' }, { name: 'Light Crossbow', damageType: 'piercing', range: '80/320 ft.' }] },
+	{ pattern: /\btiefling\b/i, attacks: [{ name: 'Scimitar', damageType: 'slashing' }, { name: 'Hellish Rebuke', damageType: 'fire', range: '60 ft.' }] },
+	{ pattern: /\bdragonborn\b/i, attacks: [{ name: 'Greataxe', damageType: 'slashing' }, { name: 'Breath Weapon', damageType: 'fire', range: '15 ft. cone' }] },
 ];
 
 /** Default attacks when no keyword matches. */

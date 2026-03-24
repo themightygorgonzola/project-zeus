@@ -56,7 +56,18 @@ function systemPrompt(): string {
 You generate structured content that fits the existing world.
 Always respond with ONLY valid JSON — no markdown, no commentary.
 Keep descriptions vivid but concise (1-2 sentences each).
-Names should feel consistent with the existing world.`;
+Names should feel consistent with the existing world.
+
+When generating quest objectives, ALWAYS include a "type" field:
+- "talk-to": speak with a specific NPC (include linkedEntityId = NPC id, linkedEntityName = NPC name)
+- "visit-location": travel to a specific place (include linkedEntityId = location id, linkedEntityName = location name)
+- "find-item": acquire a specific item (include linkedEntityName = item name)
+- "defeat-encounter": defeat enemies in combat
+- "escort": protect someone during travel
+- "custom": anything else
+
+When generating quests, ALWAYS include rewards:
+{ "xp": number, "gold": number }`;
 }
 
 function describeLocation(loc: Location): string {
@@ -113,6 +124,7 @@ export function parseEnrichmentResponse(raw: string): StateChange {
 		}
 
 		if (Array.isArray(parsed.questsAdded)) {
+			const validObjTypes = new Set(['talk-to', 'visit-location', 'find-item', 'defeat-encounter', 'escort', 'custom']);
 			changes.questsAdded = parsed.questsAdded
 				.filter((q: Record<string, unknown>) => q && typeof q.name === 'string')
 				.map((q: Record<string, unknown>) => ({
@@ -123,10 +135,19 @@ export function parseEnrichmentResponse(raw: string): StateChange {
 					objectives: Array.isArray(q.objectives)
 						? q.objectives.map((o: Record<string, unknown>) => ({
 							id: typeof o?.id === 'string' ? o.id : `obj-${ulid()}`,
-							text: typeof o?.text === 'string' ? o.text : String(o)
+							text: typeof o?.text === 'string' ? o.text : String(o),
+							type: typeof o?.type === 'string' && validObjTypes.has(o.type) ? o.type : 'custom',
+							linkedEntityId: typeof o?.linkedEntityId === 'string' ? o.linkedEntityId : undefined,
+							linkedEntityName: typeof o?.linkedEntityName === 'string' ? o.linkedEntityName : undefined
 						}))
 						: [],
-					recommendedLevel: typeof q.recommendedLevel === 'number' ? q.recommendedLevel : 1
+					recommendedLevel: typeof q.recommendedLevel === 'number' ? q.recommendedLevel : 1,
+					rewards: q.rewards && typeof q.rewards === 'object'
+						? {
+							xp: typeof (q.rewards as Record<string, unknown>).xp === 'number' ? (q.rewards as Record<string, unknown>).xp as number : 100,
+							gold: typeof (q.rewards as Record<string, unknown>).gold === 'number' ? (q.rewards as Record<string, unknown>).gold as number : 20
+						}
+						: { xp: 100, gold: 20 }
 				}));
 		}
 
@@ -251,18 +272,29 @@ export async function extendQuestArc(
 
 ORIGINAL QUEST: "${quest.name}" — ${quest.description}
 STATUS: ${quest.status}
-OBJECTIVES: ${quest.objectives.map((o) => `${o.done ? '[x]' : '[ ]'} ${o.text}`).join('; ')}
+OBJECTIVES: ${quest.objectives.map((o) => `${o.done ? '[x]' : '[ ]'} ${o.text} (type: ${o.type ?? 'custom'})`).join('; ')}
 QUEST GIVER: ${giver ? describeNpc(giver) : 'Unknown'}
 PARTY LOCATION: ${location ? describeLocation(location) : 'Unknown'}
 PARTY LEVEL: ${state.characters.length > 0 ? state.characters[0].level : 1}
 
+KNOWN LOCATIONS: ${state.locations.slice(0, 8).map((l) => `${l.name}[${l.id}]`).join(', ')}
+KNOWN NPCS: ${state.npcs.filter((n) => n.alive).slice(0, 10).map((n) => `${n.name}[${n.id}](${n.role})`).join(', ')}
+
 Generate a follow-up quest that raises the stakes or introduces a new angle.
-Include 2-4 objectives. Optionally introduce a new NPC connected to the quest.
+Include 2-4 objectives with typed objective tracking.
+Each objective MUST have: text, type (talk-to|visit-location|find-item|defeat-encounter|escort|custom).
+For talk-to/visit-location, include linkedEntityId and linkedEntityName from known NPCs/locations.
+Include rewards (xp, gold). Optionally introduce a new NPC connected to the quest.
 
 Return JSON:
 {
   "questsAdded": [
-    { "name": "...", "description": "...", "giverNpcId": "${giver?.id ?? ''}", "objectives": [{ "text": "..." }], "recommendedLevel": ${(state.characters[0]?.level ?? 1) + 1} }
+    {
+      "name": "...", "description": "...", "giverNpcId": "${giver?.id ?? ''}",
+      "objectives": [{ "text": "...", "type": "talk-to", "linkedEntityId": "npc-xxx", "linkedEntityName": "Name" }],
+      "recommendedLevel": ${(state.characters[0]?.level ?? 1) + 1},
+      "rewards": { "xp": ${100 + (state.characters[0]?.level ?? 1) * 50}, "gold": ${20 + (state.characters[0]?.level ?? 1) * 10} }
+    }
   ],
   "npcsAdded": [
     { "name": "...", "role": "quest-giver|neutral|hostile|ally", "locationId": "${location?.id ?? ''}", "disposition": 0, "description": "...", "notes": "..." }
@@ -324,7 +356,8 @@ ${turnSummaries}
 
 PARTY LOCATION: ${location ? describeLocation(location) : 'Unknown'}
 LOCAL NPCS: ${localNpcs.length > 0 ? localNpcs.map(describeNpc).join('; ') : 'None'}
-ACTIVE QUESTS: ${state.quests.filter((q) => q.status === 'active' || q.status === 'available').map((q) => `"${q.name}" (${q.status})`).join('; ') || 'None'}
+KNOWN LOCATIONS: ${state.locations.slice(0, 8).map((l) => `${l.name}[${l.id}]`).join(', ')}
+ACTIVE QUESTS: ${state.quests.filter((q) => q.status === 'active' || q.status === 'available').map((q) => `"${q.name}" (${q.status}) — objectives: ${q.objectives.map((o) => `${o.done ? '[x]' : '[ ]'} ${o.text}`).join('; ')}`).join(' | ') || 'None'}
 
 Consider:
 - How do local NPCs feel about the party's actions? (disposition changes)

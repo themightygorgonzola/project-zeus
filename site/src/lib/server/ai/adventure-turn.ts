@@ -7,6 +7,7 @@ import type { ChatRecord } from '$lib/game/state';
 import { assembleGMContext, assembleNarrativeGMContext, assembleNarratorContext, assembleRoundNarratorContext, assembleStateExtractionContext } from '$lib/game/gm-context';
 import { resolveTurn, parseTurnIntent, type ResolvedTurn } from './turn-executor';
 import { classifyCombatIntent, buildClassifierInput } from './combat-classifier';
+import { classifyEncounterStart, resolveSurpriseDamage, type EncounterClassification } from './encounter-classifier';
 import type {
 	CombatIntent,
 	Condition,
@@ -32,6 +33,7 @@ import { createEncounter, resolveEncounter, initEncounterTurnOrder, syncCombatan
 import { generateCreatureStatBlock, averagePartyLevel, parseCreatureTier } from '$lib/game/creature-templates';
 import { skillCheck, abilityCheck, savingThrow } from '$lib/game/mechanics';
 import { SKILL_ABILITY_MAP } from '$lib/game/types';
+import { advanceClockOnState } from '$lib/game/travel';
 
 // ---------------------------------------------------------------------------
 // Public types (unchanged interface for existing callers)
@@ -515,7 +517,7 @@ export async function executeAdventureTurn(
 		if (resolvedTurn.roundComplete === true) {
 			// Round just completed — narrate the entire round as a cohesive scene
 			const roundActions = currentState.activeEncounter?.roundActions ?? [];
-			narrativeMessages = assembleRoundNarratorContext(currentState, world, roundActions, recentTurns, payload.recentChat);
+			narrativeMessages = assembleRoundNarratorContext(currentState, world, roundActions, recentTurns, payload.recentChat, resolvedTurn.stateChanges.encounterEnded);
 		} else {
 			narrativeMessages = assembleNarratorContext(currentState, world, recentTurns, resolvedTurn, payload.recentChat);
 		}
@@ -717,12 +719,42 @@ export async function executeAdventureTurn(
 			}
 		}
 
+		// -----------------------------------------------------------------
+		// Encounter Classification (LLM-based)
+		// If the AI proposed an encounter start, validate it and detect
+		// surprise/ambush scenarios for pre-combat damage resolution.
+		// -----------------------------------------------------------------
+		let encounterClassification: EncounterClassification | null = null;
+		if (finalStateChanges.encounterStarted?.creatures?.length && narrativeText) {
+			const creatureNames = finalStateChanges.encounterStarted.creatures.map(
+				(c: { name: string }) => c.name
+			);
+			try {
+				encounterClassification = await classifyEncounterStart(
+					narrativeText,
+					creatureNames,
+					openaiKey,
+					'gpt-4o-mini'
+				);
+
+				if (!encounterClassification.shouldStartEncounter) {
+					console.warn('[encounterClassifier] LLM says narrative does not describe combat — stripping encounterStarted');
+					delete finalStateChanges.encounterStarted;
+				} else if (encounterClassification.isSurprise) {
+					console.log(`[encounterClassifier] Surprise detected! ${encounterClassification.surprisedSide} is surprised, ${encounterClassification.preRoundDamage.length} pre-round damage entries`);
+				}
+			} catch (err) {
+				console.error('[encounterClassifier] Classification failed, allowing encounter:', err);
+				// On error, trust the AI's proposal (no surprise detection)
+			}
+		}
+
 		// Persist the turn and apply state changes
 		const finalResolvedTurn: ResolvedTurn = {
 			...resolvedTurn,
 			stateChanges: finalStateChanges
 		};
-		await persistResolvedTurnAndState(payload, finalResolvedTurn, narrativeText, currentState, debugData);
+		await persistResolvedTurnAndState(payload, finalResolvedTurn, narrativeText, currentState, debugData, encounterClassification);
 
 		// Mark unconsumed chat as consumed by this turn
 		const chatIds = payload.recentChat.map((c) => c.id);
@@ -985,7 +1017,7 @@ async function broadcastTurnEvents(
 	// State update event (if any state changes were applied)
 	const sc = resolvedTurn.stateChanges;
 	const hasStateChanges = sc.hpChanges?.length || sc.conditionsApplied?.length ||
-		sc.xpAwarded?.length || sc.locationChange || sc.questUpdates?.length ||
+		sc.xpAwarded?.length || sc.goldChange?.length || sc.locationChange || sc.questUpdates?.length ||
 		sc.npcChanges?.length || sc.clockAdvance || sc.spellSlotUsed ||
 		sc.itemsLost?.length || sc.itemsGained?.length || sc.hitDiceUsed ||
 		sc.encounterStarted || sc.encounterEnded;
@@ -1116,6 +1148,7 @@ export function mergeStateChanges(engine: StateChange, gm: StateChange): StateCh
 		hpChanges: mergeUniqueByKey(engine.hpChanges, gm.hpChanges, (hc) => `${hc.characterId}|${hc.oldHp}|${hc.newHp}|${hc.reason ?? ''}`),
 		conditionsApplied: mergeUniqueByKey(engine.conditionsApplied, gm.conditionsApplied, (ca) => `${ca.characterId}|${ca.condition}|${ca.applied}`),
 		xpAwarded: mergeUniqueByKey(engine.xpAwarded, gm.xpAwarded, (xp) => `${xp.characterId}|${xp.amount}`),
+		goldChange: mergeUniqueByKey(engine.goldChange, gm.goldChange, (gc) => `${gc.characterId}|${gc.delta}|${gc.reason ?? ''}`),
 		locationChange: engine.locationChange ?? gm.locationChange,
 		questUpdates: mergeUniqueByKey(engine.questUpdates, gm.questUpdates, (qu) => `${qu.questId}|${qu.field}|${qu.objectiveId ?? ''}`),
 		npcChanges: mergeUniqueByKey(engine.npcChanges, gm.npcChanges, (nc) => `${nc.npcId}|${nc.field}`),
@@ -1201,7 +1234,7 @@ function tryParseGMJson(text: string): GMResponse | null {
 					? { ...parsed.stateChanges }
 					: {};
 				const rescueKeys = [
-					'hpChanges', 'conditionsApplied', 'xpAwarded', 'locationChange',
+					'hpChanges', 'conditionsApplied', 'xpAwarded', 'goldChange', 'locationChange',
 					'questUpdates', 'npcChanges', 'clockAdvance', 'spellSlotUsed',
 					'itemsLost', 'itemsGained', 'itemsDropped', 'itemsPickedUp', 'locationItemsAdded',
 					'hitDiceUsed', 'featureUsed',
@@ -1253,7 +1286,7 @@ export function parseStateExtractionResponse(raw: string): StateChange {
 			}
 			// AI may have returned stateChange keys at top level (no wrapper)
 			const stateChangeKeys = [
-				'hpChanges', 'conditionsApplied', 'xpAwarded', 'locationChange',
+				'hpChanges', 'conditionsApplied', 'xpAwarded', 'goldChange', 'locationChange',
 				'questUpdates', 'npcChanges', 'clockAdvance', 'spellSlotUsed',
 				'itemsLost', 'itemsGained', 'itemsDropped', 'itemsPickedUp', 'locationItemsAdded',
 				'hitDiceUsed', 'featureUsed',
@@ -1480,6 +1513,35 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 		}
 	}
 
+	// --- goldChange ---
+	if (sc.goldChange) {
+		if (!Array.isArray(sc.goldChange)) {
+			console.warn('[sanitize] goldChange is not an array — stripped');
+		} else {
+			clean.goldChange = sc.goldChange.filter((gc, i) => {
+				if (!gc || typeof gc !== 'object') {
+					console.warn(`[sanitize] goldChange[${i}] is not an object — stripped`);
+					return false;
+				}
+				if (typeof gc.characterId !== 'string' || !gc.characterId) {
+					console.warn(`[sanitize] goldChange[${i}].characterId is not a non-empty string — stripped`);
+					return false;
+				}
+				gc.characterId = resolveEntityId(gc.characterId, state.characters, `goldChange[${i}].characterId`);
+				if (typeof gc.delta !== 'number' || !isFinite(gc.delta)) {
+					console.warn(`[sanitize] goldChange[${i}].delta=${gc.delta} is not a valid number — stripped`);
+					return false;
+				}
+				if (typeof gc.reason !== 'string' || !gc.reason.trim()) {
+					console.warn(`[sanitize] goldChange[${i}].reason is missing — stripped`);
+					return false;
+				}
+				return true;
+			});
+			if (clean.goldChange.length === 0) delete clean.goldChange;
+		}
+	}
+
 	// --- locationChange ---
 	if (sc.locationChange) {
 		if (!sc.locationChange || typeof sc.locationChange !== 'object') {
@@ -1494,7 +1556,13 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 				console.warn('[sanitize] locationChange.from must be a string or null when provided — stripped');
 				(sc.locationChange as { from?: string | null }).from = undefined;
 			}
-			clean.locationChange = sc.locationChange;
+			// Guard: reject self-referencing location changes (from === to after normalization)
+			const normalizeLocId = (s: string | undefined | null) => s?.toLowerCase().replace(/^loc-/, '').replace(/[-_ ]/g, '');
+			if (normalizeLocId(sc.locationChange.to) === normalizeLocId(sc.locationChange.from ?? state.partyLocationId)) {
+				console.warn(`[sanitize] locationChange.to resolves to same location as current — stripped`);
+			} else {
+				clean.locationChange = sc.locationChange;
+			}
 		}
 	}
 
@@ -1829,7 +1897,8 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					return true;
 				});
 
-				// Also reject encounterStarted + encounterEnded in same response (instant combat)
+				// If both encounterStarted AND encounterEnded in same response,
+				// strip encounterEnded — encounterStarted takes priority.
 				if (sc.encounterEnded) {
 					console.warn('[sanitize] encounterStarted + encounterEnded in same response — encounterEnded stripped (encounters should span multiple turns)');
 				}
@@ -1854,7 +1923,7 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 		}
 	}
 
-	// --- encounterEnded (only if not blocked by instant-combat check above) ---
+	// --- encounterEnded (only if no encounterStarted in same response) ---
 	if (sc.encounterEnded && !sc.encounterStarted) {
 		if (typeof sc.encounterEnded === 'object' && sc.encounterEnded) {
 			clean.encounterEnded = sc.encounterEnded;
@@ -1869,7 +1938,7 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 			const validRoles = new Set(['merchant', 'quest-giver', 'hostile', 'neutral', 'ally', 'companion', 'boss']);
 			clean.npcsAdded = sc.npcsAdded.filter((npc, i) => {
 				if (!npc || typeof npc !== 'object') return false;
-				if (typeof npc.id !== 'string' || !npc.id) npc.id = `npc-${Date.now()}-${i}`;
+				if (typeof npc.id !== 'string' || !npc.id || /^npc-<|<unique>|<.*>/.test(npc.id)) npc.id = `npc-${ulid()}`;
 				if (typeof npc.name !== 'string' || !npc.name) {
 					console.warn(`[sanitize] npcsAdded[${i}].name is missing — stripped`);
 					return false;
@@ -1936,7 +2005,12 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 				if (typeof q.giverNpcId === 'string' && q.giverNpcId) {
 					q.giverNpcId = resolveEntityId(q.giverNpcId, npcRefs, `questsAdded[${i}].giverNpcId`);
 				}
-				if (!Array.isArray(q.objectives)) q.objectives = [];
+					if (!Array.isArray(q.objectives)) q.objectives = [];
+				// Enforce at least one objective — zero-objective quests can never auto-complete
+				if (q.objectives.length === 0) {
+					console.warn(`[sanitize] questsAdded[${i}] "${q.name}" has no objectives — injecting default`);
+					q.objectives.push({ id: `obj-${q.id}-1`, text: `Complete: ${q.name}` });
+				}
 				return true;
 			});
 			if (clean.questsAdded.length === 0) delete clean.questsAdded;
@@ -1967,11 +2041,25 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 	if (sc.deathSaveResult) clean.deathSaveResult = sc.deathSaveResult;
 	if (sc.deathSaveOutcome) clean.deathSaveOutcome = sc.deathSaveOutcome;
 	if (sc.companionPromoted) {
-		if (typeof sc.companionPromoted === 'object' && sc.companionPromoted && typeof sc.companionPromoted.npcId === 'string' && sc.companionPromoted.npcId) {
-			sc.companionPromoted.npcId = resolveEntityId(sc.companionPromoted.npcId, npcRefs, 'companionPromoted.npcId');
-			clean.companionPromoted = sc.companionPromoted;
-		} else {
-			console.warn('[sanitize] companionPromoted missing npcId — stripped');
+		// Normalize: accept a single object { npcId } or an array [{ npcId }, ...]
+		const rawPromoted = Array.isArray(sc.companionPromoted) ? sc.companionPromoted : [sc.companionPromoted];
+		const validPromoted: Array<{ npcId: string; statBlock?: unknown }> = [];
+		for (let pi = 0; pi < rawPromoted.length; pi++) {
+			const entry = rawPromoted[pi];
+			if (typeof entry === 'object' && entry && typeof entry.npcId === 'string' && entry.npcId) {
+				entry.npcId = resolveEntityId(entry.npcId, npcRefs, `companionPromoted[${pi}].npcId`);
+				// If statBlock is missing or not a valid object, null it for auto-generation in the applier
+				if (!entry.statBlock || typeof entry.statBlock !== 'object') {
+					entry.statBlock = null;
+					console.log(`[sanitize] companionPromoted[${pi}] without statBlock — will auto-generate in applier`);
+				}
+				validPromoted.push(entry);
+			} else {
+				console.warn(`[sanitize] companionPromoted[${pi}] missing npcId — stripped`);
+			}
+		}
+		if (validPromoted.length > 0) {
+			clean.companionPromoted = validPromoted as typeof clean.companionPromoted;
 		}
 	}
 
@@ -2048,7 +2136,8 @@ async function persistResolvedTurnAndState(
 	resolvedTurn: ResolvedTurn,
 	narrativeText: string,
 	currentState: GameState | null,
-	debugData?: TurnDebugData | null
+	debugData?: TurnDebugData | null,
+	encounterClassification?: EncounterClassification | null
 ): Promise<void> {
 	const state = currentState ?? await loadGameState(payload.adventureId);
 	if (!state) return; // No game state yet — skip persistence (legacy adventure)
@@ -2085,6 +2174,56 @@ async function persistResolvedTurnAndState(
 
 	// Apply structured state changes from the GM
 	const enrichmentIntents = applyGMStateChanges(state, resolvedTurn.stateChanges, turnNumber);
+
+	// ---------------------------------------------------------------------------
+	// Surprise Damage Resolution
+	// If the encounter classifier detected a surprise/ambush with pre-combat
+	// damage, resolve it now against the newly created combatants.
+	// ---------------------------------------------------------------------------
+	if (encounterClassification?.isSurprise && encounterClassification.preRoundDamage.length > 0 && state.activeEncounter) {
+		// Build a combatant map for fuzzy name matching
+		const combatantMap = new Map<string, { id: string; name: string; type: 'pc' | 'npc' }>();
+		for (const c of state.activeEncounter.combatants) {
+			const combatantType: 'pc' | 'npc' = c.type === 'character' ? 'pc' : 'npc';
+			combatantMap.set(c.name.toLowerCase(), { id: c.id, name: c.name, type: combatantType });
+		}
+		// Also add character names for PC matching
+		for (const ch of state.characters) {
+			combatantMap.set(ch.name.toLowerCase(), { id: ch.id, name: ch.name, type: 'pc' });
+		}
+
+		const surpriseDamage = resolveSurpriseDamage(encounterClassification.preRoundDamage, combatantMap);
+		for (const dmg of surpriseDamage) {
+			// Apply to combatant
+			const combatant = state.activeEncounter.combatants.find((c) =>
+				c.id === dmg.targetId || c.referenceId === dmg.targetId
+			);
+			if (combatant) {
+				combatant.currentHp = Math.max(0, combatant.currentHp - dmg.damageRoll);
+				if (combatant.currentHp === 0) combatant.defeated = true;
+				console.log(`[surprise] ${dmg.attackerDescription} dealt ${dmg.damageRoll} ${dmg.damageType} to ${dmg.targetName} (${dmg.diceExpression})`);
+			}
+			// Also apply to the authoritative source (character HP or NPC statBlock)
+			const character = state.characters.find((c) => c.id === dmg.targetId);
+			if (character) {
+				character.hp = Math.max(0, character.hp - dmg.damageRoll);
+			} else {
+				const npc = state.npcs.find((n) => n.id === dmg.targetId);
+				if (npc?.statBlock) {
+					npc.statBlock.hp = Math.max(0, npc.statBlock.hp - dmg.damageRoll);
+					if (npc.statBlock.hp === 0) npc.alive = false;
+				}
+			}
+
+			// Record as a mechanic result for the turn log
+			turn.mechanicResults.push({
+				type: 'damage',
+				label: `Surprise: ${dmg.attackerDescription} → ${dmg.targetName}`,
+				dice: { notation: dmg.diceExpression, rolls: [], total: dmg.damageRoll },
+				success: true
+			});
+		}
+	}
 
 	// After a round-complete narration, clear the accumulated round actions so the
 	// next round starts fresh. roundComplete===true means the AI just narrated the whole round.
@@ -2237,14 +2376,27 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 	if (changes.questsAdded) {
 		for (const qData of changes.questsAdded) {
 			if (state.quests.some((q) => q.id === qData.id)) continue;
+			const enrichedRewards = (qData as Record<string, unknown>).rewards as { xp?: number; gold?: number } | undefined;
 			const quest: Quest = {
 				id: qData.id,
 				name: qData.name,
 				description: qData.description,
 				giverNpcId: qData.giverNpcId ?? null,
 				status: 'available',
-				objectives: qData.objectives.map((o) => ({ id: o.id, text: o.text, done: false })),
-				rewards: { xp: 0, gold: 0, items: [], reputationChanges: [] },
+				objectives: qData.objectives.map((o) => ({
+					id: o.id,
+					text: o.text,
+					done: false,
+					type: (o as Record<string, unknown>).type as Quest['objectives'][0]['type'],
+					linkedEntityId: (o as Record<string, unknown>).linkedEntityId as string | undefined,
+					linkedEntityName: (o as Record<string, unknown>).linkedEntityName as string | undefined
+				})),
+				rewards: {
+					xp: enrichedRewards?.xp ?? 0,
+					gold: enrichedRewards?.gold ?? 0,
+					items: [],
+					reputationChanges: qData.giverNpcId ? [{ npcId: qData.giverNpcId, delta: 10 }] : []
+				},
 				recommendedLevel: qData.recommendedLevel ?? 1,
 				encounterTemplates: []
 			};
@@ -2311,6 +2463,18 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 		}
 	}
 
+	// Gold changes (validate characterId, clamp to ≥0)
+	if (changes.goldChange) {
+		for (const gc of changes.goldChange) {
+			const char = state.characters.find((c) => c.id === gc.characterId);
+			if (char) {
+				char.gold = Math.max(0, char.gold + gc.delta);
+			} else {
+				console.warn(`[applyGMStateChanges] goldChange references unknown characterId="${gc.characterId}" — skipped`);
+			}
+		}
+	}
+
 	// Location change (validate that the target location exists — now including
 	// locations that were just added above in Phase A)
 	if (changes.locationChange) {
@@ -2332,6 +2496,10 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 		if (loc) {
 			state.partyLocationId = loc.id;
 			loc.visited = true;
+
+			// Auto-advance clock: travel takes 1 time period
+			const travelClock = advanceClockOnState(state, 1);
+			if (!changes.clockAdvance) changes.clockAdvance = travelClock.clockAdvance;
 
 			// Auto-move companion NPCs to the new location so they travel with the party
 			for (const npc of state.npcs) {
@@ -2371,7 +2539,7 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 				quest.status = qu.newValue as typeof quest.status;
 				// Quest reward auto-distribution on manual completion
 				if (previousStatus !== 'completed' && quest.status === 'completed') {
-					distributeQuestRewards(state, quest);
+					distributeQuestRewards(state, quest, changes);
 				}
 			} else if (qu.field === 'objective' && qu.objectiveId) {
 				const obj = quest.objectives.find((o) => o.id === qu.objectiveId);
@@ -2389,7 +2557,7 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 				if (quest.status !== 'completed' && quest.objectives.length > 0 && quest.objectives.every((o) => o.done)) {
 					quest.status = 'completed';
 					// Distribute quest rewards to all party characters
-					distributeQuestRewards(state, quest);
+					distributeQuestRewards(state, quest, changes);
 					// Trigger follow-up quest generation
 					enrichmentIntents.push({ type: 'extend-quest-arc', questId: quest.id });
 				}
@@ -2595,20 +2763,31 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 		}
 	}
 
-	// Companion promotion — promote an existing NPC to companion role with stat block
+	// Companion promotion — promote existing NPCs to companion role with stat blocks
 	if (changes.companionPromoted) {
-		const { npcId, statBlock } = changes.companionPromoted;
-		const npc = state.npcs.find((n) => n.id === npcId);
-		if (npc) {
-			npc.role = 'companion';
-			npc.statBlock = { ...statBlock };
-			npc.lastInteractionTurn = turnNumber;
-			// Companions travel with the party — sync location
-			if (state.partyLocationId) {
-				npc.locationId = state.partyLocationId;
+		for (const promoted of changes.companionPromoted) {
+			const { npcId, statBlock } = promoted;
+			const npc = state.npcs.find((n) => n.id === npcId);
+			if (npc) {
+				npc.role = 'companion';
+				// If the AI provided a valid stat block, use it; otherwise auto-generate at 'weak' tier
+				if (statBlock && typeof statBlock === 'object' && typeof statBlock.hp === 'number' && statBlock.hp > 0) {
+					npc.statBlock = { ...statBlock };
+				} else {
+					const partyLevel = averagePartyLevel(state.characters);
+					// Use name + description for keyword matching (e.g. "cleric" → Mace + Sacred Flame)
+					const nameHint = npc.description ? `${npc.name} ${npc.description}` : npc.name;
+					npc.statBlock = generateCreatureStatBlock(nameHint, 'weak', partyLevel);
+					console.log(`[applyGMStateChanges] companionPromoted auto-generated 'weak' stat block for "${npc.name}" (party level ${partyLevel})`);
+				}
+				npc.lastInteractionTurn = turnNumber;
+				// Companions travel with the party — sync location
+				if (state.partyLocationId) {
+					npc.locationId = state.partyLocationId;
+				}
+			} else {
+				console.warn(`[applyGMStateChanges] companionPromoted references unknown npcId="${npcId}" — skipped`);
 			}
-		} else {
-			console.warn(`[applyGMStateChanges] companionPromoted references unknown npcId="${npcId}" — skipped`);
 		}
 	}
 
@@ -2654,7 +2833,8 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 			.map((cr) => state.npcs.find((n) => n.id === cr.id))
 			.filter((n): n is NPC => !!n && !!n.statBlock && n.alive !== false);
 
-		// Also include companion NPCs at the party's location
+		// Also include companion NPCs at the party's location (role === 'companion' only).
+		// Allies (role === 'ally') must be explicitly listed in encounterStarted.creatures to join.
 		const companionNpcs = state.npcs.filter(
 			(n) => n.alive && n.role === 'companion' && n.locationId === state.partyLocationId && n.statBlock
 		);
@@ -2676,13 +2856,20 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 			.map((c) => c.referenceId);
 		const encounterNpcs = state.npcs.filter((n) => encounterNpcIds.includes(n.id));
 
-		// Mark all enemy combatants as defeated on victory
+		// Mark all enemy combatants as defeated on victory and record NPC deaths
 		if (outcome === 'victory') {
 			for (const combatant of state.activeEncounter.combatants) {
 				if (combatant.type === 'npc') {
 					const npc = state.npcs.find((n) => n.id === combatant.referenceId);
 					if (npc && npc.role !== 'companion') {
 						combatant.defeated = true;
+						// Mark NPC as dead and surface in turn record for audit trail
+						if (npc.alive !== false) {
+							npc.alive = false;
+							if (npc.statBlock) npc.statBlock.hp = 0;
+							if (!changes.npcChanges) changes.npcChanges = [];
+							changes.npcChanges.push({ npcId: npc.id, field: 'alive', oldValue: true, newValue: false });
+						}
 					}
 				}
 			}
@@ -2705,6 +2892,12 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 		}
 
 		// Clear the active encounter so it's no longer in state
+		// Auto-advance clock: combat takes time (1 period per 3 rounds, minimum 1)
+		const combatRounds = state.activeEncounter?.round ?? 1;
+		const combatPeriods = Math.max(1, Math.floor(combatRounds / 3));
+		const combatClock = advanceClockOnState(state, combatPeriods);
+		if (!changes.clockAdvance) changes.clockAdvance = combatClock.clockAdvance;
+
 		state.activeEncounter = undefined;
 	}
 
@@ -2722,6 +2915,24 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 			} else if (outcome === 'stable') {
 				char.conditions = char.conditions.filter((c) => c !== 'unconscious');
 				if (char.hp === 0) char.hp = 1;
+			}
+		}
+	}
+
+	// -----------------------------------------------------------------------
+	// Auto-generate stat blocks for companions/allies that lack them
+	// -----------------------------------------------------------------------
+	// This is a defensive sweep: any NPC with role 'companion' (auto-joins combat)
+	// should always have a stat block. If one is missing (e.g. role was set via
+	// npcChanges instead of companionPromoted), generate at 'weak' tier.
+	{
+		const partyLevel = averagePartyLevel(state.characters);
+		for (const npc of state.npcs) {
+			if (npc.alive && !npc.archived && npc.role === 'companion' && !npc.statBlock) {
+				// Use name + description for keyword matching (e.g. "ranger" → Longbow + Shortsword)
+				const nameHint = npc.description ? `${npc.name} ${npc.description}` : npc.name;
+				npc.statBlock = generateCreatureStatBlock(nameHint, 'weak', partyLevel);
+				console.log(`[applyGMStateChanges] auto-generated 'weak' stat block for companion "${npc.name}" (party level ${partyLevel})`);
 			}
 		}
 	}
@@ -2762,6 +2973,77 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 		}
 	}
 
+	// -----------------------------------------------------------------------
+	// Deterministic objective tracking — auto-complete objectives based on
+	// observable game state, regardless of whether the AI emitted questUpdates.
+	// -----------------------------------------------------------------------
+	for (const quest of state.quests) {
+		if (quest.status !== 'active' && quest.status !== 'available') continue;
+		let anyObjectiveChanged = false;
+
+		for (const obj of quest.objectives) {
+			if (obj.done) continue;
+			if (!obj.type || !obj.linkedEntityId) continue;
+
+			let completed = false;
+			switch (obj.type) {
+				case 'talk-to': {
+					const npc = state.npcs.find(n => n.id === obj.linkedEntityId);
+					if (npc && npc.lastInteractionTurn !== undefined && npc.lastInteractionTurn >= 0) {
+						completed = true;
+					}
+					break;
+				}
+				case 'visit-location': {
+					const loc = state.locations.find(l => l.id === obj.linkedEntityId);
+					if (loc && loc.visited) {
+						completed = true;
+					}
+					break;
+				}
+				case 'find-item': {
+					const itemName = obj.linkedEntityName?.toLowerCase() ?? obj.linkedEntityId.toLowerCase();
+					for (const pc of state.characters) {
+						if (pc.inventory?.some(item => item.name.toLowerCase().includes(itemName))) {
+							completed = true;
+							break;
+						}
+					}
+					break;
+				}
+				case 'defeat-encounter':
+					// Handled by linkedObjectiveIds on encounter victory — no extra check needed
+					break;
+				case 'escort':
+				case 'custom':
+					// These require AI or manual tracking — skip
+					break;
+			}
+
+			if (completed) {
+				obj.done = true;
+				anyObjectiveChanged = true;
+			}
+		}
+
+		// If objectives changed, check for quest auto-completion
+		if (anyObjectiveChanged && quest.objectives.length > 0 && quest.objectives.every(o => o.done)) {
+			if (quest.status !== 'completed') {
+				quest.status = 'completed';
+				distributeQuestRewards(state, quest, changes);
+				enrichmentIntents.push({ type: 'extend-quest-arc', questId: quest.id });
+			}
+		}
+
+		// Auto-activate available quests when the player interacts with the giver
+		if (quest.status === 'available' && quest.giverNpcId) {
+			const giver = state.npcs.find(n => n.id === quest.giverNpcId);
+			if (giver && giver.lastInteractionTurn !== undefined && giver.lastInteractionTurn >= 0) {
+				quest.status = 'active';
+			}
+		}
+	}
+
 	return enrichmentIntents;
 }
 
@@ -2774,7 +3056,7 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
  * Awards XP, gold, items, and reputation changes.
  * Only distributes if the quest has non-zero rewards.
  */
-function distributeQuestRewards(state: GameState, quest: Quest): void {
+function distributeQuestRewards(state: GameState, quest: Quest, changes?: StateChange): void {
 	const rewards = quest.rewards;
 	if (!rewards) return;
 
@@ -2785,6 +3067,11 @@ function distributeQuestRewards(state: GameState, quest: Quest): void {
 	if (rewards.xp > 0) {
 		for (const char of livingChars) {
 			char.xp += rewards.xp;
+			// Surface quest XP in the turn record for audit trail
+			if (changes) {
+				if (!changes.xpAwarded) changes.xpAwarded = [];
+				changes.xpAwarded.push({ characterId: char.id, amount: rewards.xp });
+			}
 		}
 	}
 
@@ -2792,6 +3079,11 @@ function distributeQuestRewards(state: GameState, quest: Quest): void {
 	if (rewards.gold > 0) {
 		for (const char of livingChars) {
 			char.gold += rewards.gold;
+			// Surface quest gold in the turn record for audit trail
+			if (changes) {
+				if (!changes.goldChange) changes.goldChange = [];
+				changes.goldChange.push({ characterId: char.id, delta: rewards.gold, reason: `Quest reward: ${quest.name}` });
+			}
 		}
 	}
 

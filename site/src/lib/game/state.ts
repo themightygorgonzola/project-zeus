@@ -23,6 +23,7 @@ import type {
 	NPC,
 	PlayerCharacter,
 	Quest,
+	QuestObjectiveType,
 	StateChange,
 	TurnRecord
 } from '$lib/game/types';
@@ -367,11 +368,17 @@ function normalizeQuest(value: unknown): Quest {
 		description: typeof obj.description === 'string' ? obj.description : '',
 		objectives: Array.isArray(obj.objectives)
 			? obj.objectives.filter((entry): entry is Quest['objectives'][number] => !!entry && typeof entry === 'object')
-				.map((entry) => ({
-					id: typeof (entry as unknown as Record<string, unknown>).id === 'string' ? (entry as unknown as Record<string, unknown>).id as string : '',
-					text: typeof (entry as unknown as Record<string, unknown>).text === 'string' ? (entry as unknown as Record<string, unknown>).text as string : '',
-					done: Boolean((entry as unknown as Record<string, unknown>).done)
-				}))
+				.map((entry) => {
+					const e = entry as unknown as Record<string, unknown>;
+					return {
+						id: typeof e.id === 'string' ? e.id as string : '',
+						text: typeof e.text === 'string' ? e.text as string : '',
+						done: Boolean(e.done),
+						...(typeof e.type === 'string' ? { type: e.type as QuestObjectiveType } : {}),
+						...(typeof e.linkedEntityId === 'string' ? { linkedEntityId: e.linkedEntityId } : {}),
+						...(typeof e.linkedEntityName === 'string' ? { linkedEntityName: e.linkedEntityName } : {})
+					};
+				})
 			: [],
 		rewards: {
 			xp: rewardsObject ? toNumber(rewardsObject.xp, legacyXpReward) : legacyXpReward,
@@ -784,6 +791,7 @@ export function mergeStateChanges(...changes: StateChange[]): StateChange {
 		if (c.questUpdates) pushUnique((merged.questUpdates ??= []), c.questUpdates, (qu) => `${qu.questId}|${qu.field}|${qu.objectiveId ?? ''}`);
 		if (c.conditionsApplied) pushUnique((merged.conditionsApplied ??= []), c.conditionsApplied, (ca) => `${ca.characterId}|${ca.condition}|${ca.applied}`);
 		if (c.xpAwarded) pushUnique((merged.xpAwarded ??= []), c.xpAwarded, (xp) => `${xp.characterId}|${xp.amount}`);
+		if (c.goldChange) pushUnique((merged.goldChange ??= []), c.goldChange, (gc) => `${gc.characterId}|${gc.delta}|${gc.reason ?? ''}`);
 		if (c.clockAdvance) merged.clockAdvance = c.clockAdvance;
 		if (c.spellSlotUsed) merged.spellSlotUsed = c.spellSlotUsed;
 		if (c.hitDiceUsed) merged.hitDiceUsed = c.hitDiceUsed;
