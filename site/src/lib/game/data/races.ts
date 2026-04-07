@@ -271,6 +271,149 @@ export const RACES: RaceDefinition[] = [
 		]
 	},
 
+	// ── Half-Elf ────────────────────────────────────────────
+	{
+		name: 'half-elf',
+		displayName: 'Half-Elf',
+		description: 'Half-elves combine what some say are the best qualities of their elf and human parents.',
+		abilityBonuses: { cha: 2 },
+		speed: 30,
+		size: 'Medium',
+		darkvision: 60,
+		creatureType: 'humanoid',
+		languages: ['Common', 'Elvish'],
+		traits: [
+			{
+				name: 'Ability Score Increase',
+				description: 'Two other ability scores of your choice each increase by 1 (in addition to CHA +2).',
+				effects: [{ tag: 'ability-choice', count: 2, exclude: ['cha'] }]
+			},
+			{
+				name: 'Fey Ancestry',
+				description: 'You have advantage on saving throws against being charmed, and magic can\'t put you to sleep.',
+				effects: [{ tag: 'fey-ancestry' }, { tag: 'advantage-on-saves', against: 'charmed' }]
+			},
+			{
+				name: 'Skill Versatility',
+				description: 'You gain proficiency in two skills of your choice.',
+				effects: [
+					{ tag: 'skill-proficiency', skill: 'perception' }, // placeholder — UI picks
+					{ tag: 'skill-proficiency', skill: 'persuasion' }  // placeholder — UI picks
+				]
+			},
+			{
+				name: 'Extra Language',
+				description: 'You can speak, read, and write one extra language of your choice.',
+				effects: [{ tag: 'extra-language', count: 1 }]
+			}
+		],
+		subraces: []
+	},
+
+	// ── Half-Orc ────────────────────────────────────────────
+	{
+		name: 'half-orc',
+		displayName: 'Half-Orc',
+		description: 'Half-orcs\' grayish pigmentation, sloping foreheads, jutting jaws, prominent teeth, and towering builds make their orcish heritage plain for all to see.',
+		abilityBonuses: { str: 2, con: 1 },
+		speed: 30,
+		size: 'Medium',
+		darkvision: 60,
+		creatureType: 'humanoid',
+		languages: ['Common', 'Orc'],
+		traits: [
+			{
+				name: 'Menacing',
+				description: 'You gain proficiency in the Intimidation skill.',
+				effects: [{ tag: 'menacing' }, { tag: 'skill-proficiency', skill: 'intimidation' }]
+			},
+			{
+				name: 'Relentless Endurance',
+				description: 'When you are reduced to 0 hit points but not killed outright, you can drop to 1 hit point instead. You can\'t use this feature again until you finish a long rest.',
+				effects: [{ tag: 'relentless-endurance' }]
+			},
+			{
+				name: 'Savage Attacks',
+				description: 'When you score a critical hit with a melee weapon attack, you can roll one of the weapon\'s damage dice one additional time and add it to the extra damage of the critical hit.',
+				effects: [{ tag: 'savage-attacks' }]
+			}
+		],
+		subraces: []
+	},
+
+	// ── Dragonborn ──────────────────────────────────────────
+	{
+		name: 'dragonborn',
+		displayName: 'Dragonborn',
+		description: 'Dragonborn look very much like dragons standing erect in humanoid form, though they lack wings or a tail.',
+		abilityBonuses: { str: 2, cha: 1 },
+		speed: 30,
+		size: 'Medium',
+		darkvision: 0,
+		creatureType: 'humanoid',
+		languages: ['Common', 'Draconic'],
+		traits: [
+			{
+				name: 'Breath Weapon',
+				description: 'You can use your action to exhale destructive energy. Your draconic ancestry determines the size, shape, and damage type of the exhalation. DC = 8 + CON mod + proficiency bonus, 2d6 damage (scales at 6th, 11th, 16th level).',
+				effects: [{ tag: 'breath-weapon', damageType: 'fire', shape: 'cone', size: '15 ft' }]
+			},
+			{
+				name: 'Damage Resistance',
+				description: 'You have resistance to the damage type associated with your draconic ancestry.',
+				effects: [{ tag: 'resistance', damageType: 'fire' }] // default — actual type chosen at creation
+			}
+		],
+		subraces: [
+			// Draconic ancestry — ordered for 2-column Chromatic/Metallic grid (paired by damage type)
+			// Grid order: Fire (top) → Lightning → Cold → Acid → Poison (bottom)
+			// Chromatic spectrum: Red → Orange → Blue → White → Black → Green
+			// Metallic value:     Gold → Brass → Bronze → Silver → Copper → Lead
+			{ name: 'red',    displayName: 'Red (Fire)',         abilityBonuses: {}, traits: [{ name: 'Fire Breath',      description: '15 ft. cone, fire damage.',           effects: [{ tag: 'breath-weapon', damageType: 'fire',      shape: 'cone', size: '15 ft'   }, { tag: 'resistance', damageType: 'fire'      }] }] },
+			{ name: 'gold',   displayName: 'Gold (Fire)',        abilityBonuses: {}, traits: [{ name: 'Fire Breath',      description: '15 ft. cone, fire damage.',           effects: [{ tag: 'breath-weapon', damageType: 'fire',      shape: 'cone', size: '15 ft'   }, { tag: 'resistance', damageType: 'fire'      }] }] },
+			{ name: 'orange', displayName: 'Orange (Fire)',      abilityBonuses: {}, traits: [{ name: 'Fire Breath',      description: '15 ft. cone, fire damage.',           effects: [{ tag: 'breath-weapon', damageType: 'fire',      shape: 'cone', size: '15 ft'   }, { tag: 'resistance', damageType: 'fire'      }] }] },
+			{ name: 'brass',  displayName: 'Brass (Fire)',       abilityBonuses: {}, traits: [{ name: 'Fire Breath',      description: '5 by 30 ft. line, fire damage.',      effects: [{ tag: 'breath-weapon', damageType: 'fire',      shape: 'line', size: '5x30 ft' }, { tag: 'resistance', damageType: 'fire'      }] }] },
+			{ name: 'blue',   displayName: 'Blue (Lightning)',   abilityBonuses: {}, traits: [{ name: 'Lightning Breath', description: '5 by 30 ft. line, lightning damage.', effects: [{ tag: 'breath-weapon', damageType: 'lightning', shape: 'line', size: '5x30 ft' }, { tag: 'resistance', damageType: 'lightning' }] }] },
+			{ name: 'bronze', displayName: 'Bronze (Lightning)', abilityBonuses: {}, traits: [{ name: 'Lightning Breath', description: '5 by 30 ft. line, lightning damage.', effects: [{ tag: 'breath-weapon', damageType: 'lightning', shape: 'line', size: '5x30 ft' }, { tag: 'resistance', damageType: 'lightning' }] }] },
+			{ name: 'white',  displayName: 'White (Cold)',       abilityBonuses: {}, traits: [{ name: 'Cold Breath',      description: '15 ft. cone, cold damage.',           effects: [{ tag: 'breath-weapon', damageType: 'cold',      shape: 'cone', size: '15 ft'   }, { tag: 'resistance', damageType: 'cold'      }] }] },
+			{ name: 'silver', displayName: 'Silver (Cold)',      abilityBonuses: {}, traits: [{ name: 'Cold Breath',      description: '15 ft. cone, cold damage.',           effects: [{ tag: 'breath-weapon', damageType: 'cold',      shape: 'cone', size: '15 ft'   }, { tag: 'resistance', damageType: 'cold'      }] }] },
+			{ name: 'black',  displayName: 'Black (Acid)',       abilityBonuses: {}, traits: [{ name: 'Acid Breath',      description: '5 by 30 ft. line, acid damage.',      effects: [{ tag: 'breath-weapon', damageType: 'acid',      shape: 'line', size: '5x30 ft' }, { tag: 'resistance', damageType: 'acid'      }] }] },
+			{ name: 'copper', displayName: 'Copper (Acid)',      abilityBonuses: {}, traits: [{ name: 'Acid Breath',      description: '5 by 30 ft. line, acid damage.',      effects: [{ tag: 'breath-weapon', damageType: 'acid',      shape: 'line', size: '5x30 ft' }, { tag: 'resistance', damageType: 'acid'      }] }] },
+			{ name: 'green',  displayName: 'Green (Poison)',     abilityBonuses: {}, traits: [{ name: 'Poison Breath',    description: '15 ft. cone, poison damage.',         effects: [{ tag: 'breath-weapon', damageType: 'poison',    shape: 'cone', size: '15 ft'   }, { tag: 'resistance', damageType: 'poison'    }] }] },
+			{ name: 'lead',   displayName: 'Lead (Poison)',      abilityBonuses: {}, traits: [{ name: 'Poison Breath',    description: '15 ft. cone, poison damage.',         effects: [{ tag: 'breath-weapon', damageType: 'poison',    shape: 'cone', size: '15 ft'   }, { tag: 'resistance', damageType: 'poison'    }] }] }
+		]
+	},
+
+	// ── Tiefling ────────────────────────────────────────────
+	{
+		name: 'tiefling',
+		displayName: 'Tiefling',
+		description: 'Tieflings are derived from human bloodlines, and in the broadest possible sense, they still look human — but their infernal heritage has left a clear imprint on their appearance.',
+		abilityBonuses: { cha: 2, int: 1 },
+		speed: 30,
+		size: 'Medium',
+		darkvision: 60,
+		creatureType: 'humanoid',
+		languages: ['Common', 'Infernal'],
+		traits: [
+			{
+				name: 'Hellish Resistance',
+				description: 'You have resistance to fire damage.',
+				effects: [{ tag: 'resistance', damageType: 'fire' }]
+			},
+			{
+				name: 'Infernal Legacy',
+				description: 'You know the thaumaturgy cantrip. At 3rd level you can cast hellish rebuke as a 2nd-level spell once per long rest. At 5th level you can cast darkness once per long rest. Charisma is your spellcasting ability for these spells.',
+				effects: [
+					{ tag: 'cantrip', cantrip: 'thaumaturgy', ability: 'cha' },
+					{ tag: 'hellish-rebuke', level: 3 },
+					{ tag: 'infernal-legacy-darkness' }
+				]
+			}
+		],
+		subraces: []
+	},
+
 	// ── Dwarf ───────────────────────────────────────────────
 	{
 		name: 'dwarf',
@@ -388,37 +531,6 @@ export const RACES: RaceDefinition[] = [
 		]
 	},
 
-	// ── Half-Orc ────────────────────────────────────────────
-	{
-		name: 'half-orc',
-		displayName: 'Half-Orc',
-		description: 'Half-orcs\' grayish pigmentation, sloping foreheads, jutting jaws, prominent teeth, and towering builds make their orcish heritage plain for all to see.',
-		abilityBonuses: { str: 2, con: 1 },
-		speed: 30,
-		size: 'Medium',
-		darkvision: 60,
-		creatureType: 'humanoid',
-		languages: ['Common', 'Orc'],
-		traits: [
-			{
-				name: 'Menacing',
-				description: 'You gain proficiency in the Intimidation skill.',
-				effects: [{ tag: 'menacing' }, { tag: 'skill-proficiency', skill: 'intimidation' }]
-			},
-			{
-				name: 'Relentless Endurance',
-				description: 'When you are reduced to 0 hit points but not killed outright, you can drop to 1 hit point instead. You can\'t use this feature again until you finish a long rest.',
-				effects: [{ tag: 'relentless-endurance' }]
-			},
-			{
-				name: 'Savage Attacks',
-				description: 'When you score a critical hit with a melee weapon attack, you can roll one of the weapon\'s damage dice one additional time and add it to the extra damage of the critical hit.',
-				effects: [{ tag: 'savage-attacks' }]
-			}
-		],
-		subraces: []
-	},
-
 	// ── Gnome ───────────────────────────────────────────────
 	{
 		name: 'gnome',
@@ -474,113 +586,6 @@ export const RACES: RaceDefinition[] = [
 				]
 			}
 		]
-	},
-
-	// ── Tiefling ────────────────────────────────────────────
-	{
-		name: 'tiefling',
-		displayName: 'Tiefling',
-		description: 'Tieflings are derived from human bloodlines, and in the broadest possible sense, they still look human — but their infernal heritage has left a clear imprint on their appearance.',
-		abilityBonuses: { cha: 2, int: 1 },
-		speed: 30,
-		size: 'Medium',
-		darkvision: 60,
-		creatureType: 'humanoid',
-		languages: ['Common', 'Infernal'],
-		traits: [
-			{
-				name: 'Hellish Resistance',
-				description: 'You have resistance to fire damage.',
-				effects: [{ tag: 'resistance', damageType: 'fire' }]
-			},
-			{
-				name: 'Infernal Legacy',
-				description: 'You know the thaumaturgy cantrip. At 3rd level you can cast hellish rebuke as a 2nd-level spell once per long rest. At 5th level you can cast darkness once per long rest. Charisma is your spellcasting ability for these spells.',
-				effects: [
-					{ tag: 'cantrip', cantrip: 'thaumaturgy', ability: 'cha' },
-					{ tag: 'hellish-rebuke', level: 3 },
-					{ tag: 'infernal-legacy-darkness' }
-				]
-			}
-		],
-		subraces: []
-	},
-
-	// ── Dragonborn ──────────────────────────────────────────
-	{
-		name: 'dragonborn',
-		displayName: 'Dragonborn',
-		description: 'Dragonborn look very much like dragons standing erect in humanoid form, though they lack wings or a tail.',
-		abilityBonuses: { str: 2, cha: 1 },
-		speed: 30,
-		size: 'Medium',
-		darkvision: 0,
-		creatureType: 'humanoid',
-		languages: ['Common', 'Draconic'],
-		traits: [
-			{
-				name: 'Breath Weapon',
-				description: 'You can use your action to exhale destructive energy. Your draconic ancestry determines the size, shape, and damage type of the exhalation. DC = 8 + CON mod + proficiency bonus, 2d6 damage (scales at 6th, 11th, 16th level).',
-				effects: [{ tag: 'breath-weapon', damageType: 'fire', shape: 'cone', size: '15 ft' }]
-			},
-			{
-				name: 'Damage Resistance',
-				description: 'You have resistance to the damage type associated with your draconic ancestry.',
-				effects: [{ tag: 'resistance', damageType: 'fire' }] // default — actual type chosen at creation
-			}
-		],
-		subraces: [
-			// Draconic ancestry is modeled as subraces for simplicity
-			{ name: 'black', displayName: 'Black (Acid)', abilityBonuses: {}, traits: [{ name: 'Acid Breath', description: '5 by 30 ft. line, acid damage.', effects: [{ tag: 'breath-weapon', damageType: 'acid', shape: 'line', size: '5x30 ft' }, { tag: 'resistance', damageType: 'acid' }] }] },
-			{ name: 'blue', displayName: 'Blue (Lightning)', abilityBonuses: {}, traits: [{ name: 'Lightning Breath', description: '5 by 30 ft. line, lightning damage.', effects: [{ tag: 'breath-weapon', damageType: 'lightning', shape: 'line', size: '5x30 ft' }, { tag: 'resistance', damageType: 'lightning' }] }] },
-			{ name: 'brass', displayName: 'Brass (Fire)', abilityBonuses: {}, traits: [{ name: 'Fire Breath', description: '5 by 30 ft. line, fire damage.', effects: [{ tag: 'breath-weapon', damageType: 'fire', shape: 'line', size: '5x30 ft' }, { tag: 'resistance', damageType: 'fire' }] }] },
-			{ name: 'bronze', displayName: 'Bronze (Lightning)', abilityBonuses: {}, traits: [{ name: 'Lightning Breath', description: '5 by 30 ft. line, lightning damage.', effects: [{ tag: 'breath-weapon', damageType: 'lightning', shape: 'line', size: '5x30 ft' }, { tag: 'resistance', damageType: 'lightning' }] }] },
-			{ name: 'copper', displayName: 'Copper (Acid)', abilityBonuses: {}, traits: [{ name: 'Acid Breath', description: '5 by 30 ft. line, acid damage.', effects: [{ tag: 'breath-weapon', damageType: 'acid', shape: 'line', size: '5x30 ft' }, { tag: 'resistance', damageType: 'acid' }] }] },
-			{ name: 'gold', displayName: 'Gold (Fire)', abilityBonuses: {}, traits: [{ name: 'Fire Breath', description: '15 ft. cone, fire damage.', effects: [{ tag: 'breath-weapon', damageType: 'fire', shape: 'cone', size: '15 ft' }, { tag: 'resistance', damageType: 'fire' }] }] },
-			{ name: 'green', displayName: 'Green (Poison)', abilityBonuses: {}, traits: [{ name: 'Poison Breath', description: '15 ft. cone, poison damage.', effects: [{ tag: 'breath-weapon', damageType: 'poison', shape: 'cone', size: '15 ft' }, { tag: 'resistance', damageType: 'poison' }] }] },
-			{ name: 'red', displayName: 'Red (Fire)', abilityBonuses: {}, traits: [{ name: 'Fire Breath', description: '15 ft. cone, fire damage.', effects: [{ tag: 'breath-weapon', damageType: 'fire', shape: 'cone', size: '15 ft' }, { tag: 'resistance', damageType: 'fire' }] }] },
-			{ name: 'silver', displayName: 'Silver (Cold)', abilityBonuses: {}, traits: [{ name: 'Cold Breath', description: '15 ft. cone, cold damage.', effects: [{ tag: 'breath-weapon', damageType: 'cold', shape: 'cone', size: '15 ft' }, { tag: 'resistance', damageType: 'cold' }] }] },
-			{ name: 'white', displayName: 'White (Cold)', abilityBonuses: {}, traits: [{ name: 'Cold Breath', description: '15 ft. cone, cold damage.', effects: [{ tag: 'breath-weapon', damageType: 'cold', shape: 'cone', size: '15 ft' }, { tag: 'resistance', damageType: 'cold' }] }] }
-		]
-	},
-
-	// ── Half-Elf ────────────────────────────────────────────
-	{
-		name: 'half-elf',
-		displayName: 'Half-Elf',
-		description: 'Half-elves combine what some say are the best qualities of their elf and human parents.',
-		abilityBonuses: { cha: 2 },
-		speed: 30,
-		size: 'Medium',
-		darkvision: 60,
-		creatureType: 'humanoid',
-		languages: ['Common', 'Elvish'],
-		traits: [
-			{
-				name: 'Ability Score Increase',
-				description: 'Two other ability scores of your choice each increase by 1 (in addition to CHA +2).',
-				effects: [{ tag: 'ability-choice', count: 2, exclude: ['cha'] }]
-			},
-			{
-				name: 'Fey Ancestry',
-				description: 'You have advantage on saving throws against being charmed, and magic can\'t put you to sleep.',
-				effects: [{ tag: 'fey-ancestry' }, { tag: 'advantage-on-saves', against: 'charmed' }]
-			},
-			{
-				name: 'Skill Versatility',
-				description: 'You gain proficiency in two skills of your choice.',
-				effects: [
-					{ tag: 'skill-proficiency', skill: 'perception' }, // placeholder — UI picks
-					{ tag: 'skill-proficiency', skill: 'persuasion' }  // placeholder — UI picks
-				]
-			},
-			{
-				name: 'Extra Language',
-				description: 'You can speak, read, and write one extra language of your choice.',
-				effects: [{ tag: 'extra-language', count: 1 }]
-			}
-		],
-		subraces: []
 	}
 ];
 
@@ -645,10 +650,18 @@ export function computeRacialBonuses(
 export function collectRacialTraits(raceName: RaceName, subraceName?: string): RacialTrait[] {
 	const race = getRace(raceName);
 	if (!race) return [];
-	const traits = [...race.traits];
+	let traits = [...race.traits];
 	if (subraceName) {
 		const sub = getSubrace(raceName, subraceName);
-		if (sub) traits.push(...sub.traits);
+		if (sub) {
+			// Dragonborn: the base race has a placeholder "Damage Resistance" → fire trait.
+			// Each subrace provides the real resistance for that ancestry, so strip the
+			// placeholder before appending subrace traits to avoid double resistances.
+			if (raceName === 'dragonborn' && sub.traits.some(t => t.effects.some(e => e.tag === 'resistance'))) {
+				traits = traits.filter(t => t.name !== 'Damage Resistance');
+			}
+			traits.push(...sub.traits);
+		}
 	}
 	return traits;
 }

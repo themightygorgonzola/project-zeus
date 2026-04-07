@@ -135,7 +135,15 @@ export function parseEnrichmentResponse(raw: string): StateChange {
 					objectives: Array.isArray(q.objectives)
 						? q.objectives.map((o: Record<string, unknown>) => ({
 							id: typeof o?.id === 'string' ? o.id : `obj-${ulid()}`,
-							text: typeof o?.text === 'string' ? o.text : String(o),
+							// Try canonical field name first, then common AI fallbacks, then a safe default.
+							// Never use String(o) — it produces "[object Object]" when the field is missing.
+							text: typeof o?.text === 'string' && o.text.trim() !== ''
+								? o.text
+								: typeof o?.description === 'string' && o.description.trim() !== ''
+								? o.description
+								: typeof o?.name === 'string' && o.name.trim() !== ''
+								? o.name
+								: 'Complete the objective',
 							type: typeof o?.type === 'string' && validObjTypes.has(o.type) ? o.type : 'custom',
 							linkedEntityId: typeof o?.linkedEntityId === 'string' ? o.linkedEntityId : undefined,
 							linkedEntityName: typeof o?.linkedEntityName === 'string' ? o.linkedEntityName : undefined

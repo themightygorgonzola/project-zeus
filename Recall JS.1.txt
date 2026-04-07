@@ -1,0 +1,3184 @@
+================================================================================
+  RECALL JS.1 — Project Nornyx / Project Zeus
+  Complete change manifest for all UI, backend, and routing modifications
+  recorded from the original codebase state.
+
+  PURPOSE:
+    Any AI system or developer can read this document and reproduce every
+    change listed here, in order, from scratch, on a clean copy of the
+    original codebase. Changes are grouped by feature, not by file, so
+    context and intent are preserved alongside the implementation details.
+
+  SCOPE:
+    All changes made across all sessions up to March 31, 2026.
+    "Original" means the codebase before any of these sessions began.
+
+  TECH STACK:
+    - SvelteKit with Svelte 5 rune syntax ($props, $state, $derived, $effect)
+    - TypeScript throughout
+    - Drizzle ORM with SQLite (libsql / Turso)
+    - PartyKit for real-time multiplayer socket messaging
+    - Vite + svelte-kit/adapter-vercel
+    - Path aliases: $lib → src/lib, $components → src/lib/components,
+      $stores → src/lib/stores, $server → src/lib/server, $types → src/lib/types
+
+  ROUTING CONVENTION:
+    - All routes live under  site/src/routes/
+    - Dynamic segments use [id] bracket syntax (SvelteKit file-based routing)
+    - +page.server.ts  = server-only load function (runs on server before render)
+    - +page.svelte     = page component (runs on both server and client)
+    - +server.ts       = API endpoint (no page, pure JSON responses)
+    - +layout.svelte   = layout wrapper (NOT modified in these sessions)
+
+  FILE PATH FORMAT:
+    All paths in this document are relative to  project-zeus/site/src/
+    unless prefixed with  project-zeus/  for project-level files.
+
+  SVELTE 5 RUNE SYNTAX NOTES:
+    - let { x } = $props()         — declare component props
+    - let x = $state(initial)      — reactive state variable
+    - let x = $derived(expr)       — computed value, re-runs when deps change
+    - let x = $derived.by(() => {}) — computed with function body
+    - $effect(() => {})            — side effect, re-runs when deps change
+    - $effect returns a cleanup fn if needed (return () => cleanup())
+
+================================================================================
+
+
+================================================================================
+  GROUP 1 — FOUC PREVENTION & THEME FLASH FIX
+  Purpose: Apply the user's saved theme BEFORE the first browser paint so
+           there is never a flash of wrong-theme or unstyled content (FOUC).
+  Files modified: site/src/app.html
+================================================================================
+
+CHANGE 1.1 — Add visibility:hidden guard on <html> until theme is applied
+  File: app.html
+  Location: Inside <head>, immediately before the blocking theme script.
+
+  Add this <style> tag as the FIRST thing after the <link> tags in <head>:
+
+      <style>html:not(.fouc-ready) { visibility: hidden; }</style>
+
+  Explanation:
+    This CSS hides the entire page until the class "fouc-ready" is added to
+    <html>. The hidden state lasts only microseconds — the blocking IIFE
+    below adds the class synchronously. The result: the user never sees
+    unstyled content, a white flash, or the wrong theme on page load or
+    navigation. This is a pure CSS guard; it does not rely on JavaScript
+    executing — if JS is disabled the page will remain invisible, which is
+    acceptable because this app requires JS.
+
+CHANGE 1.2 — Add blocking IIFE script to restore saved theme before first paint
+  File: app.html
+  Location: Inside <head>, immediately after the visibility:hidden <style>.
+
+  Add this <script> block (must be a plain IIFE — no type="module", no
+  async/defer — so browsers execute it synchronously before rendering):
+
+      <script>
+          (function () {
+              var VALID = [
+                  'arcane-celestial',
+                  'dark-academia',
+                  'void-astral',
+                  'silver-scroll',
+                  'forge-iron',
+                  'morning-mist',
+                  'midnight-court',
+                  'clean-slate',
+                  'blood-oath',
+                  'vellum-quill',
+                  'sakura-court',
+                  'frozen-spire'
+              ];
+              try {
+                  var saved = localStorage.getItem('nornyx-theme');
+                  if (saved && VALID.indexOf(saved) !== -1) {
+                      document.documentElement.dataset.theme = saved;
+                  }
+              } catch (e) {
+                  // localStorage unavailable (private browsing, security policy)
+                  // Fall through — default theme is used silently.
+              }
+              // CRITICAL: classList.add must be OUTSIDE the try/catch block.
+              // If localStorage throws, we must still reveal the page —
+              // otherwise the page stays invisible forever.
+              document.documentElement.classList.add('fouc-ready');
+          })();
+      </script>
+
+  How it works:
+    1. The IIFE runs synchronously before the browser paints anything.
+    2. It validates the saved theme string against the VALID list —
+       never trusting arbitrary localStorage content.
+    3. It sets data-theme on <html>, which activates the matching
+       CSS [data-theme='...'] block (defined in app.css).
+    4. It adds the class "fouc-ready" to <html> (outside try/catch),
+       which satisfies the html:not(.fouc-ready) guard and makes the
+       page visible.
+    5. On first visit (no saved theme), no data-theme is set and the
+       CSS :root defaults (arcane-celestial) are used.
+
+CHANGE 1.3 — Complete app.html head structure with all font families
+  File: app.html
+  Location: <head>, before the FOUC script.
+
+  The <link> tag below loads all 14 font families used across all 12 themes
+  in a single HTTP request. Preconnect links reduce DNS + TLS negotiation
+  time. The display=swap parameter prevents invisible text during load.
+
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+      <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Arvo:wght@400;600&family=Cinzel+Decorative:wght@400;700&family=Cinzel:wght@400;600;700&family=Crimson+Pro:wght@400;600&family=IM+Fell+English&family=Lora:wght@400;600&family=Nunito:wght@400;600;700&family=Orbitron:wght@400;600;700&family=Playfair+Display:wght@600;700&family=Rajdhani:wght@400;600&family=Rye&family=Space+Grotesk:wght@400;600;700&family=Spectral:wght@400;600&family=Uncial+Antiqua&display=swap"
+      />
+
+  Font-to-theme mapping:
+    Cinzel / Cinzel Decorative — arcane-celestial, silver-scroll, blood-oath,
+                                  forge-iron (display), nav brand text
+    Rye                        — dark-academia (Dusty Trail) display
+    Arvo                       — dark-academia (Dusty Trail) UI
+    Space Grotesk              — void-astral display + UI
+    Orbitron                   — clean-slate (Forged Steel) display
+    Rajdhani                   — clean-slate (Forged Steel) UI
+    Playfair Display           — midnight-court display
+    Lora                       — sakura-court display
+    Uncial Antiqua             — morning-mist (Grove Circle) display
+    Nunito                     — morning-mist (Grove Circle) UI
+    Spectral                   — forge-iron (Ashen Gate) UI, blood-oath UI
+    IM Fell English            — vellum-quill display
+    Crimson Pro                — vellum-quill UI
+
+
+================================================================================
+  GROUP 2 — DESIGN TOKENS & GLOBAL CSS (app.css)
+  Purpose: A complete set of CSS custom properties (design tokens) that every
+           component uses instead of hardcoded colour values. 12 theme
+           overrides. Global badge, button, layout, and utility classes.
+  Files modified: app.css
+================================================================================
+
+CHANGE 2.1 — :root design token block
+  File: app.css
+  Replace / set the entire :root block with:
+
+      :root {
+          --bg: #07111f;
+          --bg-alt: #0d1b2f;
+          --surface: rgba(15, 28, 48, 0.88);
+          --border: rgba(120, 164, 255, 0.2);
+          --text: #edf3ff;
+          --text-muted: #9db2d1;
+          --accent: #7c9cff;
+          --accent-2: #34d3a2;
+          --danger: #ff6d8a;
+          --warning: #ffd36b;
+          --shadow: 0 22px 60px rgba(0, 0, 0, 0.35);
+          --radius: 18px;
+          --radius-lg: 24px;
+
+          /* Extended tokens — components use these instead of hardcoded values */
+          --nav-bg: rgba(7, 17, 31, 0.85);
+          --toast-bg: rgba(15, 28, 48, 0.95);
+          --toast-bg-hover: rgba(20, 36, 60, 0.97);
+          --quest-accent: #c084fc;
+          --orb-3-color: #a855f7;
+          --card-hover-border: rgba(124, 156, 255, 0.4);
+          --blur-glass: 18px;
+          --body-gradient: radial-gradient(circle at top, rgba(124, 156, 255, 0.18), transparent 30%),
+              linear-gradient(180deg, #091220 0%, #040912 100%);
+
+          --font-display: 'Cinzel', serif;
+          --font-ui: Inter, 'Segoe UI', system-ui, sans-serif;
+      }
+
+  Token reference:
+    --bg              Page background colour
+    --bg-alt          Slightly lighter bg for nested surfaces (popovers, etc.)
+    --surface         Card/panel glass surface (semi-opaque)
+    --border          Border colour for all panels, inputs, cards
+    --text            Primary body text
+    --text-muted      Secondary / label text
+    --accent          Primary interactive accent (links, active states, focus rings)
+    --accent-2        Secondary accent (success badges, glow effects)
+    --danger          Error / delete / dangerous action colour
+    --warning         Warning / lobby / pending state colour
+    --shadow          Box shadow used by GlassPanel and elevated elements
+    --radius          Default border-radius for cards, buttons, inputs
+    --radius-lg       Larger radius for modals, popovers
+    --nav-bg          Navigation bar background (semi-opaque)
+    --toast-bg        Toast notification background
+    --toast-bg-hover  Toast hover state background
+    --quest-accent     Quest panel accent colour
+    --orb-3-color      Third decorative orb colour (hero/landing page)
+    --card-hover-border Card border colour on hover
+    --blur-glass       backdrop-filter blur value for glass panels
+    --body-gradient    Full-page background gradient
+    --font-display     Thematic display/heading font
+    --font-ui          UI/body font
+
+CHANGE 2.2 — 12 [data-theme='...'] overrides
+  File: app.css
+  Each block is activated when the <html> element has the matching
+  data-theme attribute (set by the IIFE in app.html or by setTheme()).
+  All 12 blocks are listed below in full.
+
+  ── Theme 1: arcane-celestial (default) ──────────────────────────────
+  [data-theme='arcane-celestial'] {
+      --bg: #07111f;
+      --bg-alt: #0d1b2f;
+      --surface: rgba(15, 28, 48, 0.88);
+      --border: rgba(120, 164, 255, 0.22);
+      --text: #edf3ff;
+      --text-muted: #9db2d1;
+      --accent: #7c9cff;
+      --accent-2: #34d3a2;
+      --danger: #ff6d8a;
+      --warning: #ffd36b;
+      --shadow: 0 22px 60px rgba(0, 0, 0, 0.35);
+      --radius: 18px;
+      --radius-lg: 24px;
+      --nav-bg: rgba(7, 17, 31, 0.85);
+      --toast-bg: rgba(15, 28, 48, 0.95);
+      --toast-bg-hover: rgba(20, 36, 60, 0.97);
+      --quest-accent: #c084fc;
+      --orb-3-color: #a855f7;
+      --card-hover-border: rgba(124, 156, 255, 0.4);
+      --blur-glass: 18px;
+      --body-gradient: radial-gradient(circle at top, rgba(124, 156, 255, 0.18), transparent 30%),
+          linear-gradient(180deg, #091220 0%, #040912 100%);
+      --font-display: 'Cinzel', serif;
+      --font-ui: Inter, 'Segoe UI', system-ui, sans-serif;
+      color-scheme: dark;
+  }
+
+  ── Theme 2: dark-academia (renamed: Dusty Trail — Western/Frontier) ─
+  [data-theme='dark-academia'] {
+      --bg: #1c0e06;
+      --bg-alt: #261408;
+      --surface: rgba(28, 14, 6, 0.90);
+      --border: rgba(200, 130, 60, 0.30);
+      --text: #f2e8d0;
+      --text-muted: #9a7a50;
+      --accent: #d4763a;
+      --accent-2: #b5a040;
+      --danger: #b83224;
+      --warning: #c8920a;
+      --shadow: 0 8px 32px rgba(0, 0, 0, 0.60);
+      --radius: 4px;
+      --radius-lg: 8px;
+      --nav-bg: rgba(18, 8, 2, 0.92);
+      --toast-bg: rgba(28, 14, 6, 0.97);
+      --toast-bg-hover: rgba(38, 20, 8, 0.99);
+      --quest-accent: #a05a1a;
+      --orb-3-color: #6b3010;
+      --card-hover-border: rgba(212, 118, 58, 0.45);
+      --blur-glass: 2px;
+      --body-gradient:
+          repeating-linear-gradient(90deg,
+              rgba(0,0,0,0.06) 0px, rgba(0,0,0,0.06) 1px,
+              transparent 1px, transparent 28px),
+          linear-gradient(180deg, #3a1e08 0%, #200e04 40%, #1c0e06 100%);
+      --font-display: 'Rye', serif;
+      --font-ui: 'Arvo', Georgia, serif;
+      color-scheme: dark;
+  }
+
+  ── Theme 3: void-astral (Cosmic AI Narrator) ────────────────────────
+  [data-theme='void-astral'] {
+      --bg: #020408;
+      --bg-alt: #060c14;
+      --surface: rgba(6, 8, 18, 0.92);
+      --border: rgba(129, 140, 248, 0.18);
+      --text: #e0e7ff;
+      --text-muted: #6b7280;
+      --accent: #818cf8;
+      --accent-2: #4ade80;
+      --danger: #f87171;
+      --warning: #fbbf24;
+      --shadow: 0 22px 60px rgba(0, 0, 0, 0.55);
+      --radius: 18px;
+      --radius-lg: 24px;
+      --nav-bg: rgba(2, 4, 8, 0.90);
+      --toast-bg: rgba(6, 8, 18, 0.97);
+      --toast-bg-hover: rgba(10, 12, 28, 0.99);
+      --quest-accent: #7c3aed;
+      --orb-3-color: #312e81;
+      --card-hover-border: rgba(129, 140, 248, 0.4);
+      --blur-glass: 24px;
+      --body-gradient: radial-gradient(circle at 50% 0%, #0d0b2b 0%, #020408 60%);
+      --font-display: 'Space Grotesk', sans-serif;
+      --font-ui: 'Space Grotesk', system-ui, sans-serif;
+      color-scheme: dark;
+  }
+
+  ── Theme 4: silver-scroll (Light, Map-room clarity) ─────────────────
+  [data-theme='silver-scroll'] {
+      --bg: #f5f4f0;
+      --bg-alt: #eceae4;
+      --surface: rgba(255, 254, 250, 0.92);
+      --border: rgba(60, 80, 120, 0.15);
+      --text: #1a1f2e;
+      --text-muted: #5a6480;
+      --accent: #3b5bdb;
+      --accent-2: #0ca678;
+      --danger: #e03131;
+      --warning: #e67700;
+      --shadow: 0 4px 20px rgba(0, 0, 0, 0.10);
+      --radius: 18px;
+      --radius-lg: 24px;
+      --nav-bg: rgba(245, 244, 240, 0.92);
+      --toast-bg: rgba(255, 254, 250, 0.97);
+      --toast-bg-hover: rgba(240, 238, 232, 0.99);
+      --quest-accent: #7048e8;
+      --orb-3-color: #7048e8;
+      --card-hover-border: rgba(59, 91, 219, 0.35);
+      --blur-glass: 12px;
+      --body-gradient: linear-gradient(160deg, #f5f4f0 0%, #e8e5dc 100%);
+      --font-display: 'Cinzel', serif;
+      --font-ui: Inter, 'Segoe UI', system-ui, sans-serif;
+      color-scheme: light;
+  }
+
+  ── Theme 5: forge-iron (renamed: Ashen Gate — Infernal/Hellfire) ────
+  [data-theme='forge-iron'] {
+      --bg: #0d0402;
+      --bg-alt: #160602;
+      --surface: rgba(22, 6, 2, 0.92);
+      --border: rgba(255, 80, 20, 0.25);
+      --text: #ffe8d0;
+      --text-muted: #7a4030;
+      --accent: #ff4500;
+      --accent-2: #ffaa00;
+      --danger: #ff2020;
+      --warning: #ffcc00;
+      --shadow: 0 22px 60px rgba(200, 40, 0, 0.45);
+      --radius: 14px;
+      --radius-lg: 20px;
+      --nav-bg: rgba(10, 2, 0, 0.92);
+      --toast-bg: rgba(22, 6, 2, 0.97);
+      --toast-bg-hover: rgba(32, 10, 4, 0.99);
+      --quest-accent: #cc2200;
+      --orb-3-color: #7c1a00;
+      --card-hover-border: rgba(255, 69, 0, 0.50);
+      --blur-glass: 16px;
+      --body-gradient:
+          radial-gradient(ellipse at 0% 100%, rgba(180, 30, 0, 0.45) 0%, transparent 50%),
+          radial-gradient(ellipse at 100% 100%, rgba(160, 60, 0, 0.35) 0%, transparent 45%),
+          radial-gradient(ellipse at 50% 100%, rgba(220, 50, 0, 0.30) 0%, transparent 40%),
+          linear-gradient(180deg, #0d0402 0%, #0a0200 100%);
+      --font-display: 'Cinzel Decorative', 'Cinzel', serif;
+      --font-ui: 'Spectral', Georgia, serif;
+      color-scheme: dark;
+  }
+
+  ── Theme 6: morning-mist (renamed: Grove Circle — Druidic/Nature) ───
+  [data-theme='morning-mist'] {
+      --bg: #0a1a08;
+      --bg-alt: #121f0e;
+      --surface: rgba(12, 24, 8, 0.90);
+      --border: rgba(80, 160, 40, 0.22);
+      --text: #e8f0d8;
+      --text-muted: #7a9060;
+      --accent: #7ab648;
+      --accent-2: #c17f24;
+      --danger: #c03030;
+      --warning: #c89010;
+      --shadow: 0 16px 48px rgba(10, 40, 10, 0.50);
+      --radius: 32px;
+      --radius-lg: 40px;
+      --nav-bg: rgba(8, 16, 6, 0.92);
+      --toast-bg: rgba(12, 24, 8, 0.97);
+      --toast-bg-hover: rgba(18, 32, 12, 0.99);
+      --quest-accent: #4a8c20;
+      --orb-3-color: #2a5c10;
+      --card-hover-border: rgba(122, 182, 72, 0.40);
+      --blur-glass: 14px;
+      --body-gradient:
+          radial-gradient(ellipse at 70% 30%, rgba(150, 100, 20, 0.20) 0%, transparent 50%),
+          radial-gradient(ellipse at 20% 80%, rgba(30, 80, 10, 0.30) 0%, transparent 40%),
+          linear-gradient(180deg, #0e2008 0%, #0a1a08 60%, #060e04 100%);
+      --font-display: 'Uncial Antiqua', serif;
+      --font-ui: 'Nunito', Inter, system-ui, sans-serif;
+      color-scheme: dark;
+  }
+
+  ── Theme 7: midnight-court (Regal Purple Bardic Drama) ──────────────
+  [data-theme='midnight-court'] {
+      --bg: #0d0814;
+      --bg-alt: #150f1e;
+      --surface: rgba(21, 15, 30, 0.90);
+      --border: rgba(180, 100, 220, 0.22);
+      --text: #f0eaff;
+      --text-muted: #9070b0;
+      --accent: #c084fc;
+      --accent-2: #f59e0b;
+      --danger: #fb7185;
+      --warning: #fde68a;
+      --shadow: 0 22px 60px rgba(0, 0, 0, 0.45);
+      --radius: 18px;
+      --radius-lg: 24px;
+      --nav-bg: rgba(13, 8, 20, 0.90);
+      --toast-bg: rgba(21, 15, 30, 0.97);
+      --toast-bg-hover: rgba(30, 20, 42, 0.99);
+      --quest-accent: #a855f7;
+      --orb-3-color: #7c3aed;
+      --card-hover-border: rgba(192, 132, 252, 0.4);
+      --blur-glass: 20px;
+      --body-gradient: radial-gradient(circle at top right, #1a0d2e 0%, #070410 100%);
+      --font-display: 'Playfair Display', serif;
+      --font-ui: Inter, 'Segoe UI', system-ui, sans-serif;
+      color-scheme: dark;
+  }
+
+  ── Theme 8: clean-slate (renamed: Forged Steel — Cold Steel/Armory) ─
+  [data-theme='clean-slate'] {
+      --bg: #0e0e10;
+      --bg-alt: #161618;
+      --surface: rgba(20, 20, 24, 0.95);
+      --border: rgba(200, 208, 220, 0.18);
+      --text: #dce0e8;
+      --text-muted: #6c7280;
+      --accent: #c0c8d8;
+      --accent-2: #5b8fcc;
+      --danger: #e84040;
+      --warning: #d4a010;
+      --shadow: 0 12px 40px rgba(0, 0, 0, 0.70), 0 1px 0 rgba(255, 255, 255, 0.04);
+      --radius: 6px;
+      --radius-lg: 10px;
+      --nav-bg: rgba(10, 10, 12, 0.96);
+      --toast-bg: rgba(20, 20, 24, 0.98);
+      --toast-bg-hover: rgba(28, 28, 32, 0.99);
+      --quest-accent: #8899bb;
+      --orb-3-color: #2c3040;
+      --card-hover-border: rgba(192, 200, 216, 0.35);
+      --blur-glass: 8px;
+      --body-gradient:
+          repeating-linear-gradient(135deg,
+              rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px,
+              transparent 1px, transparent 6px),
+          linear-gradient(180deg, #0e0e10 0%, #0a0a0c 100%);
+      --font-display: 'Orbitron', sans-serif;
+      --font-ui: 'Rajdhani', Inter, system-ui, sans-serif;
+      color-scheme: dark;
+  }
+
+  ── Theme 9: blood-oath (War Council / Dark Gold Pact) ───────────────
+  [data-theme='blood-oath'] {
+      --bg: #110204;
+      --bg-alt: #1c0408;
+      --surface: rgba(20, 2, 6, 0.93);
+      --border: rgba(139, 26, 26, 0.28);
+      --text: #f0d8d0;
+      --text-muted: #7a3030;
+      --accent: #b8960a;
+      --accent-2: #8b1a1a;
+      --danger: #e03030;
+      --warning: #d4a010;
+      --shadow: 0 20px 56px rgba(100, 10, 10, 0.55);
+      --radius: 16px;
+      --radius-lg: 22px;
+      --nav-bg: rgba(10, 0, 2, 0.94);
+      --toast-bg: rgba(20, 2, 6, 0.97);
+      --toast-bg-hover: rgba(30, 4, 8, 0.99);
+      --quest-accent: #8b6a00;
+      --orb-3-color: #5c1010;
+      --card-hover-border: rgba(184, 150, 10, 0.40);
+      --blur-glass: 14px;
+      --body-gradient:
+          radial-gradient(ellipse at 50% 100%, rgba(139, 26, 26, 0.50) 0%, transparent 60%),
+          radial-gradient(ellipse at 15% 90%, rgba(100, 10, 10, 0.30) 0%, transparent 40%),
+          linear-gradient(180deg, #110204 0%, #0a0102 100%);
+      --font-display: 'Cinzel', serif;
+      --font-ui: 'Spectral', Georgia, serif;
+      color-scheme: dark;
+  }
+
+  ── Theme 10: vellum-quill (Manuscript / Aged Parchment) ─────────────
+  [data-theme='vellum-quill'] {
+      --bg: #f0e6cc;
+      --bg-alt: #e6d8b4;
+      --surface: rgba(252, 242, 218, 0.92);
+      --border: rgba(74, 44, 14, 0.18);
+      --text: #2c1a08;
+      --text-muted: #7a6040;
+      --accent: #4a2c0e;
+      --accent-2: #8b2020;
+      --danger: #b02020;
+      --warning: #a06010;
+      --shadow: 0 4px 16px rgba(74, 44, 14, 0.18);
+      --radius: 10px;
+      --radius-lg: 16px;
+      --nav-bg: rgba(240, 230, 204, 0.95);
+      --toast-bg: rgba(252, 242, 218, 0.97);
+      --toast-bg-hover: rgba(240, 228, 200, 0.99);
+      --quest-accent: #6a3c0e;
+      --orb-3-color: #8b4410;
+      --card-hover-border: rgba(74, 44, 14, 0.30);
+      --blur-glass: 6px;
+      --body-gradient:
+          radial-gradient(ellipse at 50% 50%, rgba(240, 200, 140, 0.35) 0%, transparent 65%),
+          linear-gradient(160deg, #f0e6cc 0%, #e4d4b0 100%);
+      --font-display: 'IM Fell English', serif;
+      --font-ui: 'Crimson Pro', Georgia, serif;
+      color-scheme: light;
+  }
+
+  ── Theme 11: sakura-court (Cherry Blossom / Spring Court) ──────────
+  [data-theme='sakura-court'] {
+      --bg: #f7eef0;
+      --bg-alt: #eedde2;
+      --surface: rgba(255, 248, 250, 0.92);
+      --border: rgba(192, 88, 120, 0.15);
+      --text: #2c1018;
+      --text-muted: #8a5060;
+      --accent: #c05878;
+      --accent-2: #c8a840;
+      --danger: #c03040;
+      --warning: #c09020;
+      --shadow: 0 8px 32px rgba(160, 60, 90, 0.12);
+      --radius: 28px;
+      --radius-lg: 36px;
+      --nav-bg: rgba(247, 238, 240, 0.94);
+      --toast-bg: rgba(255, 248, 250, 0.97);
+      --toast-bg-hover: rgba(242, 233, 238, 0.99);
+      --quest-accent: #a83860;
+      --orb-3-color: #d090a8;
+      --card-hover-border: rgba(192, 88, 120, 0.35);
+      --blur-glass: 20px;
+      --body-gradient:
+          radial-gradient(ellipse at 30% 20%, rgba(200, 160, 180, 0.15) 0%, transparent 50%),
+          radial-gradient(ellipse at 70% 80%, rgba(210, 180, 190, 0.12) 0%, transparent 45%),
+          linear-gradient(160deg, #f7eef0 0%, #f0e4eb 100%);
+      --font-display: 'Lora', serif;
+      --font-ui: Inter, 'Segoe UI', system-ui, sans-serif;
+      color-scheme: light;
+  }
+
+  ── Theme 12: frozen-spire (Ice Tower / Glacier Crystal — LIGHT) ─────
+  NOTE: frozen-spire is a LIGHT theme. The theme block itself includes three
+  chat-accent token overrides (--gm-accent, --mechanic-accent, --roll-accent)
+  placed just before color-scheme: light; — these keep adventure chat labels
+  legible against the light background. Components using dark-optimised accent
+  colours also need standalone badge contrast override selectors — see CHANGE 2.4.
+
+  [data-theme='frozen-spire'] {
+      --bg: #e8f0f8;
+      --bg-alt: #d8e8f4;
+      --surface: rgba(240, 248, 255, 0.92);
+      --border: rgba(32, 96, 160, 0.15);
+      --text: #0c1c30;
+      --text-muted: #5070a0;
+      --accent: #1a5ca8;
+      --accent-2: #c8ddf0;
+      --danger: #d03040;
+      --warning: #c08020;
+      --shadow: 0 8px 36px rgba(30, 60, 120, 0.15);
+      --radius: 20px;
+      --radius-lg: 26px;
+      --nav-bg: rgba(232, 240, 248, 0.94);
+      --toast-bg: rgba(240, 248, 255, 0.97);
+      --toast-bg-hover: rgba(228, 240, 252, 0.99);
+      --quest-accent: #3070b0;
+      --orb-3-color: #7ab0e0;
+      --card-hover-border: rgba(26, 92, 168, 0.30);
+      --blur-glass: 22px;
+      --body-gradient:
+          radial-gradient(ellipse at 50% 110%, rgba(32, 96, 160, 0.25) 0%, transparent 50%),
+          radial-gradient(ellipse at 80% 0%, rgba(200, 225, 245, 0.30) 0%, transparent 40%),
+          linear-gradient(180deg, #e8f0f8 0%, #d8eaf6 60%, #c8ddf0 100%);
+      --font-display: 'Cinzel', serif;
+      --font-ui: Inter, 'Segoe UI', system-ui, sans-serif;
+      /* Adventure chat: override hardcoded accent colors for legibility on light bg */
+      --gm-accent: #7a3c00;        /* deep amber — GM name, thinking dots */
+      --mechanic-accent: #1a5ca8;  /* reuse dark blue — mechanic label */
+      --roll-accent: #4a1a8a;      /* dark purple — roll-request label */
+      color-scheme: light;
+  }
+
+CHANGE 2.3 — Badge classes with glow effects
+  File: app.css
+  Location: After the [data-theme] blocks, before Form Controls.
+
+  These classes style the status/mode pills shown on AdventureCard and
+  elsewhere. The "active" badge gets a text-shadow glow to make live
+  adventures visually prominent.
+
+      .badge {
+          display: inline-flex;
+          align-items: center;
+          padding: 0.25rem 0.65rem;
+          border-radius: 999px;
+          font-size: 0.78rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+      }
+
+      .badge-solo {
+          background: rgba(124, 156, 255, 0.15);
+          color: var(--accent);
+      }
+
+      .badge-multiplayer {
+          background: rgba(52, 211, 162, 0.15);
+          color: var(--accent-2);
+      }
+
+      .badge-lobby {
+          background: rgba(255, 211, 107, 0.15);
+          color: var(--warning);
+          text-shadow: 0 0 10px color-mix(in srgb, var(--warning) 70%, transparent);
+      }
+
+      .badge-active {
+          background: rgba(52, 211, 162, 0.18);
+          color: var(--accent-2);
+          text-shadow: 0 0 12px color-mix(in srgb, var(--accent-2) 75%, transparent);
+          box-shadow: 0 0 10px color-mix(in srgb, var(--accent-2) 15%, transparent);
+      }
+
+      .badge-completed {
+          background: rgba(255, 255, 255, 0.08);
+          color: var(--text-muted);
+      }
+
+CHANGE 2.4 — Frozen Spire badge contrast overrides
+  File: app.css
+  Location: After the frozen-spire [data-theme] block.
+
+  frozen-spire is a light theme. The default badge colours are designed for
+  dark backgrounds and would be illegible or invisible on the light bg.
+  These overrides replace the glow with a dark blue equivalent.
+
+      [data-theme='frozen-spire'] .badge-active {
+          background: rgba(26, 92, 168, 0.12);
+          color: #1a5ca8;
+          text-shadow: 0 0 10px rgba(26, 92, 168, 0.55);
+          box-shadow: 0 0 8px rgba(26, 92, 168, 0.12);
+      }
+
+      [data-theme='frozen-spire'] .badge-multiplayer {
+          background: rgba(26, 92, 168, 0.12);
+          color: #1a5ca8;
+      }
+
+CHANGE 2.5 — Global reset, layout, button, form control, and utility classes
+  File: app.css
+  Location: After all [data-theme] blocks and badge rules.
+
+  These rules form the global baseline for the entire application. They are
+  written once and inherit CSS custom properties from the theme tokens above,
+  so they automatically adapt to all 12 themes without change.
+
+  ── Reset ─────────────────────────────────────────────────────────────
+
+      *,
+      *::before,
+      *::after {
+          box-sizing: border-box;
+      }
+
+  ── HTML and body base ────────────────────────────────────────────────
+
+      html {
+          color-scheme: dark;   /* default until a [data-theme] block overrides it */
+          font-family: var(--font-ui);
+      }
+
+      body {
+          margin: 0;
+          min-height: 100vh;
+          color: var(--text);
+          background: var(--body-gradient);
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+      }
+
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+
+  ── Layout shell ──────────────────────────────────────────────────────
+
+      .page-container {
+          width: min(1200px, calc(100vw - 32px));
+          margin: 0 auto;
+          padding: 2rem 0 4rem;
+      }
+
+  ── Buttons ───────────────────────────────────────────────────────────
+
+      .btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+          border: 1px solid var(--border);
+          background: linear-gradient(180deg, rgba(124, 156, 255, 0.22), rgba(124, 156, 255, 0.08));
+          color: var(--text);
+          padding: 0.7rem 1.25rem;
+          border-radius: 14px;
+          font-size: 0.95rem;
+          font-weight: 600;
+          font-family: var(--font-ui);
+          cursor: pointer;
+          transition: all 0.2s ease;
+          text-decoration: none;
+      }
+      .btn:hover {
+          border-color: var(--card-hover-border);
+          transform: translateY(-1px);
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+          text-decoration: none;
+      }
+      .btn-primary {
+          background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, black));
+          border-color: var(--accent);
+          color: #fff;
+      }
+      .btn-primary:hover {
+          border-color: color-mix(in srgb, var(--accent) 70%, white);
+          box-shadow: 0 4px 24px color-mix(in srgb, var(--accent) 40%, transparent);
+      }
+      .btn-ghost {
+          background: rgba(255, 255, 255, 0.03);
+          border-color: var(--border);
+      }
+      .btn-danger {
+          background: rgba(255, 109, 138, 0.15);
+          border-color: rgba(255, 109, 138, 0.3);
+          color: var(--danger);
+      }
+
+  ── Form controls ─────────────────────────────────────────────────────
+
+      input[type='text'],
+      input[type='search'],
+      select {
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid var(--border);
+          color: var(--text);
+          padding: 0.7rem 1rem;
+          border-radius: 12px;
+          font-size: 1rem;
+          outline: none;
+          transition: border-color 0.2s ease;
+      }
+      input:focus,
+      select:focus {
+          border-color: var(--accent);
+      }
+
+  ── Utilities ─────────────────────────────────────────────────────────
+
+      .visually-hidden {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          padding: 0;
+          margin: -1px;
+          overflow: hidden;
+          clip: rect(0, 0, 0, 0);
+          border: 0;
+      }
+
+      .text-muted   { color: var(--text-muted); }
+      .text-accent  { color: var(--accent); }
+      .text-center  { text-align: center; }
+
+  ── Responsive ────────────────────────────────────────────────────────
+
+      @media (max-width: 768px) {
+          .page-container {
+              padding: 1rem 0 2rem;
+          }
+      }
+
+
+================================================================================
+  GROUP 3 — NAV COMPONENT (Nav.svelte)
+  Purpose: A sticky navigation bar with a rotating SVG emblem logo,
+           3-zone flex layout, ThemePicker integration, and a mobile
+           hamburger drawer.
+  Files modified: lib/components/Nav.svelte
+================================================================================
+
+CHANGE 3.1 — 8 SVG emblem logo with crossfade rotation
+  File: lib/components/Nav.svelte
+  Location: <script> section, computed at module level.
+
+  The nav brand area displays a 36×36px logo that cycles through 8 thematic
+  SVG emblems with a 5.5-second crossfade interval.
+
+  The emblems array (full SVG path 'd' attribute values):
+
+      const emblems = [
+          {
+              name: 'crossed-sabres',
+              path: 'M27.084 18.248C-17.903 146.478 143.15 277.92 314.496 381.074c-4.645 13.767-5.585 27.628-3.394 40.635 4.44 26.355 20.974 48.997 42.86 62.425 21.884 13.428 49.776 17.57 75.645 5.765 25.87-11.804 48.69-38.923 62.737-84.654l-17.865-5.488c-13 42.318-32.806 64.094-52.63 73.14-19.825 9.047-40.69 5.998-58.116-4.693-17.425-10.69-30.75-29.095-34.205-49.6-3.455-20.507 2.232-43.318 24.677-65.218 20.743-20.24 32.068-41.615 30.434-61.24l-18.622 1.552c.74 8.89-4.35 22.76-16.684 37.486C222.057 230.8 73.838 128.622 27.084 18.248zm458.05 0C451.34 98.03 364.527 173.53 270.93 247.166c19.492 15.878 39.56 31.622 59.195 45.012 110.756-84.836 187.878-180.243 155.01-273.93zM127.58 292.146c-1.634 19.626 9.69 41 30.434 61.24 22.445 21.9 28.132 44.712 24.677 65.218-3.455 20.506-16.78 38.91-34.206 49.6-17.425 10.692-38.29 13.74-58.115 4.694-19.825-9.046-39.632-30.822-52.63-73.14l-17.865 5.488c14.046 45.73 36.867 72.85 62.736 84.654 25.87 11.805 53.763 7.663 75.648-5.765 21.885-13.428 38.42-36.07 42.86-62.426 2.19-13.005 1.25-26.863-3.393-40.628 13.986-8.42 27.905-17.022 41.648-25.803l-56.967-39.387c-6.55 5.103-13.063 10.2-19.52 15.293C150.55 316.46 145.46 302.59 146.2 293.7l-18.622-1.554zm18.1 73.614c-26.1 8.6-62.087 36.255-77.104 60.324 4.948 8.63 10.393 15.223 16.05 20.14 25.846-8.953 59.85-37.406 74.733-60.257-3.007-6.6-7.454-13.386-13.68-20.207zm220.863 0c-6.225 6.822-10.67 13.61-13.68 20.21 14.886 22.85 48.89 51.3 74.736 60.255 5.656-4.918 11.1-11.51 16.05-20.14-15.018-24.07-51.004-51.724-77.105-60.325z'
+          },
+          {
+              name: 'spiked-dragon-head',
+              path: 'M188.8 20.38c-5.3 26.85 4.6 55.74 34.1 86.52 11.2-7.29 31.6-10.94 50-8.16-46-22.31-66.5-47.13-84.1-78.36zM29.19 26.62C43.56 73.08 81.09 128.8 129.6 168.3 93.51 166 49.93 153.1 18.76 143c24.96 35.2 64.17 52.9 103.34 66.3C97.13 227 66.99 245 18.66 248c54.64 19.2 107.54 8.9 131.34.7-17.9 34.9-100.72 66.2-122.31 77 53.26 4.2 121.71-11 167.01-32.9 10 24.6-1.6 53.2-10.1 77.8-1.9 4.5-3.8 8.9-5.7 13.3 5.1-3.5 10.1-7 14.9-10.6 23.6-16.2 47.8-31.9 59.5-58.8 26.1 31.2 62.7 62.1 107 85.4 17.4 22.1 28.3 49 34.2 73.8 8.3-19.1 13.8-40.2 9.7-60.3 24.5-3.6 35.6-29.7 35.5-54.4-12.6 6.2-15.1 6.3-31.2 8.2 0-10.1.6-12.5-3-28.7-10.3 8.4-21 11.2-30.8 11.8 2.1-7.6 3-19.5 3.7-27.3-13 7.1-19.2 9.7-30.1 10.8-.4-10.9-.1-20-4.1-30.4-29.6 19-48.6 1.5-68-21.3 19.8-17 96.4-21.8 95.1 7.1 14-7.3 18.8-11.2 23.6-15.9 9.1 8.5 13.4 20.9 15.1 31.4 9.3-9.4 10.3-10.5 17.1-23.8 5.7 10.1 8.8 17 10.7 30.6 8.5-6.2 15.4-13.1 19.8-21.4 7.5 15.5 8.3 16 12.4 33 17.8-13.1 21.8-31.2 22.8-47.6 2-33-.3-108.2-31-142.9 1.7 36.3-13.1 70-33.8 80.7-12.6 4.9-96.5-74.6-137.6-93.3-23.5-10.2-48.1 7.1-67.8 9.3C147 106.2 83.57 70.94 29.19 26.62zM296.1 152.8c13.3 20.9 32.2 36.9 60.1 55-19.4 2.9-65.8-6.7-77.7-24-5.5-7.9 7.1-21.3 17.6-31zM180.6 319.1c-14.4 6.2-29.2 10.9-43.8 14.3-2.4 3.6-4.6 7.1-6.7 10.5 14.8 5.3 31.5 7 44.1 2.8 3.3-9.8 5.5-19.3 6.4-27.6zm-68 19.1-10.2 1.5c-31.81 36.6-61.9 103.2-48.24 151.9h36.13c-11.12-37.7-16.53-87.1 22.31-153.4zm8.5 21.5c-5.9 11.4-10.4 22.1-13.8 32.1 12.9 6.7 29.1 8.9 44.8 8.2 4.6-10.5 9.8-21.8 14.6-33.3-15.4 1.8-31.4-1.4-45.6-7zm111.4 6.6c-12 10.5-25.2 20.3-38.9 29.6 7 34 33.4 63.4 73.9 95.7h83.3c-57.2-31.8-94.6-73.3-118.3-125.3zm-130 43.2c-2.5 11.8-3.3 22.7-3 32.9 37.3 14.2 62.5 13.5 97.5 4.1-7.2-10.3-13-21-16.9-32.3-32.7 9.4-55.4 5.7-77.6-4.7zm106.6 52.4c-38.1 10.9-68.8 13.2-107.5.3 1.8 10.4 4.5 20.1 7.5 29.4h130.1c-11.3-9.8-21.4-19.6-30.1-29.7z'
+          },
+          {
+              name: 'unicorn',
+              path: 'M494 20 304.887 143.357c16.494 14.608 32.743 22.57 44.963 36.97zM298.346 93.594c-12.58.436-26.59 4.984-38.047 11.77-7.64 4.523-14.115 9.97-18.304 15.142-4.19 5.173-5.79 9.832-5.648 12.668l.283 5.73-5.075 2.676C133.713 193.16 80.945 250.727 18 310.594V494h166.047c6.145-15.424 12.724-33.898 15.086-47.535 1.728-9.977-2.783-21.807-8.23-35.244-5.444-13.436-11.85-28.706-7.63-45.423 3.49-13.827 14.375-25.752 24.096-35.656 4.45-4.534 8.71-8.463 12.075-11.445-6.558-8.577-14.065-20.315-16.51-34.894l17.75-2.978c2.68 15.976 15.203 28.533 22.8 39.24l-.323.23c10.54 14.634 18.892 28.395 30.72 37.546 13.358 10.337 31.484 16.39 66.526 11.49l6.658-.932 2.782 6.124c6.96 15.322 14.372 23.89 21.015 28.423 6.643 4.535 12.63 5.46 18.692 4.79 12.125-1.34 24.29-10.974 27.76-14.264 4.13-3.92 9.657-9.476 13.32-16.124 3.347-6.076 5.073-12.687 3.48-20.744-42.68-37.562-69.592-108.75-90.256-152.6-9.245-19.62-35.786-34.492-52.967-47.95-2.427-1.4-2.675-2.582-3.24-5.154-4.215-19.167 3.188-40.257 10.974-57.298-.096.002-.186-.01-.28-.006zM59.352 136.55c17.863 4.925 37.775 9.665 57.406 14.815 14.803 3.883 29.26 7.935 42.406 12.766 17.914-12.178 37.407-24.123 59.072-35.77-51.62-13.3-109.928-3.148-158.884 8.19zm28.738 26.126c-23.002 4.133-45.974 10.254-67.147 16.662 18.133 3.813 38.298 7.314 58.207 11.242 11.774 2.323 23.337 4.766 34.256 7.643a686.475 686.475 0 0 1 27.403-21.15c-9.044-2.932-18.71-5.698-28.62-8.298-7.952-2.086-16.043-4.098-24.1-6.1zM47.44 202.94c-9.875 2.096-19.728 4.582-29.44 7.29v18.04a2251.165 2251.165 0 0 1 20.172 3.146c10.505 1.7 20.847 3.498 30.734 5.625 8.836-8.185 17.887-16.322 27.268-24.397-6.64-1.56-13.52-3.024-20.508-4.403-9.32-1.838-18.81-3.566-28.227-5.3zM304 224c8.837 0 16 7.163 16 16s-7.163 16-16 16-16-7.163-16-16 7.163-16 16-16zM18 246.512v26.58c4.16.195 8.28.425 12.342.71 7.44-7.2 14.878-14.384 22.387-21.538a604.747 604.747 0 0 0-17.433-3.078A1501.67 1501.67 0 0 0 18 246.512z'
+          },
+          {
+              name: 'brutal-helm',
+              path: 'M256 34.162c-.135.22-.175.203-.314.447-1.975 3.46-4.37 9.255-6.72 16.347-4.703 14.183-9.438 33.67-13.575 53.223-4.137 19.553-7.708 39.222-10.238 54.084-1.264 7.43-2.27 13.66-2.957 18.07a518.223 518.223 0 0 0-.78 5.158 61.5 61.5 0 0 0-.15 1.065c.095 1.402 1.882 4.45 8.008 7.433 6.302 3.07 15.98 5.293 26.727 5.293 10.748 0 20.425-2.223 26.727-5.293 6.126-2.984 7.913-6.03 8.01-7.433l-.15-1.065c-.176-1.2-.44-2.954-.782-5.158-.687-4.41-1.693-10.64-2.957-18.07-2.53-14.862-6.1-34.53-10.24-54.084-4.136-19.554-8.87-39.04-13.573-53.223-2.35-7.092-4.746-12.886-6.72-16.348-.14-.245-.18-.23-.315-.448zM87.066 53.222c-39.793 29.842-65.173 69.95-65.173 114.284 0 30.934 11.92 59.887 32.646 84.695l27.13-78.23c-11.335-17.452-17.668-36.89-17.668-57.384 0-22.984 8.953-44.332 23.064-63.363zm337.883.016c14.094 19.032 23.064 40.38 23.064 63.364 0 20.493-6.333 39.928-17.664 57.377l27.123 78.208c20.718-24.805 32.634-53.753 32.634-84.682 0-44.333-25.38-84.443-65.158-114.268zM214.26 129.043c-36.194 9.176-61.82 31.89-80.563 70.234-24.892 50.927-35.985 130.406-36.304 239.645 43.728 24.578 91.336 38.24 139.99 40.765-.34-38.18-6.926-98.547-11.704-137.69-66.903-5.935-95.838-29.493-95.838-29.493s3.777-27.682 6.396-39.936c38.412 12.937 78.856 19.46 119.776 19.22 40.904.223 81.347-6.283 119.76-19.22 2.618 12.254 6.398 39.936 6.398 39.936s-27.968 24-95.875 29.648c-4.778 39.148-11.345 99.41-11.687 137.536 48.655-2.526 96.263-16.188 139.99-40.766-.318-109.24-11.41-188.718-36.302-239.645-18.74-38.345-44.368-61.058-80.562-70.234a1572.08 1572.08 0 0 1 4.617 25.748c.345.185.697.36 1.036.55 12.55 6.98 21.67 17.51 23.542 30.355l6.01 41.295-.815 1.998c-5.284 12.98-18.74 20.31-33.104 25.653-14.363 5.344-30.252 8.233-42.947 8.356h-.158c-12.69-.13-28.578-3.02-42.94-8.36-14.365-5.342-27.82-12.666-33.105-25.648l-.814-1.998 6.008-41.295c1.87-12.844 10.99-23.374 23.54-30.355.34-.19.692-.365 1.037-.55 1.297-7.6 2.854-16.367 4.617-25.747zm-112.41 35.178-41.44 119.49 29.695 13.71c6.08-42.11 15.602-77.018 29.332-105.11 3.33-6.817 6.94-13.21 10.814-19.2l-28.402-8.89zm308.312 0-28.416 8.895c3.874 5.986 7.482 12.38 10.813 19.194 13.732 28.093 23.256 63.002 29.335 105.116l29.71-13.717-41.44-119.49zm-208.066 19.147a18.537 18.537 0 0 0-1.323 4.615l-5.287 36.332c2.948 4.908 11.57 11.185 23.02 15.442 12.417 4.617 27.205 7.245 37.496 7.363 10.286-.112 25.07-2.738 37.486-7.356 11.45-4.26 20.074-10.54 23.022-15.45l-5.287-36.332a18.507 18.507 0 0 0-1.323-4.615c-1.095.378-2.223.747-3.37 1.112-.98 9.068-8.33 15.628-16.854 19.78-9.16 4.462-20.84 6.896-33.678 6.896-12.84 0-24.52-2.434-33.678-6.896-8.523-4.152-15.873-10.712-16.853-19.78-1.15-.366-2.277-.735-3.372-1.113z'
+          },
+          {
+              name: 'crowned-skull',
+              path: 'm92.406 13.02-.164 156.353c3.064.507 6.208 1.38 9.39 2.627 36.496 14.306 74.214 22.435 111.864 25.473l43.402-60.416 42.317 58.906c36.808-4.127 72.566-12.502 105.967-24.09 3.754-1.302 7.368-2.18 10.818-2.6l1.523-156.252-75.82 95.552-34.084-95.55-53.724 103.74-53.722-103.74-35.442 95.55-72.32-95.55h-.006zm164.492 156.07-28.636 39.86 28.634 39.86 28.637-39.86-28.635-39.86zM86.762 187.55c-2.173-.08-3.84.274-5.012.762-2.345.977-3.173 2.19-3.496 4.196-.645 4.01 2.825 14.35 23.03 21.36 41.7 14.468 84.262 23.748 126.778 26.833l-17.75-24.704c-38.773-3.285-77.69-11.775-115.5-26.596-3.197-1.253-5.877-1.77-8.05-1.85zm333.275.19c-2.156.052-5.048.512-8.728 1.79-33.582 11.65-69.487 20.215-106.523 24.646l-19.264 26.818c40.427-2.602 80.433-11.287 119.22-26.96 15.913-6.43 21.46-17.81 21.36-22.362-.052-2.276-.278-2.566-1.753-3.274-.738-.353-2.157-.71-4.313-.658zm-18.117 47.438c-42.5 15.87-86.26 23.856-130.262 25.117l-14.76 20.547-14.878-20.71c-44.985-1.745-89.98-10.23-133.905-24.306-12.78 28.51-18.94 61.14-19.603 93.44 37.52 17.497 62.135 39.817 75.556 64.63C177 417.8 179.282 443.62 174.184 467.98c7.72 5.007 16.126 9.144 24.98 12.432l5.557-47.89 18.563 2.154-5.935 51.156c9.57 2.21 19.443 3.53 29.377 3.982v-54.67h18.69v54.49c9.903-.638 19.705-2.128 29.155-4.484l-5.857-50.474 18.564-2.155 5.436 46.852c8.747-3.422 17.004-7.643 24.506-12.69-5.758-24.413-3.77-49.666 9.01-72.988 13.28-24.234 37.718-46 74.803-64.29-.62-33.526-6.687-66.122-19.113-94.23zm-266.733 47.006c34.602.23 68.407 12.236 101.358 36.867-46.604 33.147-129.794 34.372-108.29-36.755 2.315-.09 4.626-.127 6.933-.11zm242.825 0c2.307-.016 4.617.022 6.93.11 21.506 71.128-61.684 69.903-108.288 36.757 32.95-24.63 66.756-36.637 101.358-36.866zM255.164 332.14c11.77 21.725 19.193 43.452 25.367 65.178h-50.737c4.57-21.726 13.77-43.45 25.37-65.18z'
+          },
+          {
+              name: 'sword-altar',
+              path: 'm256 24-20 24 12 19.2v38.7c5.3.3 10.7.3 16 0V67.2L276 48l-20-24zm-61.5 86.4-5 15.2c49 16.3 84 16.3 133 0l-5-15.2c-47 15.7-76 15.7-123 0zM232 152v128h16V152h-16zm32 0v128h16V152h-16zm-51.1 144-8 16h102.2l-8-16h-86.2zm-80.2 32L71.65 440H440.3l-61.1-112H132.7zm43.3 16h96v16h-96v-16zm112 0h48v16h-48v-16zm-112 32h32v16h-32v-16zm48 0h112v16H224v-16zm-48 32h64v16h-64v-16zM37.77 456 27.1 488h457.8l-10.7-32H37.77z'
+          },
+          {
+              name: 'coliseum',
+              path: 'M152.39 77.82c-49.333 15.867-93.323 45.849-114.356 85.986 13.498-.909 10.582 14.516 10.582 29.947H35.133c.299 20.005 4.471 22.494 4.471 22.494 8.813 0 8.813 16 8.813 32H31.576L21 410.247c0 2.752 3.504 5.265 9.857 7.543.22-25.637 1.467-47.543 8.747-47.543 7.706 0 8.674 24.472 8.795 52.014 6.795 1.305 14.716 2.501 23.544 3.593.173-27.374 1.5-51.607 11.724-51.607 10.528 0 11.617 25.708 11.73 54.07 9.233.829 19.047 1.576 29.416 2.23.127-28.453 1.37-54.3 13.687-54.3 12.527 0 13.596 26.746 13.69 55.772 8.306.378 16.815.712 25.5.994.132-28.636 1.492-54.766 15.643-54.766 14.282 0 17.254 8 17.365 36.943 27.602 20.197 24.014 14.35 27.7 18.983.115-29.085 1.467-55.926 17.602-55.926 16.136 0 17.487 26.846 17.602 55.934 9.875-.068 19.698-.194 29.419-.375.112-28.944 1.364-55.559 15.646-55.559 14.15 0 15.51 26.127 15.643 54.76a1988.66 1988.66 0 0 0 20.588-.764l-34.499-77.27-30.497-2.595-24.543-113.03-35.274 2.962-13.024-52.692-15.948-2.326zm-13.691 45.933c13.708 0 13.708 16 13.708 32l-27.416 8c0-16 0-40 13.708-40zm-54.833 16c11.75 0 11.75 16 11.75 32l-23.5 4c0-16 0-36 11.75-36zm109.467 60.494c15.667 0 15.667 16 15.667 32l-31.333 2c0-16 0-34 15.666-34zm-54.833 4c13.708 0 13.708 16 13.708 32l-27.416 2c0-16 0-34 13.708-34zm-54.833 6c11.75 0 11.75 16 11.75 32l-23.5 4c0-16 0-36 11.75-36zm199.323 27.147 20.012 92.175c0-23.77.146-47.322 15.665-47.322 15.666 0 15.666 24 15.666 48-1.437 5.715-1.537 6.167-2.18 7.664l28.683 64.244c1.412-15.195 4.743-25.908 12.664-25.908 12.316 0 13.56 25.846 13.687 54.299 9.64-.609 18.791-1.3 27.457-2.059.11-28.43 1.182-54.24 11.731-54.24 10.253 0 11.559 24.37 11.725 51.84 10.484-1.26 19.768-2.66 27.463-4.211.129-27.382 1.122-51.629 8.791-51.629 7.21 0 8.501 21.485 8.74 46.797 5.109-2.078 7.906-4.342 7.906-6.797l-9.013-138.066c-10.884-10.001-26.092-16.875-44.141-21.692l-19.893 14.002-30.259-2.808-20.7-21.143c-27.077-1.717-55.883-2.184-84.004-3.146zm-89.657 44.853c15.667 0 15.667 24 15.667 48h-31.333c0-24 0-48 15.666-48zm62.667 0c17.625 0 17.625 24 17.625 48h-35.25c0-24 0-48 17.625-48zm-117.5 2c13.708 0 13.708 24 13.708 48h-27.416c0-24 0-48 13.708-48zm235 0c13.708 0 13.708 24 13.708 48h-27.416c0-24 0-48 13.708-48zm-289.833 2c11.75 0 11.75 22 11.75 46l-23.5 2c0-24 0-48 11.75-48zm342.708 0c11.75 0 11.75 24 11.75 48l-23.5-2c0-24 0-46 11.75-46zm-382.77 2c8.812 0 8.812 22 8.812 46l-17.625 2c0-24 0-48 8.812-48zm426.75 0c8.812 0 8.812 24 8.812 48l-17.625-2c0-24 0-46 8.812-46z'
+          },
+          {
+              name: 'qaitbay-citadel',
+              path: 'M208 80v25h-13v126h18v-71c0-5.5 1.4-10.5 4.3-14.4 3-3.9 7.8-6.5 12.7-6.5 5 0 9.7 2.7 12.7 6.6 2.9 3.9 4.3 8.8 4.3 14.3v71h18v-71c0-5.5 1.4-10.5 4.3-14.4 2.9-3.9 7.7-6.6 12.7-6.6 5 0 9.8 2.7 12.7 6.6 2.9 3.9 4.3 8.9 4.3 14.4v71h18V105h-13V80h-18v25h-21V80h-18v25h-21V80h-18zM16 112v32h9v71h78v-65.9h9V112H94v25H73v-25H55v25H34v-25H16zm384 0v32h9v71h78v-71h9v-32h-18v25h-21v-25h-18v25h-21v-25h-18zm-265 32v25h-14v64h-16v254h110v-81.6c0-17.5 4.4-31.5 11.8-41.4 7.4-9.9 18.2-15.6 29.2-15.6s21.8 5.7 29.2 15.6c7.4 9.9 11.8 23.9 11.8 41.4V487h110V233h-16v-64h-14v-25h-18v25h-24v80H177v-80h-24v-25h-18zm-94 89v254h46V233H41zm384 0v254h46V233h-46zm-290 7h18v48h-18v-48zm224 0h18v48h-18v-48zM135 359h50v50h-50v-50zm192 0h50v50h-50v-50zm-71 7.4c-5 0-10.2 2.3-14.8 8.4-4.6 6.1-8.2 16.1-8.2 30.6V432h46v-26.6c0-14.5-3.6-24.5-8.2-30.6-4.6-6.1-9.8-8.4-14.8-8.4zM153 377v14h14v-14h-14zm192 0v14h14v-14h-14z'
+          }
+      ];
+
+  Rotation logic (in <script>):
+
+      let activeEmblem = $state(0);
+      let timer: ReturnType<typeof setInterval>;
+
+      onMount(() => {
+          timer = setInterval(() => {
+              activeEmblem = (activeEmblem + 1) % emblems.length;
+          }, 5500);
+      });
+
+      onDestroy(() => clearInterval(timer));
+
+  CSS for the crossfade (in <style>):
+
+      .logo-wrap {
+          position: relative;
+          width: 36px;
+          height: 36px;
+          flex-shrink: 0;
+      }
+
+      .brand-logo {
+          position: absolute;
+          top: 0; left: 0;
+          width: 100%; height: 100%;
+          opacity: 0;
+          transition: opacity 1.2s ease-in-out;
+      }
+
+      .brand-logo.active {
+          opacity: 1;
+      }
+
+  Template (inside <a class="nav-brand">):
+
+      <div class="logo-wrap" aria-hidden="true">
+          {#each emblems as emblem, i}
+              <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 512 512"
+                  fill="currentColor"
+                  class="brand-logo"
+                  class:active={i === activeEmblem}
+              >
+                  <path d={emblem.path} />
+              </svg>
+          {/each}
+      </div>
+      <span class="brand-text">Project Nornyx</span>
+
+  Brand text CSS:
+
+      .brand-text {
+          font-family: 'Cinzel Decorative', serif;
+          font-size: 2rem;
+          letter-spacing: 0.02em;
+          line-height: 1;
+      }
+
+CHANGE 3.2 — 3-zone flex layout
+  File: lib/components/Nav.svelte
+
+  The nav bar is a sticky strip divided into three horizontal zones:
+
+      Zone 1 (left):  .nav-brand — logo + "Project Nornyx" text, flex-shrink: 0
+      Zone 2 (center): .nav-links — horizontal page links, flex: 1, justify-content: center
+      Zone 3 (right): .nav-right — ThemePicker + user/auth buttons + hamburger, flex-shrink: 0
+
+  The .nav-inner container:
+
+      .nav-inner {
+          width: min(1200px, calc(100vw - 32px));
+          margin: 0 auto;
+          display: flex;
+          align-items: center;
+          padding: 1rem 0;
+          gap: 1rem;
+      }
+
+  Nav links shown in Zone 2: Home, About, Reviews, Adventures (only when logged in).
+  Active link styling: color: var(--accent) + background: color-mix(in srgb, var(--accent) 10%, transparent).  
+
+CHANGE 3.3 — Mobile hamburger and drawer
+  File: lib/components/Nav.svelte
+
+  Below 768px, .nav-links is hidden and the hamburger button is shown:
+
+      .hamburger {
+          display: none; /* shown in media query */
+          width: 34px; height: 34px;
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          background: transparent;
+          color: var(--text);
+          cursor: pointer;
+      }
+
+  A .nav-drawer dropdown renders below the nav bar when menuOpen = true.
+  A .nav-overlay (position: fixed, inset: 0, z-index: 99) is rendered behind
+  the drawer — clicking it calls closeMenu().
+
+CHANGE 3.4 — ThemePicker integration
+  File: lib/components/Nav.svelte
+
+  ThemePicker is imported and placed in Zone 3 (.nav-right).
+  It is a self-contained client-only component (see lib/stores/themeStore.ts).
+  It renders a trigger button (coloured dot + "Theme" label) and a popover
+  grid of all 12 themes, split into Originals and Eccentrics subgroups.
+
+
+================================================================================
+  GROUP 4 — ACTIVE ADVENTURE PAGE FIXES
+  Purpose: Fix three bugs present in the original adventure page:
+           1. Main-page scrollbar visible alongside overflow-locked body
+           2. Scroll-to-bottom animation firing on initial load (jarring)
+           3. Flash of CharacterCreation screen before data hydrates
+           Plus one visual fix: inter-panel glow/shadow effect
+  Files modified: routes/adventures/[id]/+page.svelte
+================================================================================
+
+CHANGE 4.1 — Lock html overflow as well as body
+  File: routes/adventures/[id]/+page.svelte
+
+  ORIGINAL CODE (in an $effect that locks scrolling when the page mounts):
+
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+
+  CHANGED TO:
+
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.overflow = 'hidden';
+      return () => {
+          document.documentElement.style.overflow = '';
+          document.body.style.overflow = '';
+      };
+
+  Why: Locking only <body> leaves <html> scrollable in some browsers,
+  causing a visible second scrollbar on the main page. Locking both
+  elements eliminates it completely.
+
+CHANGE 4.2 — Parametrize scrollChatToBottom + call with 'instant' on mount
+  File: routes/adventures/[id]/+page.svelte
+
+  ORIGINAL function signature:
+
+      function scrollChatToBottom() {
+
+  CHANGED TO:
+
+      function scrollChatToBottom(behavior: ScrollBehavior = 'smooth') {
+
+  And wherever the function performs the scroll, pass behavior through:
+
+      el.scrollTo({ top: el.scrollHeight, behavior });
+
+  In onMount, change the call from:
+
+      scrollChatToBottom();
+
+  TO:
+
+      scrollChatToBottom('instant');
+
+  Why: On initial page load, animating the scroll to the bottom of a
+  potentially long transcript looks unpolished and causes layout shift.
+  Using 'instant' on mount snaps to the bottom immediately. Subsequent
+  scrolls (new messages arriving) continue to use 'smooth' by default.
+
+CHANGE 4.3 — Initialize partyCharacters from server data synchronously
+  File: routes/adventures/[id]/+page.svelte
+
+  ORIGINAL declaration:
+
+      let partyCharacters = $state<Record<string, PlayerCharacter>>({});
+
+  CHANGED TO:
+
+      let partyCharacters = $state<Record<string, PlayerCharacter>>(
+          Object.fromEntries(
+              (((data.gameState as { characters?: PlayerCharacter[] } | undefined)
+                  ?.characters ?? []) as PlayerCharacter[])
+                  .map((character) => [character.userId, character])
+          )
+      );
+
+  Why: With the original empty-object initialization, the $derived
+  "currentCharacter" resolved to null on the first render, causing the
+  CharacterCreation screen to flash briefly before the $effect that
+  populated partyCharacters from socket data ran. By initializing
+  directly from data.gameState.characters (which is available
+  synchronously from the server load), currentCharacter is never null
+  on first render for returning players.
+
+CHANGE 4.4 — Remove inter-panel shadow darkening
+  File: routes/adventures/[id]/+page.svelte
+
+  The .adventure-screen rule is the primary layout container for the entire
+  active adventure page. It already existed with a full CSS grid layout;
+  the property --shadow: none was ADDED as the final line inside that existing
+  rule. An implementer must write (or preserve) the complete block:
+
+      .adventure-screen {
+          height: calc(100dvh - 3.5rem);
+          display: grid;
+          grid-template-columns: 240px minmax(0, 1fr) 460px;
+          grid-template-rows: auto 1fr;
+          grid-template-areas:
+              "header header journal"
+              "left   main   journal";
+          column-gap: 0.85rem;
+          row-gap: 0;
+          padding: 0.3rem 0 1.5rem;
+          overflow: hidden;
+          --shadow: none;     /* ← THE ADDED LINE */
+      }
+
+  Layout explained:
+    - height: calc(100dvh - 3.5rem) — fills the full viewport minus nav height;
+      dvh (dynamic viewport height) avoids the mobile address-bar jump.
+    - grid-template-columns: 240px left sidebar | flexible main content | 460px journal
+    - grid-template-areas: the header row spans both left + main columns;
+      the journal panel spans both rows (tall single column on the right).
+    - overflow: hidden — each panel manages its own internal scrolling;
+      no page-level scroll occurs inside the adventure screen.
+    - --shadow: none — the ONLY property added in this change. It is
+      inherited by every child GlassPanel via the CSS cascade. The default
+      --shadow value produces a glow/darkening ring between adjacent panels;
+      setting it to none on the parent removes the effect simultaneously for
+      all child panels without modifying the component or global CSS.
+
+  Why: The default --shadow creates an uneven darkening effect between the
+  sidebar, main content area, and journal panel. Overriding it at the
+  container level is the minimal surgical fix — it does not affect the
+  summary page or any other route that uses GlassPanel.
+
+
+================================================================================
+  GROUP 5 — ADVENTURE LIFECYCLE API ENDPOINT
+  Purpose: Allow the adventure owner to mark an adventure as "completed"
+           or permanently delete it via REST API calls.
+  Files created: routes/api/adventure/[id]/+server.ts  (NEW FILE)
+================================================================================
+
+CHANGE 5.1 — Create /api/adventure/[id]/+server.ts
+  This file is created from scratch. Full file content:
+
+      import { json, error } from '@sveltejs/kit';
+      import type { RequestHandler } from './$types';
+      import { db } from '$server/db/client';
+      import {
+          adventures,
+          adventureMembers,
+          adventureState,
+          adventureChat,
+          adventureTurns
+      } from '$server/db/schema';
+      import { eq, and } from 'drizzle-orm';
+
+      /**
+       * PATCH /api/adventure/[id]
+       * Body: { status: 'completed' }
+       * Owner-only. Marks an adventure as completed.
+       */
+      export const PATCH: RequestHandler = async ({ params, locals, request }) => {
+          if (!locals.user) error(401, 'Not authenticated');
+
+          const { id: adventureId } = params;
+
+          const [adv] = await db
+              .select({ id: adventures.id, ownerId: adventures.ownerId })
+              .from(adventures)
+              .where(and(eq(adventures.id, adventureId), eq(adventures.ownerId, locals.user.id)))
+              .limit(1);
+
+          if (!adv) error(404, 'Adventure not found or not owner');
+
+          const body = (await request.json().catch(() => ({}))) as { status?: string };
+          if (body.status !== 'completed') error(400, 'Only status: completed is accepted');
+
+          await db
+              .update(adventures)
+              .set({ status: 'completed', updatedAt: Date.now() })
+              .where(eq(adventures.id, adventureId));
+
+          return json({ ok: true });
+      };
+
+      /**
+       * DELETE /api/adventure/[id]
+       * Owner-only. Permanently deletes an adventure and all its data.
+       * Child rows are deleted in FK dependency order.
+       */
+      export const DELETE: RequestHandler = async ({ params, locals }) => {
+          if (!locals.user) error(401, 'Not authenticated');
+
+          const { id: adventureId } = params;
+
+          const [adv] = await db
+              .select({ id: adventures.id, ownerId: adventures.ownerId })
+              .from(adventures)
+              .where(and(eq(adventures.id, adventureId), eq(adventures.ownerId, locals.user.id)))
+              .limit(1);
+
+          if (!adv) error(404, 'Adventure not found or not owner');
+
+          // Delete in FK dependency order: children before parent
+          await db.delete(adventureChat).where(eq(adventureChat.adventureId, adventureId));
+          await db.delete(adventureTurns).where(eq(adventureTurns.adventureId, adventureId));
+          await db.delete(adventureState).where(eq(adventureState.adventureId, adventureId));
+          await db.delete(adventureMembers).where(eq(adventureMembers.adventureId, adventureId));
+          await db.delete(adventures).where(eq(adventures.id, adventureId));
+
+          return json({ ok: true });
+      };
+
+  Security notes:
+    - Both handlers require locals.user (auth guard) — unauthenticated
+      calls get 401 immediately.
+    - Both handlers verify ownerId === locals.user.id before touching any
+      data — non-owners get 404 (not 403, to avoid leaking existence).
+    - PATCH only accepts status='completed' — any other body is rejected
+      with 400 to prevent arbitrary status mutation.
+    - DELETE order matters — adventureChat first, then adventureTurns,
+      then adventureState, then adventureMembers, then adventures. Reversing
+      this order will violate foreign key constraints.
+
+
+================================================================================
+  GROUP 6 — ADVENTURECARD: MANAGEMENT ROW + LIVE GLOW ANIMATIONS
+  Purpose: Add owner-only controls (Complete / Delete-with-confirm) to each
+           card, and add breathing glow animations to active/lobby cards
+           so they stand out from completed ones at a glance.
+  Files modified: lib/components/AdventureCard.svelte
+================================================================================
+
+CHANGE 6.1 — Add isOwner and onAction props
+  File: lib/components/AdventureCard.svelte
+
+  Add to the interface Props block:
+
+      isOwner?: boolean;
+      onAction?: () => void;
+
+  Add to the destructuring:
+
+      let { adventure, memberCount = 1, isOwner = false, onAction = () => {} }: Props = $props();
+
+CHANGE 6.2 — Add management state variables and handlers
+  File: lib/components/AdventureCard.svelte
+
+  Add to the <script> section:
+
+      let busy = $state(false);
+      let confirmingDelete = $state(false);
+      let errorMsg = $state('');
+
+      async function handleComplete() {
+          if (busy) return;
+          busy = true;
+          errorMsg = '';
+          try {
+              const res = await fetch(`/api/adventure/${adventure.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ status: 'completed' })
+              });
+              if (!res.ok) throw new Error(await res.text());
+              onAction();
+          } catch (e) {
+              errorMsg = 'Failed to complete adventure.';
+          } finally {
+              busy = false;
+          }
+      }
+
+      async function handleDelete() {
+          if (busy) return;
+          busy = true;
+          errorMsg = '';
+          try {
+              const res = await fetch(`/api/adventure/${adventure.id}`, { method: 'DELETE' });
+              if (!res.ok) throw new Error(await res.text());
+              onAction();
+          } catch (e) {
+              errorMsg = 'Failed to delete adventure.';
+          } finally {
+              busy = false;
+              confirmingDelete = false;
+          }
+      }
+
+CHANGE 6.3 — Add glowClass derived
+  File: lib/components/AdventureCard.svelte
+  Add after the existing modeClass / statusClass deriveds:
+
+      let glowClass = $derived(
+          adventure.status === 'active'
+              ? 'is-active'
+              : adventure.status === 'lobby'
+                  ? 'is-lobby'
+                  : ''
+      );
+
+CHANGE 6.4 — Apply glowClass to wrapper div
+  File: lib/components/AdventureCard.svelte
+
+  Change:
+      <div class="adventure-card-wrapper">
+
+  To:
+      <div class="adventure-card-wrapper {glowClass}">
+
+CHANGE 6.5 — Add management row in template
+  File: lib/components/AdventureCard.svelte
+  Add below the closing </a> tag (after the card link), inside the wrapper div:
+
+      {#if isOwner}
+          <div class="card-manage">
+              {#if errorMsg}
+                  <span class="manage-error">{errorMsg}</span>
+              {/if}
+
+              {#if confirmingDelete}
+                  <span class="manage-label">Delete forever?</span>
+                  <button class="manage-btn manage-btn-danger" onclick={handleDelete} disabled={busy}>
+                      {busy ? '…' : 'Confirm'}
+                  </button>
+                  <button class="manage-btn" onclick={() => { confirmingDelete = false; errorMsg = ''; }} disabled={busy}>
+                      Cancel
+                  </button>
+              {:else}
+                  {#if adventure.status !== 'completed'}
+                      <button class="manage-btn" onclick={handleComplete} disabled={busy} title="Mark as completed">
+                          {busy ? '…' : '✓ Complete'}
+                      </button>
+                  {/if}
+                  <button
+                      class="manage-btn manage-btn-delete"
+                      onclick={() => { confirmingDelete = true; errorMsg = ''; }}
+                      disabled={busy}
+                      title="Permanently delete this adventure"
+                  >
+                      🗑 Delete
+                  </button>
+              {/if}
+          </div>
+      {/if}
+
+CHANGE 6.6 — Add glow CSS to AdventureCard <style> block
+  File: lib/components/AdventureCard.svelte
+  Add these rules inside the <style> block (after the existing
+  .adventure-card-wrapper base rule):
+
+  Active glow (teal, breathing pulse):
+      .adventure-card-wrapper.is-active {
+          border-color: color-mix(in srgb, var(--accent-2) 70%, transparent);
+          animation: card-active-pulse 3.5s ease-in-out infinite;
+      }
+      .adventure-card-wrapper.is-active:hover {
+          animation: none;
+          border-color: var(--accent-2);
+          box-shadow:
+              0 0 0 1px color-mix(in srgb, var(--accent-2) 55%, transparent),
+              0 0 28px color-mix(in srgb, var(--accent-2) 35%, transparent),
+              0 6px 24px rgba(0, 0, 0, 0.35);
+          transform: translateY(-3px);
+      }
+
+  Lobby glow (amber, breathing pulse):
+      .adventure-card-wrapper.is-lobby {
+          border-color: color-mix(in srgb, var(--warning) 60%, transparent);
+          animation: card-lobby-pulse 3.5s ease-in-out infinite;
+      }
+      .adventure-card-wrapper.is-lobby:hover {
+          animation: none;
+          border-color: var(--warning);
+          box-shadow:
+              0 0 0 1px color-mix(in srgb, var(--warning) 50%, transparent),
+              0 0 24px color-mix(in srgb, var(--warning) 30%, transparent),
+              0 6px 24px rgba(0, 0, 0, 0.35);
+          transform: translateY(-3px);
+      }
+
+  Frozen Spire overrides (light bg — use darker glow colours):
+      :global([data-theme='frozen-spire']) .adventure-card-wrapper.is-active {
+          border-color: rgba(26, 92, 168, 0.55);
+          animation: card-active-pulse-fs 3.5s ease-in-out infinite;
+      }
+      :global([data-theme='frozen-spire']) .adventure-card-wrapper.is-active:hover {
+          animation: none;
+          border-color: #1a5ca8;
+          box-shadow:
+              0 0 0 1px rgba(26, 92, 168, 0.4),
+              0 0 20px rgba(26, 92, 168, 0.18),
+              0 6px 20px rgba(0, 0, 0, 0.1);
+      }
+      :global([data-theme='frozen-spire']) .adventure-card-wrapper.is-lobby {
+          border-color: rgba(180, 100, 0, 0.5);
+          animation: card-lobby-pulse-fs 3.5s ease-in-out infinite;
+      }
+      :global([data-theme='frozen-spire']) .adventure-card-wrapper.is-lobby:hover {
+          animation: none;
+          border-color: #a05c00;
+          box-shadow:
+              0 0 0 1px rgba(160, 92, 0, 0.4),
+              0 0 18px rgba(160, 92, 0, 0.15);
+      }
+
+  Keyframe definitions (add at the bottom of the <style> block):
+      @keyframes :global(card-active-pulse) {
+          0%, 100% {
+              box-shadow:
+                  0 0 0 1px color-mix(in srgb, var(--accent-2) 35%, transparent),
+                  0 0 14px color-mix(in srgb, var(--accent-2) 15%, transparent);
+          }
+          50% {
+              box-shadow:
+                  0 0 0 1px color-mix(in srgb, var(--accent-2) 55%, transparent),
+                  0 0 24px color-mix(in srgb, var(--accent-2) 25%, transparent);
+          }
+      }
+      @keyframes :global(card-lobby-pulse) {
+          0%, 100% {
+              box-shadow:
+                  0 0 0 1px color-mix(in srgb, var(--warning) 30%, transparent),
+                  0 0 12px color-mix(in srgb, var(--warning) 12%, transparent);
+          }
+          50% {
+              box-shadow:
+                  0 0 0 1px color-mix(in srgb, var(--warning) 50%, transparent),
+                  0 0 20px color-mix(in srgb, var(--warning) 20%, transparent);
+          }
+      }
+      @keyframes :global(card-active-pulse-fs) {
+          0%, 100% { box-shadow: 0 0 0 1px rgba(26,92,168,0.25), 0 0 10px rgba(26,92,168,0.08); }
+          50%       { box-shadow: 0 0 0 1px rgba(26,92,168,0.45), 0 0 18px rgba(26,92,168,0.15); }
+      }
+      @keyframes :global(card-lobby-pulse-fs) {
+          0%, 100% { box-shadow: 0 0 0 1px rgba(160,92,0,0.22), 0 0 10px rgba(160,92,0,0.07); }
+          50%       { box-shadow: 0 0 0 1px rgba(160,92,0,0.42), 0 0 16px rgba(160,92,0,0.13); }
+      }
+
+  Management row CSS (add after the card-action styles):
+      .card-manage {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.55rem 1.25rem;
+          border-top: 1px solid var(--border);
+          flex-wrap: wrap;
+      }
+      .manage-label { font-size: 0.8rem; color: var(--text-muted); margin-right: 0.25rem; }
+      .manage-error { font-size: 0.78rem; color: var(--danger); flex: 1 1 100%; margin-bottom: 0.2rem; }
+      .manage-btn {
+          padding: 0.25rem 0.65rem;
+          font-size: 0.78rem;
+          font-family: inherit;
+          border-radius: 6px;
+          border: 1px solid var(--border);
+          background: transparent;
+          color: var(--text-muted);
+          cursor: pointer;
+          transition: background 0.15s, color 0.15s, border-color 0.15s;
+          line-height: 1.4;
+      }
+      .manage-btn:hover:not(:disabled) {
+          background: rgba(255,255,255,0.06);
+          color: var(--text);
+          border-color: var(--accent);
+      }
+      .manage-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+      .manage-btn-delete:hover:not(:disabled) {
+          border-color: var(--danger); color: var(--danger);
+          background: rgba(255,100,100,0.07);
+      }
+      .manage-btn-danger {
+          border-color: var(--danger); color: var(--danger);
+          background: rgba(255,100,100,0.07);
+      }
+      .manage-btn-danger:hover:not(:disabled) { background: rgba(255,100,100,0.16); }
+
+
+================================================================================
+  GROUP 7 — ADVENTURES LIST PAGE: ACTIVE / COMPLETED SPLIT
+  Purpose: Visually separate active/lobby adventures from completed ones.
+           Active cards appear at the top with glow animations. Completed
+           cards appear below a horizontal divider, desaturated and dimmed.
+  Files modified: routes/adventures/+page.svelte
+================================================================================
+
+CHANGE 7.1 — Import invalidateAll and add $derived splits
+  File: routes/adventures/+page.svelte
+
+  Add to imports (already exists but ensure it is imported):
+      import { invalidateAll } from '$app/navigation';
+
+  In the <script> section, after the handleAdventureAction function, add:
+
+      const activeAdventures = $derived(data.adventures.filter((a) => a.status !== 'completed'));
+      const completedAdventures = $derived(data.adventures.filter((a) => a.status === 'completed'));
+
+CHANGE 7.2 — Replace the single adventures grid with active + divider + completed
+  File: routes/adventures/+page.svelte
+
+  ORIGINAL template in the {:else} block:
+
+      {:else}
+          <div class="adventures-grid">
+              {#each data.adventures as adventure}
+                  <AdventureCard
+                      {adventure}
+                      memberCount={adventure.memberCount}
+                      isOwner={adventure.ownerId === data.user?.id}
+                      onAction={handleAdventureAction}
+                  />
+              {/each}
+          </div>
+      {/if}
+
+  CHANGED TO:
+
+      {:else}
+          <!-- Active adventures (lobby + active status) -->
+          {#if activeAdventures.length > 0}
+              <div class="adventures-grid">
+                  {#each activeAdventures as adventure}
+                      <AdventureCard
+                          {adventure}
+                          memberCount={adventure.memberCount}
+                          isOwner={adventure.ownerId === data.user?.id}
+                          onAction={handleAdventureAction}
+                      />
+                  {/each}
+              </div>
+          {:else}
+              <p class="none-active text-muted">
+                  No active adventures. <a href="/adventures/new">Start one?</a>
+              </p>
+          {/if}
+
+          <!-- Horizontal divider + completed section -->
+          {#if completedAdventures.length > 0}
+              <div class="section-divider">
+                  <span class="divider-label">Completed</span>
+              </div>
+              <div class="adventures-grid adventures-grid-completed">
+                  {#each completedAdventures as adventure}
+                      <AdventureCard
+                          {adventure}
+                          memberCount={adventure.memberCount}
+                          isOwner={adventure.ownerId === data.user?.id}
+                          onAction={handleAdventureAction}
+                      />
+                  {/each}
+              </div>
+          {/if}
+      {/if}
+
+CHANGE 7.3 — Add CSS for divider and completed grid
+  File: routes/adventures/+page.svelte
+
+  Add to the <style> block:
+
+      .none-active {
+          font-size: 0.9rem;
+          margin: 0 0 0.5rem;
+      }
+
+      .section-divider {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          margin: 2.25rem 0 1.5rem;
+      }
+      .section-divider::before,
+      .section-divider::after {
+          content: '';
+          flex: 1;
+          height: 1px;
+          background: var(--border);
+      }
+      .divider-label {
+          font-size: 0.7rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          color: var(--text-muted);
+          white-space: nowrap;
+          padding: 0 0.25rem;
+      }
+
+      /* Completed grid — visually recessed until hovered */
+      .adventures-grid-completed {
+          opacity: 0.72;
+          filter: saturate(0.55);
+          transition: opacity 0.25s, filter 0.25s;
+      }
+      .adventures-grid-completed:hover {
+          opacity: 1;
+          filter: saturate(1);
+      }
+
+  Why the completed grid is dimmed:
+    Active adventures should always visually dominate the page — they need
+    attention. Completed ones are reference material. The desaturation +
+    opacity reduction at rest achieves this without hiding them. Hovering
+    the section restores full colour as a clear affordance when the user
+    wants to interact with them.
+
+
+================================================================================
+  GROUP 8 — COMPLETED ADVENTURE SUMMARY ROUTE
+  Purpose: When a user navigates to /adventures/[id] on a completed adventure,
+           redirect them to /adventures/[id]/summary — a dedicated read-only
+           chronicle page showing the full transcript, stats, party snapshot,
+           quest log, world map, and NPC roster.
+  Files created: routes/adventures/[id]/summary/+page.server.ts  (NEW FILE)
+                 routes/adventures/[id]/summary/+page.svelte      (NEW FILE)
+  Files modified: routes/adventures/[id]/+page.server.ts
+================================================================================
+
+CHANGE 8.1 — Add completed redirect in [id]/+page.server.ts
+  File: routes/adventures/[id]/+page.server.ts
+
+  Location: After the existing lobby redirect (status === 'lobby' → /lobby).
+
+  ADD these lines immediately after the lobby redirect:
+
+      // Completed adventures have their own summary view
+      if (adventure[0].status === 'completed') {
+          redirect(302, `/adventures/${params.id}/summary`);
+      }
+
+  Why: Without this, a direct URL visit to /adventures/[id] on a completed
+  adventure would try to render the active adventure page (with socket
+  connection, combat UI, chat input, etc.) for a finished story. The summary
+  route renders a read-only chronicle instead.
+
+CHANGE 8.2 — Create summary/+page.server.ts
+  File: routes/adventures/[id]/summary/+page.server.ts  (NEW FILE)
+
+  This file is the server-side load function for the completed adventure
+  summary page. Full content:
+
+      import { redirect, error } from '@sveltejs/kit';
+      import type { PageServerLoad } from './$types';
+      import { db } from '$server/db/client';
+      import {
+          adventures, adventureMembers, adventureState,
+          adventureTurns, adventureChat, users
+      } from '$server/db/schema';
+      import { eq, and, asc } from 'drizzle-orm';
+      import { createInitialGameState, migrateState } from '$lib/game/state';
+      import type { TurnRecord, StateChange } from '$lib/game/types';
+
+      export const load: PageServerLoad = async ({ params, locals, url }) => {
+          if (!locals.user) {
+              redirect(302, `/auth/login?returnTo=${encodeURIComponent(url.pathname + url.search)}`);
+          }
+
+          const [adv] = await db
+              .select()
+              .from(adventures)
+              .where(eq(adventures.id, params.id))
+              .limit(1);
+
+          if (!adv) error(404, 'Adventure not found');
+
+          // Guard: redirect away if not actually completed
+          if (adv.status === 'lobby') redirect(302, `/adventures/${params.id}/lobby`);
+          if (adv.status === 'active') redirect(302, `/adventures/${params.id}`);
+
+          const [membership] = await db
+              .select()
+              .from(adventureMembers)
+              .where(and(
+                  eq(adventureMembers.adventureId, params.id),
+                  eq(adventureMembers.userId, locals.user.id)
+              ))
+              .limit(1);
+
+          if (!membership) error(403, 'You are not a member of this adventure');
+
+          const members = await db
+              .select({
+                  userId: adventureMembers.userId,
+                  role: adventureMembers.role,
+                  username: users.username,
+                  avatarUrl: users.avatarUrl
+              })
+              .from(adventureMembers)
+              .innerJoin(users, eq(adventureMembers.userId, users.id))
+              .where(eq(adventureMembers.adventureId, params.id));
+
+          const [stateRow] = await db
+              .select()
+              .from(adventureState)
+              .where(eq(adventureState.adventureId, params.id))
+              .limit(1);
+
+          let gameState = createInitialGameState(adv.worldSeed ?? '');
+          if (stateRow) {
+              try { gameState = migrateState(JSON.parse(stateRow.stateJson)); }
+              catch { /* corrupted state — fall back to empty */ }
+          }
+
+          // Load ALL turns in chronological order (no limit — story is frozen)
+          const turnRows = await db
+              .select()
+              .from(adventureTurns)
+              .where(eq(adventureTurns.adventureId, params.id))
+              .orderBy(asc(adventureTurns.turnNumber));
+
+          const allTurns: TurnRecord[] = turnRows.map((r) => ({
+              id: r.id,
+              turnNumber: r.turnNumber,
+              actorType: r.actorType as TurnRecord['actorType'],
+              actorId: r.actorId,
+              action: r.action,
+              intent: r.intent as TurnRecord['intent'],
+              status: (r.status ?? 'completed') as TurnRecord['status'],
+              resolvedActionSummary: r.resolvedSummary ?? '',
+              mechanicResults: JSON.parse(r.mechanicsJson) as TurnRecord['mechanicResults'],
+              stateChanges: JSON.parse(r.stateChangesJson) as StateChange,
+              narrativeText: r.narrativeText,
+              timestamp: r.createdAt
+          }));
+
+          // Load ALL chat in chronological order (no limit)
+          const chatRows = await db
+              .select()
+              .from(adventureChat)
+              .where(eq(adventureChat.adventureId, params.id))
+              .orderBy(asc(adventureChat.createdAt));
+
+          const allChat = chatRows.map((r) => ({
+              id: r.id,
+              userId: r.userId,
+              username: r.username,
+              text: r.text,
+              mentions: JSON.parse(r.mentionsJson) as string[],
+              retroInvoked: r.retroInvoked,
+              consumedByTurn: r.consumedByTurn,
+              createdAt: r.createdAt
+          }));
+
+          // ── Compute 14 stats ─────────────────────────────────────────────
+          const msPlayed = adv.updatedAt - adv.createdAt;
+          const hoursPlayed = Math.floor(msPlayed / 3_600_000);
+          const minutesPlayed = Math.floor((msPlayed % 3_600_000) / 60_000);
+
+          const enemyRoles = new Set(['hostile', 'boss']);
+          const enemiesDefeated = gameState.npcs.filter(n => !n.alive && enemyRoles.has(n.role)).length;
+          const bossesDefeated  = gameState.npcs.filter(n => !n.alive && n.role === 'boss').length;
+          const alliesLost      = gameState.npcs.filter(n => !n.alive && (n.role === 'ally' || n.role === 'companion')).length;
+
+          const questsCompleted = gameState.quests.filter(q => q.status === 'completed').length;
+          const questsFailed    = gameState.quests.filter(q => q.status === 'failed').length;
+          const questsActive    = gameState.quests.filter(q => q.status === 'active' || q.status === 'available').length;
+
+          const locationsVisited = gameState.locations.filter(l => l.visited).length;
+          const locationsTotal   = gameState.locations.length;
+
+          const totalXp   = gameState.characters.reduce((s, c) => s + (c.xp   ?? 0), 0);
+          const totalGold = gameState.characters.reduce((s, c) => s + (c.gold ?? 0), 0);
+
+          const itemsAcquired = allTurns.reduce((sum, t) => {
+              const gained = (t.stateChanges as StateChange)?.itemsGained ?? [];
+              return sum + gained.reduce((s, g) => s + (g.item?.quantity ?? 1), 0);
+          }, 0);
+
+          const stats = {
+              hoursPlayed, minutesPlayed,
+              totalTurns: allTurns.length,
+              totalMessages: allChat.length,
+              enemiesDefeated, bossesDefeated, alliesLost,
+              questsCompleted, questsFailed, questsActive,
+              locationsVisited, locationsTotal,
+              totalXp, totalGold,
+              daysElapsed: gameState.clock?.day ?? 1,
+              itemsAcquired
+          };
+
+          return {
+              adventure: adv,
+              members,
+              gameState,
+              stats,
+              allTurns,
+              allChat,
+              currentUserId: locals.user.id
+          };
+      };
+
+CHANGE 8.3 — Create summary/+page.svelte
+  File: routes/adventures/[id]/summary/+page.svelte  (NEW FILE)
+
+  This file is the page component for the completed adventure chronicle.
+  Important constraints:
+    - NO PartySocket connection (story is frozen)
+    - NO body/html overflow lock ($effect for scroll lock must NOT be added)
+    - NO chat input, NO combat panel, NO dice roll UI
+    - Normal scrollable page layout (no height constraints on root)
+    - Uses GlassPanel component for party cards and quest/world panels
+    - All CSS is scoped inside <style> using CSS custom properties from app.css
+
+  ── SECTION OVERVIEW ──────────────────────────────────────────────────
+
+  1. Hero Banner
+     - "← My Adventures" back link (top left)
+     - Two badges: "Completed" (badge-completed class) + mode badge (badge-solo/badge-multiplayer)
+     - <h1> in var(--font-display) with the adventure name
+     - Meta line: "Completed [date] · Day [N] reached · World: [seed]"
+     - Date formatted via: new Date(ts).toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' })
+
+  2. Stats Bar
+     - A flex-wrap row of .stat-pill elements
+     - Always shown: Time Played (⏱), Turns (🎲), Messages (💬),
+       Enemies Defeated (⚔️), Quests Done (📜), Locations (🗺️),
+       Total XP (🌟), Gold (💰)
+     - Conditionally shown (only if value > 0):
+       Bosses Slain (👑) with .stat-pill-accent border
+       Items Found (🎒)
+       Allies Lost (💀) with .stat-pill-danger border
+
+  3. Party Section ("The Party" heading)
+     - Responsive grid: repeat(auto-fill, minmax(280px, 1fr))
+     - One GlassPanel per character (PlayerCharacter from gameState.characters)
+     - Each card shows:
+       * Avatar circle with initials (first letter of each name word)
+       * Avatar background: color-mix(in srgb, var(--accent) 20%, var(--surface))
+       * Name (h3), race · class/level line, "Played by [username]" if member found
+       * 4-stat grid: XP / HP (current/max) / AC / Gold
+       * Death status (⚰️ Fallen / 💤 Stabilized) if applicable
+       * <details> element for backstory (collapsed by default)
+       * Inventory list: top 5 items + "+N more…" overflow indicator
+
+  4. Quest Chronicle ("Quest Chronicle" heading)
+     - Three GlassPanel columns (auto-fill minmax 280px):
+       * Completed quests — heading: "✓ Completed" in green (var(--accent-2))
+       * Failed quests — heading: "✗ Failed" in red (var(--danger))
+       * Unresolved quests — heading: "◌ Unresolved" in muted colour
+     - Each quest entry shows name, XP/gold rewards, and objectives
+       with ✓/○ per objective (strikethrough on completed objectives)
+
+  5. World & Encounters ("World & Encounters" heading)
+     - Two-column grid (auto-fill minmax 300px):
+       * Locations panel: list with coloured dot (accent = visited, border = unvisited)
+         and type label
+       * NPCs panel: table rows showing name / role / alive status
+         NPCs sorted by role priority: boss → hostile → ally → companion →
+         quest-giver → merchant → neutral
+
+  6. Full Transcript ("The Story" heading)
+     - Wrapped in a single GlassPanel
+     - buildTranscript() function merges allTurns + allChat:
+       * Sort combined array by timestamp
+       * From chat: kind='party', username=c.username
+       * From GM turns: kind='gm-narration' (narrativeText field)
+       * From turns with mechanic results: kind='mechanic' (formatted summary)
+     - Collapsed by default: shows last 20 messages
+     - "Show full story (N messages)" expand button
+     - "Collapse story" button when expanded
+     - Transcript capped at max-height: 600px with overflow-y: auto when collapsed
+     - Message styles:
+       * gm-narration: left border 3px var(--accent), italic text
+       * mechanic:     left border 3px var(--accent-2), smaller muted text
+       * system:       centred, muted
+       * party:        plain, author name above in var(--accent) colour
+
+  ── KEY CSS CLASSES ───────────────────────────────────────────────────
+
+  .summary-page      — page shell, width: min(1200px, calc(100vw - 32px)), centered
+  .hero-banner       — padding 2.5rem 0 2rem, border-bottom: 1px solid var(--border)
+  .hero-title        — font-size: clamp(1.8rem, 4vw, 2.8rem), var(--font-display)
+  .stats-bar         — flex-wrap row, gap 0.65rem
+  .stat-pill         — flex column, min-width 80px, var(--surface) bg, var(--border) border
+  .content-grid      — flex column, gap 2.5rem
+  .party-grid        — repeat(auto-fill, minmax(280px, 1fr))
+  .quests-grid       — repeat(auto-fill, minmax(280px, 1fr)), align-items: start
+  .world-grid        — repeat(auto-fill, minmax(300px, 1fr)), align-items: start
+  .transcript-scroll — max-height 600px, overflow-y: auto, scrollbar-width: thin
+  .section-heading   — uppercase, letter-spacing 0.07em, var(--text-muted), font-size 1.1rem
+  .expand-btn        — ghost button with hover border-color: var(--accent)
+
+  ── RESPONSIVE BREAKPOINT (max-width: 640px) ─────────────────────────
+
+  - .party-grid, .quests-grid, .world-grid → grid-template-columns: 1fr
+  - .stat-pill → min-width: 68px, padding: 0.5rem 0.65rem
+  - .stat-value → font-size: 0.95rem
+
+
+================================================================================
+  APPENDIX A — THEMEPICKER COMPONENT (no changes, reference only)
+  Purpose: Documents the ThemePicker component so implementers understand
+           the theme selection mechanism referenced by Nav.svelte.
+  File: lib/components/ThemePicker.svelte (READ-ONLY reference)
+================================================================================
+
+  ThemePicker is already fully implemented in the original codebase.
+  It was NOT modified in these sessions. It is documented here purely
+  as a reference because it is imported in Nav.svelte.
+
+  Key APIs it exposes (from lib/stores/themeStore.ts):
+    - THEMES: ThemeMeta[] — full list of all 12 theme objects, split into
+        group: 'original' | 'eccentric'; each has id, name, description,
+        swatchBg, swatchAccent, swatchAccent2, colorScheme
+    - themeStore: Svelte writable — current ThemeId as reactive store
+    - setTheme(id: ThemeId): void — saves to localStorage + applies data-theme
+    - ThemeId type: union of all 12 theme id strings
+
+  The ThemePicker renders:
+    - A trigger button (coloured dot + "Theme" label + chevron)
+    - A popover with two sections:
+        Originals: arcane-celestial, dark-academia, void-astral, silver-scroll,
+                   forge-iron, morning-mist, midnight-court, clean-slate
+        Eccentrics: blood-oath, vellum-quill, sakura-court, frozen-spire
+    - Each swatch shows 3 colour dots (bg, accent, accent-2) + DARK/LIGHT badge
+    - Active theme has a ✓ checkmark and highlighted border
+    - Escape key closes the popover; clicking outside the popover closes it
+    - Client-only: no server state, no network calls; local storage only
+
+
+================================================================================
+  APPENDIX B — GLASSPANEL COMPONENT (no changes, reference only)
+  Purpose: Documents the GlassPanel component so implementers understand
+           the surface container used throughout the summary page and cards.
+  File: lib/components/GlassPanel.svelte (READ-ONLY reference)
+================================================================================
+
+  GlassPanel is already fully implemented in the original codebase.
+  It was NOT modified in these sessions. It is used as a container in:
+    - summary/+page.svelte (party cards, quest panels, world panels, transcript)
+
+  Props:
+    - padding?: string — CSS padding value, applied as inline style (default varies)
+
+  Rendered HTML:
+
+      <div class="glass-panel" style="padding: {padding}">
+          <slot />  (or Svelte 5 {#snippet children}, equivalent)
+      </div>
+
+  CSS (inside the component):
+
+      .glass-panel {
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          box-shadow: var(--shadow);
+          backdrop-filter: blur(var(--blur-glass));
+          -webkit-backdrop-filter: blur(var(--blur-glass));
+      }
+
+  Note: The --shadow variable is set to 'none' inside .adventure-screen
+  (see CHANGE 4.4) which removes the shadow from all GlassPanels within
+  the active adventure page. The summary page does NOT do this, so
+  GlassPanels on the summary page retain their default shadow.
+
+
+================================================================================
+  APPENDIX C — DATABASE SCHEMA (no changes, reference only)
+  Purpose: Documents the SQLite tables used by the new and modified server
+           files, so implementers can verify their schema matches.
+  All tables are defined in lib/server/db/schema.ts
+================================================================================
+
+  adventures
+    id            text PRIMARY KEY
+    name          text NOT NULL
+    ownerId       text NOT NULL  (FK → users.id)
+    worldSeed     text
+    mode          text           ('solo' | 'multiplayer')
+    status        text           ('lobby' | 'active' | 'completed')
+    createdAt     integer        (Unix ms timestamp)
+    updatedAt     integer        (Unix ms timestamp)
+
+  adventureMembers
+    adventureId   text  (FK → adventures.id)
+    userId        text  (FK → users.id)
+    role          text  ('owner' | 'player')
+    PRIMARY KEY (adventureId, userId)
+
+  adventureState
+    adventureId   text  (FK → adventures.id)
+    stateJson     text  (JSON-serialised GameState)
+
+  adventureTurns
+    id            text PRIMARY KEY
+    adventureId   text  (FK → adventures.id)
+    turnNumber    integer
+    actorType     text
+    actorId       text
+    action        text
+    intent        text  (JSON)
+    status        text
+    resolvedSummary text
+    mechanicsJson text  (JSON array of MechanicResult)
+    stateChangesJson text (JSON StateChange object)
+    narrativeText text
+    createdAt     integer
+
+  adventureChat
+    id            text PRIMARY KEY
+    adventureId   text  (FK → adventures.id)
+    userId        text
+    username      text
+    text          text
+    mentionsJson  text  (JSON string[])
+    retroInvoked  integer (boolean)
+    consumedByTurn text
+    createdAt     integer
+
+  users
+    id            text PRIMARY KEY
+    username      text NOT NULL
+    avatarUrl     text
+
+
+================================================================================
+  GROUP 9 — DISPLAY HEADING DESCENDER CLIP FIX
+  Purpose: Letters with descenders (g, y, p, q, Q, Y) were visually cut off
+           on all large page-title headings. The bottom stroke of those glyphs
+           appeared to be sliced by an invisible horizontal line.
+  Root cause: Every affected heading uses  -webkit-background-clip: text
+              (gradient fill). With this technique the browser paints the
+              gradient only inside the element's own CSS box. Line-heights of
+              1.1 – 1.15 produce a box that is too tight: descenders extend
+              below the line box, land outside the painted region, and become
+              invisible because -webkit-text-fill-color: transparent has made
+              the real text colour transparent.
+  Fix: Add padding-bottom: 0.15em (0.1em for the summary page heading) to
+       each affected element. Padding expands the element's box downward,
+       giving the background-clip paint region enough room to cover every
+       descender. Line-height was also nudged from 1.1/1.15 → 1.2/1.15 to
+       add consistent breathing room between wrapped lines.
+       The summary page hero-title does NOT use background-clip (plain text
+       colour) but received the same line-height and padding-bottom treatment
+       to prevent any parent overflow: hidden from clipping descenders.
+  Files modified: routes/+page.svelte
+                  routes/about/+page.svelte
+                  routes/reviews/+page.svelte
+                  routes/adventures/[id]/summary/+page.svelte
+  Session date: April 2, 2026
+================================================================================
+
+CHANGE 9.1 — Fix descender clipping on home page hero title
+  File: routes/+page.svelte
+  Class: .hero-title
+
+  ORIGINAL:
+      .hero-title {
+          font-family: var(--font-display);
+          font-size: clamp(2.5rem, 6vw, 4.5rem);
+          font-weight: 800;
+          line-height: 1.1;
+          margin: 0 0 1.5rem;
+          background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+      }
+
+  CHANGED TO:
+      .hero-title {
+          font-family: var(--font-display);
+          font-size: clamp(2.5rem, 6vw, 4.5rem);
+          font-weight: 800;
+          line-height: 1.15;
+          margin: 0 0 1.5rem;
+          padding-bottom: 0.15em;
+          background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+      }
+
+  The mobile @media (max-width: 768px) override for .hero-title only
+  sets font-size: 2.5rem and does not need to be changed — the new
+  line-height and padding-bottom inherit from the base rule.
+
+  Heading text: "Your World. Your Story."
+
+CHANGE 9.2 — Fix descender clipping on About page title
+  File: routes/about/+page.svelte
+  Class: .about-title
+
+  ORIGINAL:
+      .about-title {
+          font-family: var(--font-display);
+          font-size: clamp(2rem, 5vw, 3.5rem);
+          font-weight: 700;
+          line-height: 1.15;
+          margin: 0 0 1.5rem;
+          background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+      }
+
+  CHANGED TO:
+      .about-title {
+          font-family: var(--font-display);
+          font-size: clamp(2rem, 5vw, 3.5rem);
+          font-weight: 700;
+          line-height: 1.2;
+          margin: 0 0 1.5rem;
+          padding-bottom: 0.15em;
+          background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+      }
+
+  Heading text: "What is Project Nornyx?"
+
+CHANGE 9.3 — Fix descender clipping on Reviews page title
+  File: routes/reviews/+page.svelte
+  Class: .reviews-title
+
+  ORIGINAL:
+      .reviews-title {
+          font-family: var(--font-display);
+          font-size: clamp(2rem, 5vw, 3.5rem);
+          font-weight: 700;
+          line-height: 1.15;
+          margin: 0 0 1.25rem;
+          background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+      }
+
+  CHANGED TO:
+      .reviews-title {
+          font-family: var(--font-display);
+          font-size: clamp(2rem, 5vw, 3.5rem);
+          font-weight: 700;
+          line-height: 1.2;
+          margin: 0 0 1.25rem;
+          padding-bottom: 0.15em;
+          background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+      }
+
+  Heading text: "What Adventurers Say"
+
+CHANGE 9.4 — Fix descender clipping on Adventure Summary page title
+  File: routes/adventures/[id]/summary/+page.svelte
+  Class: .hero-title
+
+  NOTE: This heading does NOT use background-clip / gradient fill — it
+  inherits plain text colour. However the parent hero-banner section can
+  produce descender clipping when overflow: hidden is present elsewhere.
+  The same treatment is applied preventively.
+
+  ORIGINAL:
+      .hero-title {
+          margin: 0;
+          font-size: clamp(1.8rem, 4vw, 2.8rem);
+          font-family: var(--font-display);
+          font-weight: 700;
+          line-height: 1.1;
+      }
+
+  CHANGED TO:
+      .hero-title {
+          margin: 0;
+          font-size: clamp(1.8rem, 4vw, 2.8rem);
+          font-family: var(--font-display);
+          font-weight: 700;
+          line-height: 1.2;
+          padding-bottom: 0.1em;
+      }
+
+
+================================================================================
+  GROUP 10 — CHARACTER CREATION DATA LAYER (Phase 1)
+  Purpose: Correct RACES array order, reorder Dragonborn subraces for
+           2-column Chromatic/Metallic display, and remove 'unaligned'
+           from the Alignment type union.
+  Files modified: site/src/lib/game/data/races.ts
+                  site/src/lib/game/types.ts
+================================================================================
+
+CHANGE 10.1 — Reorder RACES array
+  File: site/src/lib/game/data/races.ts
+  Location: export const RACES: RaceDefinition[] = [ ... ]
+
+  Previous order: Human, Elf, Dwarf, Halfling, Half-Orc, Gnome, Tiefling,
+                  Dragonborn, Half-Elf
+
+  New order:      Human, Elf, Half-Elf, Half-Orc, Dragonborn, Tiefling,
+                  Dwarf, Halfling, Gnome
+
+  Only the array element order was changed. No race object contents were
+  modified (descriptions, stat blocks, traits, subraces all unchanged).
+
+CHANGE 10.2 — Reorder Dragonborn subraces for 2-column grid
+  File: site/src/lib/game/data/races.ts
+  Location: subraces array inside the 'dragonborn' race object
+
+  Previous order: black, blue, brass, bronze, copper, gold, green, red,
+                  silver, white (alphabetical)
+
+  New order:      black, copper, blue, bronze, red, brass, gold, green,
+                  white, silver
+
+  Rationale: The 2-column Chromatic/Metallic grid (Phase 2e) will pair
+  rows by damage type. The subrace array order drives the pairing:
+    Row 1 — Black (Acid/Line)       | Copper (Acid/Line)
+    Row 2 — Blue (Lightning/Line)   | Bronze (Lightning/Line)
+    Row 3 — Red (Fire/Cone)         | Brass (Fire/Line)
+    Row 4 — Gold (Fire/Cone)        | Green (Poison/Cone)  [no metallic pair for green]
+    Row 5 — White (Cold/Cone)       | Silver (Cold/Cone)
+
+  No subrace object content was modified.
+
+CHANGE 10.3 — Remove 'unaligned' from Alignment type
+  File: site/src/lib/game/types.ts
+  Location: export type Alignment = ...
+
+  ORIGINAL (last two lines of the union):
+      | 'neutral-evil'
+      | 'chaotic-evil'
+      | 'unaligned';
+
+  CHANGED TO:
+      | 'neutral-evil'
+      | 'chaotic-evil';
+
+  The 'unaligned' value is not a valid player alignment — it applies only
+  to monsters. Removing it from the type union enforces correctness at the
+  TypeScript level.
+  Note: The corresponding UI entry { value: 'unaligned', label: 'Unaligned' }
+  in CharacterCreation.svelte line 88 will be removed in Phase 2f, completing
+  the cleanup.
+
+
+================================================================================
+  GROUP 11 — CHARACTER CREATION SVELTE TEMPLATE FIXES (Phase 2 — Part 1)
+  Purpose: Fix race list sidebar, stat tag labels, and detail-pane section
+           ordering. All changes in CharacterCreation.svelte.
+  Files modified: site/src/lib/components/CharacterCreation.svelte
+  Session date: April 2, 2026
+================================================================================
+
+CHANGE 11.1 — Race list sidebar: remove JS truncation
+  File: lib/components/CharacterCreation.svelte
+  Location: {#each RACES as race} loop, the option-sub span (~line 818)
+
+  ORIGINAL (NOTE: the 'â€¦' below is the literal corrupted string you will
+  find in the source file — it is NOT a document encoding error):
+      <span class="option-sub">{race.description.length > 70 ? race.description.slice(0, 70) + 'â€¦' : race.description}</span>
+
+  CHANGED TO:
+      <span class="option-sub">{race.description}</span>
+
+  Explanation:
+    The JS truncation was producing garbled output due to encoding corruption
+    of the ellipsis character. The .option-sub CSS selector already had
+    -webkit-line-clamp: 2 and overflow: hidden applied, so CSS clipping alone
+    is sufficient. Removing the JS slice also eliminates the corrupted
+    character entirely.
+
+CHANGE 11.2 — Race stat tag row: prefix Size and combine Languages
+  File: lib/components/CharacterCreation.svelte
+  Location: <div class="tag-row"> inside the race detail pane
+
+  ORIGINAL:
+      <span class="tag">{raceDef.size}</span>
+      {#each raceDef.languages as lang}
+          <span class="tag">{lang}</span>
+      {/each}
+
+  CHANGED TO:
+      <span class="tag">Size: {raceDef.size}</span>
+      <span class="tag">Languages: {[...raceDef.languages, ...(subraceDef?.extraLanguages ?? [])].join(', ')}</span>
+
+  Explanation:
+    The Size tag lacked its label. Languages were shown as individual tags
+    with no label. The new single Languages tag joins the base race languages
+    with any subrace extraLanguages (e.g. Drow adds Undercommon), so the tag
+    always reflects the complete language set for the current race+subrace
+    combination.
+
+CHANGE 11.3 — Reorder detail pane: Subrace picker above Ability Bonuses + Traits
+  File: lib/components/CharacterCreation.svelte
+  Location: Right-hand detail pane inside Step 0 (Race)
+
+  ORIGINAL ORDER:
+      description → tag-row → Ability Bonuses → Racial Traits → Subraces
+
+  NEW ORDER:
+      description → tag-row → Subrace picker → Ability Bonuses → Racial Traits
+
+  Implementation: Moved the entire <!-- Subraces --> {#if} block (the
+  detail-section containing the subrace card-list / Dragonborn grid) from
+  after "Traits" to immediately after the tag-row div, before the
+  "Ability Bonuses" detail-section.
+
+  Rationale: Subrace selection changes the ability bonuses displayed, so
+  the user should pick a subrace before seeing the bonuses and traits that
+  depend on it.
+
+
+================================================================================
+  GROUP 12 — CHARACTER CREATION SVELTE TEMPLATE FIXES (Phase 2 — Part 2)
+  Purpose: Effective darkvision override, Dragonborn 2-column grid,
+           remove Unaligned from alignment picker.
+  Files modified: site/src/lib/components/CharacterCreation.svelte
+  Session date: April 2, 2026
+================================================================================
+
+CHANGE 12.1 — Effective darkvision: subrace override $derived
+  File: lib/components/CharacterCreation.svelte
+  Location: Script block, immediately after the subraceDef $derived
+
+  ADD after:
+      let subraceDef = $derived(form.subrace ? getSubrace(form.race, form.subrace) : undefined);
+
+  NEW LINE:
+      let effectiveDarkvision = $derived(
+          (subraceDef?.traits.flatMap(t => t.effects).find(e => e.tag === 'darkvision') as { tag: 'darkvision'; range: number } | undefined)?.range
+          ?? raceDef?.darkvision
+          ?? 0
+      );
+
+  Also change the tag-row darkvision span from:
+      {#if raceDef.darkvision > 0}
+          <span class="tag">Darkvision {raceDef.darkvision} ft.</span>
+      {/if}
+
+  To:
+      {#if effectiveDarkvision > 0}
+          <span class="tag">Darkvision {effectiveDarkvision} ft.</span>
+      {/if}
+
+  Explanation:
+    Some subraces override the base race darkvision range via a
+    { tag: 'darkvision', range: N } effect on a subrace trait. The Dark Elf
+    (Drow) subrace sets range: 120, overriding the base Elf's 60 ft. The
+    derived walks subrace traits, finds the first darkvision effect, and
+    falls back to raceDef.darkvision if absent.
+
+CHANGE 12.2 — Dragonborn 2-column Chromatic / Metallic subrace grid
+  File: lib/components/CharacterCreation.svelte
+  Location: Subrace card-list inside the <!-- Subraces --> detail-section
+
+  When raceDef.name === 'dragonborn', the flat <div class="card-list"> is
+  replaced with a purpose-built 2-column CSS grid. All other races retain
+  the original card-list.
+
+  Grid pairs (left = Chromatic, right = Metallic):
+      Black / Copper   (Acid — Line)
+      Blue  / Bronze   (Lightning — Line)
+      Red   / Brass    (Fire — Cone / Line)
+      empty / Gold     (Fire — Cone)
+      Green / empty    (Poison — Cone)
+      White / Silver   (Cold — Cone)
+
+  Card subtitle is extracted at render time:
+      sr.traits[0]?.name + ' — ' + capitalize(breathWeaponShape)
+  where breathWeaponShape comes from the 'breath-weapon' effect on the
+  subrace's first trait (shape: 'line' | 'cone').
+
+  New CSS selectors added to <style>:
+      .subrace-dragon-grid  — display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem
+      .dragon-col-header    — uppercase label row ("Chromatic" / "Metallic")
+      .dragon-empty         — invisible placeholder to hold grid alignment
+
+  Relies on Dragonborn subraces being ordered correctly (CHANGE 10.2).
+
+CHANGE 12.3 — Remove 'unaligned' from alignments array
+  File: lib/components/CharacterCreation.svelte
+  Location: const alignments = [ ... ] as const; (was ~line 88)
+
+  REMOVED LINE:
+      { value: 'unaligned', label: 'Unaligned' }
+
+  The alignments array now has exactly 9 entries. The alignment-grid CSS
+  already uses grid-template-columns: repeat(3, 1fr), so the result is a
+  clean 3×3 grid with no orphaned cell.
+  Completes the cleanup started in CHANGE 10.3 (types.ts).
+
+
+================================================================================
+  GROUP 13 — CHARACTER CREATION ENCODING FIXES & POINT BUY (Phase 2g–2i)
+  Purpose: Fix all UTF-8 double-encoding corruption, remove feat description
+           truncation, add point buy clamping and improved hints.
+  Files modified: site/src/lib/components/CharacterCreation.svelte
+  Session date: April 2, 2026
+
+  Root cause of encoding corruption:
+    The file's original author likely edited the file in an editor that
+    re-saved it treating the UTF-8 content as Latin-1/Windows-1252, causing
+    each 2–3 byte UTF-8 sequence to be interpreted as individual Latin-1
+    characters and then re-encoded as UTF-8. Result: every special character
+    became a 2–4 character garbled sequence. The fix was applied via byte-
+    level PowerShell replacement targeting the known corrupt byte patterns.
+================================================================================
+
+CHANGE 13.1 — Global encoding corruption fix (2g)
+  File: lib/components/CharacterCreation.svelte
+  Method: PowerShell [System.IO.File]::ReadAllText + string Replace + WriteAllText
+
+  Five corruption patterns replaced globally across the file (18 total instances):
+
+  Pattern   | Corrupt chars (codepoints)      | Correct char (codepoint)
+  ----------|----------------------------------|---------------------------
+  Em dash   | [226, 8364, 8221] → â + € + "  | — (8212, U+2014)
+  Bullet    | [226, 8364, 162]  → â + € + ¢  | • (8226, U+2022)
+  Math minus| [226, 710, 8217]  → â + ˆ + '  | - (45, ASCII hyphen-minus)
+  Middle dot| [194, 183]        → Â + ·       | · (183, U+00B7)
+  Ellipsis  | [226, 8364, 166]  → â + € + ¦  | … (8230, U+2026)
+
+  Instance counts fixed:
+    Em dash   — 4 instances (formatLabel return, summary hint, 2× summary-details)
+    Bullet    — 1 instance (err-item span in error strip)
+    Math minus — 1 instance (ab-btn minus button label in ability builder)
+    Middle dot — 9 instances (step comment separators + 2 in summary hint line)
+    Ellipsis  — 3 instances (Creating… button, feat truncation expression, one other)
+
+  Specific locations called out in plan (2g table):
+    ~~Line 819: removed by 2a (already done)~~
+    Line ~797: err-item bullet → fixed (now •)
+    Line ~942: ellipsis in feat truncation → fixed, then removed (see CHANGE 13.2)
+    Line ~1184: minus button content → fixed (now -)
+    Line ~1201: em dash in locked-in hint → fixed (now —)  [also covers 2i]
+    Line ~268: formatLabel return → fixed (now '—')
+    Line ~1427: middle dot separators → fixed (now ·)
+    Line ~1452: summary hint separators + em dash fallback → fixed
+    Line ~1487: 'Creating…' button → fixed (now 'Creating…')
+
+CHANGE 13.2 — Remove feat description truncation (2g line 917)
+  File: lib/components/CharacterCreation.svelte
+  Location: Variant Human feat picker, inside {#each FEATS as feat}
+
+  ORIGINAL:
+      <small>{feat.description.length > 100 ? feat.description.slice(0, 100) + '…' : feat.description}</small>
+
+  CHANGED TO:
+      <small>{feat.description}</small>
+
+  Explanation: Full descriptions are now shown. The same pattern as 2a
+  (race description sidebar) — CSS alone wraps and clips the content.
+
+CHANGE 13.3 — Point buy: updateAbility() value clamping (2h)
+  File: lib/components/CharacterCreation.svelte
+  Location: function updateAbility(), script block
+
+  ORIGINAL:
+      function updateAbility(ability: AbilityName, value: string) {
+          const next = Number(value);
+          if (!form.abilityAssignment || Number.isNaN(next)) return;
+          form.abilityAssignment = { ...form.abilityAssignment, [ability]: next };
+          syncSpellState();
+      }
+
+  CHANGED TO:
+      function updateAbility(ability: AbilityName, value: string) {
+          const next = Number(value);
+          if (!form.abilityAssignment || Number.isNaN(next)) return;
+          const min = form.statMethod === 'rolled' ? 3 : 8;
+          const max = form.statMethod === 'rolled' ? 18 : 15;
+          form.abilityAssignment = { ...form.abilityAssignment, [ability]: Math.min(max, Math.max(min, next)) };
+          syncSpellState();
+      }
+
+  Explanation: HTML min/max attributes only block the spinner buttons;
+  typed values bypass them. Clamping in JS ensures no value outside the
+  legal range can persist in state regardless of input method.
+  Range: point-buy → 8–15, rolled → 3–18, standard → (no input, N/A).
+
+CHANGE 13.4 — Point buy: budget bar hint line + correct block structure (2h)
+  File: lib/components/CharacterCreation.svelte
+  Location: Abilities step (step === 3), the point-buy conditional block and
+            the ability-grid-builder loop that follows it.
+
+  IMPORTANT: The {#if form.statMethod === 'point-buy'} block must be CLOSED
+  before the <div class="ability-grid-builder"> wrapper. The hint <p> belongs
+  INSIDE the {#if} block (visible only in point-buy mode), with {/if} following
+  it. The {#each abilityOrder as ability} loop is INSIDE the grid div, NOT
+  inside the {#if} block — abilities are always rendered regardless of method.
+
+  CORRECT BLOCK STRUCTURE (replace the existing point-buy block + grid div):
+
+      {#if form.statMethod === 'point-buy'}
+          <div class="budget-bar" class:over={!pointBuySummary.valid && pointBuySummary.remaining < 0}>
+              <span>Points spent: <strong>{pointBuySummary.spent}</strong> / 27</span>
+              <span>Remaining: <strong>{pointBuySummary.remaining}</strong></span>
+          </div>
+          <p class="hint">Each score: 8 (0 pts) to 15 (9 pts) — total budget: 27 pts</p>
+      {/if}
+
+      <div class="ability-grid-builder">
+          {#each abilityOrder as ability}
+              {@const base = form.abilityAssignment?.[ability] ?? 10}
+              ... (ability card content — unchanged)
+          {/each}
+      </div>
+
+  Key rules enforced by this structure:
+    1. The budget-bar and hint are only shown in point-buy mode.
+    2. The {/if} closes BEFORE the grid div — never nest {#each} inside {#if}.
+    3. The ability cards render in all three stat methods (standard, rolled, point-buy).
+  
+  CSS note: .hint uses the existing muted small-text style (no new CSS needed).
+
+CHANGE 13.5 — Point buy: improved error message (2h)
+  File: lib/components/CharacterCreation.svelte
+  Location: getStepErrors(), step === 3 branch
+
+  ORIGINAL:
+      issues.push({ field: 'abilityAssignment', message: 'Spend exactly 27 points for point buy.' });
+
+  CHANGED TO:
+      issues.push({ field: 'abilityAssignment', message: 'Point buy: spend exactly 27 points. Scores must be 8–15 before racial bonuses.' });
+
+NOTE 13.6 — Skills page "locked in" hint (no separate action required)
+  This entry is for reference only. The em dash in Step 4's fixed-skills
+  hint paragraph is one of the 4 em dash instances fixed automatically by
+  the global PowerShell replacement in CHANGE 13.1.
+  Do NOT make an additional targeted edit for this line — CHANGE 13.1
+  already covers it. If CHANGE 13.1 was applied correctly, this line will
+  read: Granted by your background and race — these are locked in.
+
+
+================================================================================
+  GROUP 14 — HOTFIX: TEMPLATE STRUCTURE REGRESSION (Session 4)
+  Purpose: Restore the correct Svelte block structure in CharacterCreation.svelte
+           that was accidentally destroyed during the CHANGE 13.4 edit.
+  Files modified: site/src/lib/components/CharacterCreation.svelte
+  Session date: April 6, 2026
+
+  Root cause:
+    The replace_string_in_file edit for CHANGE 13.4 used an oldString that
+    extended into the surrounding structural lines ({/if}, <div>, {#each}) but
+    the newString omitted those lines. As a result three structural lines were
+    silently deleted:
+      (1) {/if}  — closing the point-buy conditional
+      (2) <div class="ability-grid-builder">  — wrapper for the ability cards
+      (3) {#each abilityOrder as ability}  — loop opener
+    This left a dangling {/each} with no matching {#each}, causing Svelte to
+    throw "Expected token if" at compile time. Every route importing the
+    component returned HTTP 500.
+
+  CHANGE 13.4 has been updated in this document to specify the full correct
+  block structure (see above) so it cannot be reproduced incorrectly.
+
+================================================================================
+CHANGE 14.1 — Restore deleted template lines (hotfix)
+  File: lib/components/CharacterCreation.svelte
+  Location: Abilities step, point-buy conditional + ability grid block
+
+  Applied via PowerShell array splice (not replace_string_in_file) to preserve
+  exact tab indentation and bypass special-character matching issues.
+
+  Lines restored (all at indent level relative to step content, using tabs):
+    Depth-8 : <p class="hint">...</p>   ← re-indented from 7T→8T (inside {#if})
+    Depth-7 : {/if}                     ← re-added (closes point-buy {#if})
+    (blank line)
+    Depth-7 : <div class="ability-grid-builder">   ← re-added
+    Depth-8 : {#each abilityOrder as ability}       ← re-added
+
+  All @const lines, ability card content, {/each}, and </div> that already
+  existed in the file required no changes — their indentation was correct.
+
+  Verification: get_errors on CharacterCreation.svelte → 0 errors after fix.
+
+
+================================================================================
+  GROUP 15 — ABILITY SCORES SCREEN OVERHAUL (Phases A, B, C, D)
+  Purpose: Replace the shared single-state ability editor with three
+           fully independent stat-method experiences:
+           Standard Array → drag-and-drop chips
+           Point Buy → + / span / - with no text input
+           Rolled → enlarged 3×2 cards with live dice breakdown
+  Files modified: site/src/lib/components/CharacterCreation.svelte
+  Session date: April 6, 2026
+================================================================================
+
+CHANGE 15.1 — Per-method independent ability state (Phase A)
+  File: lib/components/CharacterCreation.svelte
+  Location: Script block — new $state vars after rolledSeed, rewritten
+            setStatMethod, updated rerollStats.
+
+  PROBLEM: form.abilityAssignment was a single reactive object shared across
+  all three stat methods. Switching methods reset or overwrote the other
+  method's values, so e.g. a point-buy score of 1599 would appear in standard
+  array when switching.
+
+  SOLUTION: Three save-slots.
+
+  NEW STATE (add after let rolledSeed = $state(0)):
+      let savedStandard = $state<AbilityScores>({ str: 15, dex: 13, con: 14, int: 10, wis: 12, cha: 8 });
+      let savedPointBuy = $state<AbilityScores>({ str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 });
+      let savedRolled   = $state<AbilityScores>({ str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 });
+
+  REWRITE setStatMethod to save then restore:
+      function setStatMethod(method) {
+          // 1. Save departing method's current assignment
+          if (form.abilityAssignment) {
+              if (form.statMethod === 'standard')  savedStandard = { ...form.abilityAssignment };
+              else if (form.statMethod === 'point-buy') savedPointBuy = { ...form.abilityAssignment };
+              else if (form.statMethod === 'rolled')    savedRolled  = { ...form.abilityAssignment };
+          }
+          // 2. Switch and restore
+          form.statMethod = method;
+          if (method === 'standard')  { form.abilityAssignment = { ...savedStandard };  syncStandardSlots(); syncSpellState(); }
+          if (method === 'point-buy') { form.abilityAssignment = { ...savedPointBuy };  syncSpellState(); }
+          if (method === 'rolled') {
+              if (rolledSeed === 0) rerollStats(); // first visit — generate fresh roll
+              else { form.abilityAssignment = { ...savedRolled }; syncSpellState(); }
+          }
+      }
+
+  ADD to rerollStats: after building assignment, before syncSpellState():
+      savedRolled = { ...assignment };
+
+  Rule: NEVER call rerollStats() when switching back to 'rolled' if rolledSeed > 0.
+  This preserves the player's current roll set across method switches.
+
+CHANGE 15.2 — Rolled mode: dice tracking + enlarged 3×2 grid (Phase B)
+  File: lib/components/CharacterCreation.svelte
+
+  NEW STATE (after savedRolled):
+      let rolledDice = $state<Record<AbilityName, number[]>>({
+          str: [], dex: [], con: [], int: [], wis: [], cha: []
+      });
+
+  REWRITE roll4d6DropLowest — returns object with dice array:
+      function roll4d6DropLowest(): { total: number; dice: number[] } {
+          const dice = Array.from({ length: 4 }, () =>
+              Math.floor(Math.random() * 6) + 1).sort((a, b) => a - b);
+          return { total: dice[1] + dice[2] + dice[3], dice };
+      }
+      // dice[0] = dropped (lowest), dice[1..3] = kept (ascending)
+
+  REWRITE rerollStats body — sort by .total, populate rolledDice:
+      const rollResults = Array.from({ length: 6 }, () =>
+          roll4d6DropLowest()).sort((a, b) => b.total - a.total);
+      const dmap: Record<AbilityName, number[]> = { str:[],dex:[],con:[],int:[],wis:[],cha:[] };
+      ordered.forEach((ability, index) => {
+          assignment[ability] = rollResults[index].total;
+          dmap[ability] = rollResults[index].dice;
+      });
+      rolledDice = dmap;
+
+  TEMPLATE — ability-grid-builder:
+      <div class="ability-grid-builder" class:rolled={form.statMethod === 'rolled'}>
+
+  TEMPLATE — ability card becomes row layout when rolled:
+      <div class="ability-builder-card" class:rolled-card={form.statMethod === 'rolled'}>
+          <div class="ab-left">
+              ... (label, controls [point-buy only], breakdown, total)
+          </div>
+          {#if form.statMethod === 'rolled' && rolledDice[ability].length > 0}
+              {@const d = rolledDice[ability]}
+              <div class="dice-display">
+                  <span class="dice-rolled">{d[3]} · {d[2]} · {d[1]} · <s>{d[0]}</s></span>
+                  <span class="dice-calc">kept: {d[1]}+{d[2]}+{d[3]} = {d[1]+d[2]+d[3]}</span>
+              </div>
+          {/if}
+      </div>
+      <!-- dice[0] displayed as <s> (struck-through); d[3] highest value shown first -->
+
+  NEW CSS:
+      .ability-grid-builder.rolled { grid-template-columns: repeat(3, 1fr); }
+      .ability-builder-card.rolled-card { flex-direction: row; justify-content: space-between;
+          align-items: center; padding: 0.85rem 0.9rem; min-height: 5rem; gap: 0.5rem; }
+      .ab-left { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; }
+      .dice-display { display: flex; flex-direction: column; align-items: flex-end;
+          gap: 0.3rem; flex: 1; }
+      .dice-rolled { font-size: 0.8rem; color: var(--text-muted); font-family: monospace; }
+      .dice-rolled s { color: rgba(255,96,96,0.65); text-decoration-color: rgba(255,96,96,0.65); }
+      .dice-calc { font-size: 0.78rem; color: var(--accent); }
+
+CHANGE 15.3 — Standard array: drag-and-drop assignment (Phase C)
+  File: lib/components/CharacterCreation.svelte
+
+  NEW STATE (after rolledDice — type alias + three state vars):
+      type StandardDragSrc =
+          | { value: number; from: 'pool' }
+          | { value: number; from: 'slot'; ability: AbilityName };
+      let standardSlots  = $state<Partial<Record<AbilityName, number>>>
+          ({ str: 15, dex: 13, con: 14, int: 10, wis: 12, cha: 8 });
+      let dragSource     = $state<StandardDragSrc | null>(null);
+      let dragOverTarget = $state<AbilityName | 'pool' | null>(null);
+
+  NEW DERIVED (after pointBuySummary):
+      let standardPool = $derived.by(() => {
+          const used = new Set(Object.values(standardSlots)
+              .filter((v): v is number => v !== undefined));
+          return STANDARD_ARRAY.filter(v => !used.has(v));
+      });
+
+  NEW FUNCTIONS (between setStatMethod and updateAbility):
+
+      syncStandardSlots()       — copies savedStandard → standardSlots
+                                  called when entering standard mode
+      syncStandardAssignment()  — writes standardSlots → form.abilityAssignment,
+                                  saves back to savedStandard, calls syncSpellState
+      startDrag(src)            — sets dragSource = src
+      endDrag()                 — clears dragSource and dragOverTarget
+      dropOnSlot(target)        — moves/swaps chip from pool or another slot into target
+      dropOnPool()              — unassigns chip from a slot, returns to pool
+
+  DRAG RULES:
+      pool chip → ability slot : assigns value to slot
+      slot chip → another slot : swaps the two values
+      slot chip → pool         : unassigns, value returns to pool tray
+      A local 'src = dragSource' copy is used inside handlers to allow TypeScript
+      to narrow the discriminated union (from 'pool' | 'slot').
+
+  TEMPLATE — inside ability card ab-left, after point-buy controls:
+      {:else if form.statMethod === 'standard'}
+          <div class="ab-drop-slot"
+               class:occupied={standardSlots[ability] !== undefined}
+               class:drag-over={dragOverTarget === ability}
+               ondragover ...  ondragleave ...  ondrop={() => dropOnSlot(ability)}>
+              {#if standardSlots[ability] !== undefined}
+                  <div class="pool-chip in-slot" draggable="true"
+                       ondragstart={() => startDrag({ value: standardSlots[ability]!,
+                           from: 'slot', ability })}>
+                      {standardSlots[ability]}
+                  </div>
+              {:else}
+                  <span class="drop-hint">drop here</span>
+              {/if}
+          </div>
+
+  TEMPLATE — pool tray below ability grid (replaces old standard hint <p>):
+      {#if form.statMethod === 'standard'}
+          <div class="standard-pool" class:drag-over-pool ondragover ondrop={() => dropOnPool()}>
+              {#each standardPool as val (val)}
+                  <div class="pool-chip" draggable="true"
+                       ondragstart={() => startDrag({ value: val, from: 'pool' })}>
+                      {val}
+                  </div>
+              {/each}
+              {#if standardPool.length === 0}
+                  <span class="pool-empty">All values assigned</span>
+              {/if}
+          </div>
+          <p class="standard-hint">Assign the values {STANDARD_ARRAY.join(', ')} to your abilities in any order.</p>
+      {/if}
+
+  VALIDATION UPDATE (getStepErrors step 3):
+      ORIGINAL: no check for incomplete standard array
+      ADDED:
+          } else if (form.statMethod === 'standard' && standardPool.length > 0) {
+              issues.push({ field: 'abilityAssignment',
+                  message: `Assign all 6 values. Unplaced: ${standardPool.join(', ')}.` });
+
+  NEW CSS: .standard-pool, .standard-pool.drag-over-pool, .pool-chip,
+           .pool-chip:active, .pool-chip.in-slot, .pool-empty, .ab-drop-slot,
+           .ab-drop-slot.drag-over, .drop-hint, .standard-hint (font-size: 1rem)
+
+CHANGE 15.4 — Remove text inputs from all stat methods (Phase D)
+  File: lib/components/CharacterCreation.svelte
+
+  ORIGINAL (all 3 methods shared one ab-control block):
+      <div class="ab-control">
+          <button ...disabled={form.statMethod === 'standard'}>-</button>
+          <input type="number" class="ab-input" ... oninput />
+          <button ...disabled={form.statMethod === 'standard'}>+</button>
+      </div>
+
+  CHANGED TO (method-conditional, no input element anywhere):
+      {#if form.statMethod === 'point-buy'}
+          <div class="ab-control">
+              <button type="button" class="ab-btn" onclick={...}>-</button>
+              <span class="ab-value">{base}</span>
+              <button type="button" class="ab-btn" onclick={...}>+</button>
+          </div>
+      {:else if form.statMethod === 'standard'}
+          [ab-drop-slot — see CHANGE 15.3]
+      {/if}
+      [rolled mode: no controls, only dice-display from CHANGE 15.2]
+
+  CSS: removed .ab-input and its -webkit/-moz spinner-hiding rules entirely.
+       Added .ab-value { width: 2.8rem; text-align: center; font-size: 1rem; font-weight: 600; }
+
+  Note: updateAbility() still handles clamping for point-buy (from CHANGE 13.3).
+  Standard array and rolled no longer call updateAbility — scores are set only
+  via drag-and-drop (standard) or rerollStats() (rolled).
+
+
+================================================================================
+  GROUP 16 — HOTFIX: validateStep BRACE REGRESSION (Session 5)
+  Purpose: Restore correct brace structure in validateStep() step===3 block.
+  Files modified: site/src/lib/components/CharacterCreation.svelte
+  Session date: April 6, 2026
+
+  Root cause:
+    The multi_replace_string_in_file call that added the standard-pool validation
+    branch to validateStep() produced malformed output. The inserted } else if
+    line had 4-tab indentation instead of 3-tab, which caused the outer
+    if (step === 3) closing brace } to land BEFORE the else-if body was closed.
+    The entire rest of validateStep (step 4, step 5, and all subsequent functions)
+    became syntactically nested inside an unclosed else-if block, leaving braces
+    unbalanced at the </script> tag → "Unexpected token" parse error line 814.
+
+  Pattern to avoid: When a multi_replace newString contains template literals
+    (backtick strings with ${...}) nested inside JSON string parameters, the
+    indentation of closing braces must be verified against 0-indexed line
+    numbers with a PowerShell preview before writing. Always check the closing
+    } count after any edit that changes brace nesting.
+
+================================================================================
+CHANGE 16.1 — Restore validateStep step===3 block (hotfix)
+  File: lib/components/CharacterCreation.svelte
+  Location: validateStep(), if (step === 3) block — lines formerly 712-717
+
+  BROKEN STATE (after regression):
+      if (step === 3) {                        // 2T open
+          if (!form.abilityAssignment) {       // 3T
+              issues.push(...)                 // 4T
+              } else if (form.statMethod === 'standard' ...) {  // 4T WRONG
+                  issues.push(...)             // 5T
+      }                                        // 2T — closed outer; else-if still open!
+      if (step === 4) { ...                    // nested inside open else-if — parse error
+
+  CORRECT STATE (after fix):
+      if (step === 3) {                                      // 2T
+          if (!form.abilityAssignment) {                     // 3T
+              issues.push(... 'Assign your ability scores.')  // 4T
+          } else if (form.statMethod === 'standard' ...) {   // 3T correct
+              issues.push(... `Assign all 6 values...`)      // 4T
+          } else if (form.statMethod === 'point-buy' ...) {  // 3T
+              issues.push(... 'Point buy: spend exactly 27 points...')  // 4T
+          }                                                  // 3T
+      }                                                      // 2T — outer closed
+
+  Applied via PowerShell array splice (lines 713–717 → 8-line replacement).
+  Verification: get_errors → 0 errors.
+
+
+================================================================================
+  GROUP 17 — DRAG-DROP THEME COLORS + CHARACTERSHEET STATS RESTRUCTURE (Session 6)
+  Purpose: (A) Make standard-array drag-drop chips/slots use theme CSS variables.
+           (B) Start all 6 chips in the pool tray on first load (empty slots).
+           (C) Restructure CharacterSheet header stats block: HP bar, passive
+               perception line item, and 4 fully-labeled stat boxes.
+  Files modified: site/src/lib/components/CharacterCreation.svelte
+                  site/src/lib/components/CharacterSheet.svelte
+  Session date: April 6, 2026
+
+================================================================================
+CHANGE 17.1 — Empty savedStandard initial state
+  File: lib/components/CharacterCreation.svelte
+  Location: $state declarations block (~line 106)
+
+  OLD: let savedStandard = $state<AbilityScores>({ str: 15, dex: 13, con: 14, int: 10, wis: 12, cha: 8 });
+  NEW: let savedStandard = $state<Partial<Record<AbilityName, number>>>({});
+
+  Reason: savedStandard now mirrors standardSlots (a sparse partial), not the
+  full AbilityScores shape. Initializing it empty ensures first load starts
+  with all chips in the pool.
+  Note: This supersedes the savedStandard declaration in CHANGE 15.1, which
+  typed it as $state<AbilityScores>. If applying changes in group order,
+  use this CHANGE 17.1 type and initial value — discard the 15.1 version.
+
+================================================================================
+CHANGE 17.2 — Empty standardSlots initial state
+  File: lib/components/CharacterCreation.svelte
+  Location: $state declarations block (~line 111)
+
+  OLD: let standardSlots = $state<Partial<Record<AbilityName, number>>>({ str: 15, ...6 keys... });
+  NEW: let standardSlots = $state<Partial<Record<AbilityName, number>>>({});
+
+  Reason: Starting with no slots filled causes standardPool (derived) to return
+  all 6 STANDARD_ARRAY values, so all chips appear in the pool tray on first load.
+
+================================================================================
+CHANGE 17.3 — Fix departure save in setStatMethod
+  File: lib/components/CharacterCreation.svelte
+  Location: setStatMethod(), departure guard (~line 450)
+
+  OLD: if (form.statMethod === 'standard') savedStandard = { ...form.abilityAssignment };
+  NEW: if (form.statMethod === 'standard') savedStandard = { ...standardSlots };
+
+  Reason: Saving form.abilityAssignment (a full 6-key object with base-fallback
+  10s) would inflate standardSlots on the return visit with phantom "10" chips
+  appearing pre-placed. Saving standardSlots (the sparse partial) correctly
+  preserves only the chips the user actually dragged onto slots.
+
+================================================================================
+CHANGE 17.4 — Fix standard-arrival block in setStatMethod
+  File: lib/components/CharacterCreation.svelte
+  Location: setStatMethod(), if (method === 'standard') block (~lines 455-458)
+
+  OLD:
+      if (method === 'standard') {
+          form.abilityAssignment = { ...savedStandard };
+          syncStandardSlots();
+          syncSpellState();
+      }
+  NEW:
+      if (method === 'standard') {
+          syncStandardSlots();
+          syncStandardAssignment();
+      }
+
+  Reason: Direct spread of savedStandard (now a Partial) into form.abilityAssignment
+  would produce an incomplete AbilityScores object. Calling syncStandardAssignment()
+  instead correctly merges standardSlots over a base-10 fallback. syncSpellState()
+  is now redundant here since syncStandardAssignment() calls it internally.
+
+================================================================================
+CHANGE 17.5 — Remove savedStandard sync from syncStandardAssignment
+  File: lib/components/CharacterCreation.svelte
+  Location: syncStandardAssignment() body (~line 480)
+
+  Removed line: savedStandard = { ...form.abilityAssignment };
+
+  Reason: syncStandardAssignment() is called on every drag-drop event. Syncing
+  savedStandard from form.abilityAssignment (full 6 keys + base fallbacks) on
+  every drop would immediately corrupt savedStandard with phantom fallback values,
+  undoing the empty-pool fix. savedStandard is now only written in the departure
+  save of setStatMethod.
+
+================================================================================
+CHANGE 17.6 — Theme-reactive standard pool CSS
+  File: lib/components/CharacterCreation.svelte
+  Location: CSS — .standard-pool, .standard-pool.drag-over-pool (~lines 2161-2176)
+
+  Replaced hardcoded rgba(255,255,255,0.15) border and rgba(124,156,255,...) accents
+  with var(--border) and color-mix(in srgb, var(--accent) X%, transparent).
+
+  .standard-pool border: 1px dashed var(--border)
+  .standard-pool.drag-over-pool:
+      background: color-mix(in srgb, var(--accent) 8%, transparent)
+      border-color: color-mix(in srgb, var(--accent) 40%, transparent)
+
+================================================================================
+CHANGE 17.7 — Theme-reactive pool chip CSS
+  File: lib/components/CharacterCreation.svelte
+  Location: CSS — .pool-chip, .pool-chip.in-slot (~lines 2177-2196)
+
+  .pool-chip border: 1px solid var(--border)
+  .pool-chip.in-slot:
+      background: color-mix(in srgb, var(--accent) 18%, transparent)
+      border-color: color-mix(in srgb, var(--accent) 40%, transparent)
+
+================================================================================
+CHANGE 17.8 — Theme-reactive ab-drop-slot CSS
+  File: lib/components/CharacterCreation.svelte
+  Location: CSS — .ab-drop-slot, .ab-drop-slot.drag-over (~lines 2197-2210)
+
+  .ab-drop-slot border: 1px dashed var(--border)
+  .ab-drop-slot.drag-over:
+      border-color: color-mix(in srgb, var(--accent) 55%, transparent)
+      background: color-mix(in srgb, var(--accent) 9%, transparent)
+
+================================================================================
+CHANGE 17.9 — CharacterSheet header stats restructure
+  File: lib/components/CharacterSheet.svelte
+  Location: .sheet-header right column (lines 35-41 → 35-50)
+
+  OLD: <div class="core-stats"> with 3 boxes: HP, AC, Prof
+  NEW: <div class="stats-block"> containing:
+    1. <div class="hp-bar"> — full-width bar (label left, value right)
+    2. <p class="passive-line"> Passive Perception: {character.passivePerception}
+    3. <div class="core-stats"> — 4 boxes:
+         AC | Proficiency (+{proficiencyBonus}) | Speed ({speed} ft) | Initiative (DEX mod)
+
+  Initiative value = signed(abilityModifier(character.abilities.dex))
+  "Prof" relabeled → "Proficiency" (fully spelled)
+  "Initiative" fully spelled (new — was absent before)
+  Speed moved from Combat list to stat boxes
+  Passive Perception moved from Combat list to header line item
+
+================================================================================
+CHANGE 17.10 — Remove Speed and Passive Perception from Combat section list
+  File: lib/components/CharacterSheet.svelte
+  Location: <section> Combat <ul> (lines 54-62)
+
+  Removed:
+    <li>Speed: {character.speed} ft</li>
+    <li>Passive Perception: {character.passivePerception}</li>
+
+  Both values now shown in the header stats block (CHANGE 17.9).
+
+================================================================================
+CHANGE 17.11 — CharacterSheet CSS additions and updates
+  File: lib/components/CharacterSheet.svelte
+  Location: <style> block
+
+  ADDED .stats-block:
+    display: flex; flex-direction: column; gap: 0.5rem; min-width: 280px
+
+  ADDED .hp-bar (layout):
+    display: flex; justify-content: space-between; align-items: center
+  ADDED .hp-bar span: font-size: 0.78rem; color: var(--text-muted)
+  ADDED .hp-bar strong: font-size: 1.1rem
+
+  ADDED .passive-line: font-size: 0.85rem; color: var(--text-muted)
+
+  CHANGED .core-stats:
+    grid-template-columns: repeat(4, minmax(0, 1fr)) (was 3)
+    min-width: 280px (was 220px)
+
+  ADDED .core-stats span: font-size: 0.7rem
+    (shrinks label text so "Proficiency" fits in narrow grid cells)
+
+  ADDED .hp-bar to shared card selector:
+    .hp-bar, .core-stats div, .ability-card, section { padding/radius/bg/border }
+
+  CHANGED @media (max-width: 768px):
+    Added: .stats-block { min-width: unset }
+    Added: .core-stats { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+    (4-column box row collapses to 2×2 grid on mobile)
+
+  Verification: get_errors → 0 errors on both files.
+
+
+================================================================================
+  GROUP 18 — JOURNALPANEL STATUS SLIDE: UNABBREVIATE STAT LABELS (Session 6)
+  Purpose: Spell out truncated labels "Init", "Prof", "Passive Perc" in full
+           on the Status slide of the active adventures sidebar.
+  Files modified: site/src/lib/components/JournalPanel.svelte
+  Session date: April 6, 2026
+
+================================================================================
+CHANGE 18.1 — Unabbreviate three stat card labels
+  File: lib/components/JournalPanel.svelte
+  Location: .core-row inside the Status slide (~lines 190, 194, 198)
+
+  "Init"         → "Initiative"
+  "Prof"         → "Proficiency"
+  "Passive Perc" → "Passive Perception"
+
+  AC and Speed labels were already fully spelled; unchanged.
+
+================================================================================
+CHANGE 18.2 — Allow label text wrapping in stat cards
+  File: lib/components/JournalPanel.svelte
+  Location: CSS — .core-label (~line 793)
+
+  Added: text-align: center; white-space: normal; line-height: 1.2;
+
+  Reason: Without wrapping enabled, multi-word labels like "Passive Perception"
+  would overflow the narrow .core-stat card (min-width: 52px). Allowing wrap
+  lets the label break across two lines while remaining centered under the value.
+
+  Verification: get_errors → 0 errors.
+
+
+================================================================================
+  GROUP 19 — ORANGE & LEAD DRAGONBORN + GRID REORDER + TYPE SEPARATORS (Session 6)
+  Purpose: Add two new Dragonborn subraces (Orange/Fire and Lead/Poison),
+           reorder the entire 2-column subrace grid so fire is at the top and
+           poison at the bottom, align damage types across columns, order
+           chromatics by colour spectrum and metallics by precious-metal value,
+           and add thin CSS divider lines between each damage-type group.
+  Files modified: site/src/lib/game/data/races.ts
+                  site/src/lib/components/CharacterCreation.svelte
+  Session date: April 6, 2026
+
+  New subrace design decisions:
+    Orange (Chromatic/Fire) — copyright-clear; no TTRPG publisher has ever
+      claimed "Orange Dragon" as a type. Orange is biology's universal warning
+      colour (dart frogs, monarch butterflies) but shares fire damage with Red
+      for a second chromatic fire entry at the top of the grid. Mechanics are
+      identical to Red (15 ft. cone, fire damage + fire resistance).
+    Lead (Metallic/Poison) — copyright-clear; no D&D edition, supplement, or
+      third-party publisher has published a "Lead Dragon" type. Lead's real-
+      world toxicology (accumulative heavy-metal poisoning, cognitive effects,
+      "sugar of lead" sweet scent masking danger) makes it narratively distinct
+      from Green. Mechanics are identical to Green (15 ft. cone, poison damage
+      + poison resistance).
+
+  New grid order:
+    Row 1 — Red (Fire/Cone)     | Gold (Fire/Cone)
+    Row 2 — Orange (Fire/Cone)  | Brass (Fire/Line)
+    ── fire separator ──────────────────────────────
+    Row 3 — Blue (Lightning/Line) | Bronze (Lightning/Line)
+    ── lightning separator ─────────────────────────
+    Row 4 — White (Cold/Cone)   | Silver (Cold/Cone)
+    ── cold separator ──────────────────────────────
+    Row 5 — Black (Acid/Line)   | Copper (Acid/Line)
+    ── acid separator ──────────────────────────────
+    Row 6 — Green (Poison/Cone) | Lead (Poison/Cone)
+
+  Ordering rationale:
+    Chromatic column — spectrum order (Red → Orange → Blue → White → Black →
+      Green). Yellow is skipped (no yellow subrace). White and Black are
+      achromatic so fall after the spectral colours before the non-colour Green.
+    Metallic column — precious-metal value order (Gold → Brass → Bronze →
+      Silver → Copper → Lead). Lead is least valuable and most toxic, naturally
+      anchoring the poison row.
+    Cross-column type matching is the primary constraint — both entries in a
+      row share the same damage type. The spectrum/value ordering is applied
+      as a secondary constraint within that requirement.
+================================================================================
+
+CHANGE 19.1 — Add Orange subrace to Dragonborn
+  File: site/src/lib/game/data/races.ts
+  Location: subraces array, new entry added as 3rd item (after red, gold)
+
+  ADDED:
+      { name: 'orange', displayName: 'Orange (Fire)', abilityBonuses: {},
+        traits: [{ name: 'Fire Breath', description: '15 ft. cone, fire damage.',
+          effects: [
+            { tag: 'breath-weapon', damageType: 'fire', shape: 'cone', size: '15 ft' },
+            { tag: 'resistance', damageType: 'fire' }
+          ]
+        }]
+      }
+
+  Mechanics match Red exactly (fire/cone/15 ft + fire resistance).
+  No abilityBonuses — all dragonborn subraces inherit base race bonuses (+2 STR, +1 CHA).
+
+================================================================================
+CHANGE 19.2 — Add Lead subrace to Dragonborn
+  File: site/src/lib/game/data/races.ts
+  Location: subraces array, new entry added as last item (after green)
+
+  ADDED:
+      { name: 'lead', displayName: 'Lead (Poison)', abilityBonuses: {},
+        traits: [{ name: 'Poison Breath', description: '15 ft. cone, poison damage.',
+          effects: [
+            { tag: 'breath-weapon', damageType: 'poison', shape: 'cone', size: '15 ft' },
+            { tag: 'resistance', damageType: 'poison' }
+          ]
+        }]
+      }
+
+  Mechanics match Green exactly (poison/cone/15 ft + poison resistance).
+  'poison' is already a valid damageType in the codebase (used by Green) — no
+  types.ts change required.
+
+================================================================================
+CHANGE 19.3 — Reorder subraces array in races.ts
+  File: site/src/lib/game/data/races.ts
+  Location: dragonborn subraces array — full array order changed
+
+  The array order itself does NOT control grid display (template uses .find()
+  by name). The array was reordered to match the new grid layout for
+  readability, and the comment block was updated:
+
+  OLD ORDER: black, copper, blue, bronze, red, brass, gold, green, white, silver
+  NEW ORDER: red, gold, orange, brass, blue, bronze, white, silver, black, copper, green, lead
+
+  OLD comment: "ordered for 2-column Chromatic/Metallic grid (paired by damage type)"
+  NEW comment: multi-line block stating new grid order and column rationale
+
+================================================================================
+CHANGE 19.4 — Replace hardcoded pairs array in template
+  File: lib/components/CharacterCreation.svelte
+  Location: {#each [...] as pair} inside {#if raceDef.name === 'dragonborn'}
+
+  OLD pairs array (6 entries, some with empty strings for dragon-empty):
+      [['black','copper'],['blue','bronze'],['red','brass'],
+       ['','gold'],['green',''],['white','silver']]
+
+  NEW pairs array (10 entries — 6 dragon rows + 4 separator sentinels):
+      [['red','gold'],['orange','brass'],['_sep_',''],
+       ['blue','bronze'],['_sep_',''],
+       ['white','silver'],['_sep_',''],
+       ['black','copper'],['_sep_',''],
+       ['green','lead']]
+
+  Sentinel convention: pair[0] === '_sep_' → render separator div instead of
+  card slots. The second element of a sentinel pair is always '' (unused).
+
+================================================================================
+CHANGE 19.5 — Update outer {#each} body to handle separator sentinel
+  File: lib/components/CharacterCreation.svelte
+  Location: Immediately inside {#each [...] as pair}, before the inner
+            {#each pair as srName} loop
+
+  OLD (inner loop unconditional):
+      {#each pair as srName}
+          {#if srName}
+              ... choice-card ...
+          {:else}
+              <div class="dragon-empty"></div>
+          {/if}
+      {/each}
+
+  NEW (sentinel check wraps the inner loop):
+      {#if pair[0] === '_sep_'}
+          <div class="dragon-sep"></div>
+      {:else}
+          {#each pair as srName}
+              {#if srName}
+                  ... choice-card (unchanged) ...
+              {:else}
+                  <div class="dragon-empty"></div>
+              {/if}
+          {/each}
+      {/if}
+
+  The choice-card button content, onclick handler, class:selected binding, and
+  breathEff @const — all unchanged from the previous implementation.
+
+================================================================================
+CHANGE 19.6 — Add .dragon-sep CSS rule
+  File: lib/components/CharacterCreation.svelte
+  Location: <style> block, immediately after .dragon-empty { }
+
+  ADDED:
+      .dragon-sep {
+          grid-column: 1 / -1;
+          border-top: 1px solid var(--border);
+          margin: 0.15rem 0;
+          opacity: 0.5;
+      }
+
+  grid-column: 1 / -1 — spans both grid columns so a single div produces a
+    full-width divider line.
+  border-top: 1px solid var(--border) — uses the theme CSS variable so the
+    line colour adapts to all 12 themes automatically.
+  opacity: 0.5 — keeps the separator visually subtle (thin, not bold).
+
+  Verification: get_errors → 0 errors on both files.
+
+
+================================================================================
+  END OF RECALL JS.1
+  Total changes documented: 64 named changes across 19 groups
+  New files created: 3
+  Files modified: 13 (races.ts added)
+  Files read but not changed: ThemePicker.svelte, GlassPanel.svelte,
+                               mechanics.ts (point buy math confirmed correct)
+================================================================================

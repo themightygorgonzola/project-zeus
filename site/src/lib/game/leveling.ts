@@ -34,6 +34,7 @@ import {
 } from './data/classes';
 import type { ClassFeature, FeatDefinition, FeatEffect, FeatPrerequisite } from './data';
 import { getFeat, FEATS } from './data/feats';
+import { buildFeatureUses } from './character-creation';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -696,6 +697,20 @@ export function applyLevelUp(
 		};
 		char.classFeatures.push(ref);
 		newFeatureNames.push(feat.name);
+	}
+
+	// B5: Initialize featureUses for any newly granted tracked features.
+	// buildFeatureUses only returns entries present in FEATURE_USE_DEFS, so this is safe.
+	// We only add keys that don't already exist to preserve current-use counts.
+	const gainedUses = buildFeatureUses(
+		newFeatures.filter((f) => !f.tags.includes('asi')).map((f) => ({ name: f.name })),
+		newTotalLevel,
+		char.abilities
+	);
+	for (const [key, val] of Object.entries(gainedUses)) {
+		if (!(key in char.featureUses)) {
+			char.featureUses[key] = val;
+		}
 	}
 
 	// 6. Handle ASI / Feat (based on target CLASS level)

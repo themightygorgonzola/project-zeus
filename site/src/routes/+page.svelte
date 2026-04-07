@@ -3,12 +3,12 @@
 </script>
 
 <svelte:head>
-	<title>Adventure Awaits</title>
-	<meta name="description" content="AI-guided narrative 5e adventures in procedurally generated worlds" />
+	<title>Project Nornyx</title>
+	<meta name="description" content="Project Nornyx — AI-guided 5e adventures in procedurally generated worlds. Play solo or with friends, guided by an intelligent narrator in a living fantasy world." />
 </svelte:head>
 
-<div class="landing">
-	<section class="hero-section">
+<section class="hero-section">
+	<div class="hero-inner">
 		<div class="hero-content">
 			<p class="hero-eyebrow">AI-Guided 5e Adventures</p>
 			<h1 class="hero-title">Your World.<br />Your Story.</h1>
@@ -26,14 +26,16 @@
 				{/if}
 			</div>
 		</div>
+	</div>
 
-		<div class="hero-visual">
-			<div class="orb orb-1"></div>
-			<div class="orb orb-2"></div>
-			<div class="orb orb-3"></div>
-		</div>
-	</section>
+	<div class="hero-visual">
+		<div class="orb orb-1"></div>
+		<div class="orb orb-2"></div>
+		<div class="orb orb-3"></div>
+	</div>
+</section>
 
+<div class="landing">
 	<section class="features-section">
 		<div class="feature-grid">
 			<div class="feature-card">
@@ -76,10 +78,33 @@
 		overflow: hidden;
 	}
 
+	.hero-section::after {
+		content: '';
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		height: 120px;
+		background: linear-gradient(to bottom, transparent, var(--bg));
+		z-index: 2;
+		pointer-events: none;
+	}
+
+	.hero-inner {
+		width: min(1200px, calc(100vw - 32px));
+		margin: 0 auto;
+		position: relative;
+		z-index: 1;
+		width: 100%;
+		max-width: 1200px;
+		padding: 0 1rem;
+	}
+
 	.hero-content {
 		position: relative;
 		z-index: 1;
 		max-width: 640px;
+		padding-left: 0.5rem;
 	}
 
 	.hero-eyebrow {
@@ -92,10 +117,12 @@
 	}
 
 	.hero-title {
+		font-family: var(--font-display);
 		font-size: clamp(2.5rem, 6vw, 4.5rem);
 		font-weight: 800;
-		line-height: 1.1;
+		line-height: 1.15;
 		margin: 0 0 1.5rem;
+		padding-bottom: 0.15em;
 		background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
 		-webkit-background-clip: text;
 		background-clip: text;
@@ -156,7 +183,7 @@
 	.orb-3 {
 		width: 180px;
 		height: 180px;
-		background: #a855f7;
+		background: var(--orb-3-color);
 		top: 30%;
 		right: 35%;
 		animation: float 12s ease-in-out infinite;
@@ -188,12 +215,12 @@
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-lg);
-		backdrop-filter: blur(12px);
+		backdrop-filter: blur(var(--blur-glass));
 		transition: border-color 0.2s;
 	}
 
 	.feature-card:hover {
-		border-color: rgba(124, 156, 255, 0.35);
+		border-color: var(--card-hover-border);
 	}
 
 	.feature-icon {

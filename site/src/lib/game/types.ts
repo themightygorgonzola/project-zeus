@@ -155,8 +155,7 @@ export type Alignment =
 	| 'chaotic-neutral'
 	| 'lawful-evil'
 	| 'neutral-evil'
-	| 'chaotic-evil'
-	| 'unaligned';
+	| 'chaotic-evil';
 
 export type Condition =
 	| 'blinded'
@@ -313,7 +312,7 @@ export const DEFAULT_CONDITION_EFFECTS: ConditionEffectMap = {
 // Items
 // ---------------------------------------------------------------------------
 
-export type ItemCategory = 'weapon' | 'armor' | 'consumable' | 'quest' | 'misc';
+export type ItemCategory = 'weapon' | 'armor' | 'consumable' | 'quest' | 'misc' | 'ammunition';
 export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'very-rare' | 'legendary';
 
 export interface BaseItem {
@@ -372,7 +371,16 @@ export interface MiscItem extends BaseItem {
 	tags?: string[];
 }
 
-export type Item = WeaponItem | ArmorItem | ConsumableItem | QuestItem | MiscItem;
+export interface AmmunitionItem extends BaseItem {
+	category: 'ammunition';
+	/** Weapon IDs (from WEAPONS table) this ammo can be fired from, e.g. ['longbow', 'shortbow'] */
+	ammoFor: string[];
+	/** Damage if treated as an improvised thrown weapon — sequestered, not read by combat resolution. */
+	improvisedDamage?: string;
+	improvisedDamageType?: string;
+}
+
+export type Item = WeaponItem | ArmorItem | ConsumableItem | QuestItem | MiscItem | AmmunitionItem;
 
 // ---------------------------------------------------------------------------
 // Character progression helpers

@@ -1,0 +1,57 @@
+Plan: Copyright Compliance & Open 5e Integration
+TL;DR: All hardcoded game data is SRD-compliant. The real risk is AI-generated content — there are zero copyright guardrails in prompts, and zero content validation in sanitization. Fix via prompt guardrails, a content blocklist, optional Open 5e API integration, and proper licensing.
+
+Audit Results
+SAFE — Hardcoded SRD data (no changes needed)
+
+Category	Count	Status
+Races + subraces	9 + 19	All SRD CC-BY-4.0
+Classes + subclasses	12 + 12 (one SRD subclass each)	All SRD CC-BY-4.0
+Spells	127	All SRD; casting mechanically validated
+Feats	42	All SRD CC-BY-4.0
+Backgrounds	13	All SRD CC-BY-4.0
+Weapons + armor	36 + 13	All SRD CC-BY-4.0
+Monster templates	25 scaffolds	Procedural, not MM stat blocks
+AT RISK — AI-generated content (no guardrails exist)
+
+Risk Area	Example Violations	Where
+NPC names	"Strahd", "Drizzt", "Elminster"	world-enrichment.ts, adventure-turn.ts
+Item names	"Vorpal Sword", "Deck of Many Things"	sanitizeStateChanges() — only checks structure
+Creature names	"Beholder"™, "Mind Flayer"™, "Displacer Beast"™	creature-templates.ts accepts any name
+Location names	"Waterdeep", "Baldur's Gate", "Ravenloft"	world-enrichment.ts has no restrictions
+Narrative prose	Any copyrighted content	Completely unrestricted
+No LICENSE file	—	Repo root
+Open 5e API: NOT integrated at all. Zero references in codebase. Available at api.open5e.com with document__slug=5esrd filtering.
+
+Steps
+Phase 1: Prompt-Level Guardrails (highest impact, least code)
+
+Add copyright guidance to narrative system prompt — gm-context.ts → buildNarrativeSystemPrompt()
+Add copyright guidance to state extraction prompt — gm-context.ts → buildStateExtractionPrompt() (parallel with 1)
+Add copyright guidance to world enrichment prompt — world-enrichment.ts → systemPrompt() (parallel with 1, 2)
+
+Phase 2: Content Validation Layer (defense-in-depth, catches what prompts miss)
+
+Create copyright blocklist module — new file site/src/lib/game/data/copyright-blocklist.ts. Export a Set of ~50-80 trademarked/copyrighted terms and a containsCopyrightedTerm(text) checker. Covers: WotC trademarked creatures (Beholder, Mind Flayer, Displacer Beast, Gith, etc.), iconic NPCs (Strahd, Drizzt, Acererak, Vecna, Elminster), Forgotten Realms locations (Waterdeep, Baldur's Gate, Neverwinter, Candlekeep, Ravenloft), published module names.
+Add content validation to sanitizeStateChanges() — adventure-turn.ts: check itemsGained names, npcsAdded names, encounterStarted creature names against blocklist; auto-rename and log (depends on 4)
+Add content validation to world enrichment parsing — world-enrichment.ts → parseEnrichmentResponse(): check NPC names and quest text (depends on 4, parallel with 5)
+
+Phase 3: Open 5e API Integration (optional enhancement)
+
+Create Open 5e API client — new file site/src/lib/server/open5e.ts with typed fetch wrappers, document__slug=5esrd filtering, caching layer
+Use Open 5e for creature stat block enrichment — creature-templates.ts: check if creature name matches SRD monster before falling back to procedural generation (depends on 7)
+Use Open 5e for magic item validation — cross-reference AI-generated magic items against SRD list (depends on 7)
+
+Phase 4: Attribution
+
+Add LICENSE.md or LEGAL.md to repo root with CC-BY-4.0 SRD attribution
+Verification
+After Phase 1: manual spot-check — start new adventure, play turns, verify no copyrighted references
+After Phase 2: unit tests for containsCopyrightedTerm() (positive: "Strahd", "Beholder"; negative: "goblin", "dragon")
+After Phase 2: verify sanitizeStateChanges() renames copyrighted item/NPC names in logs
+After Phase 3: test Open 5e client results match hardcoded spell list
+site-check.bat after each phase
+Further Considerations
+Blocklist scope: Start with ~50-80 most iconic trademarked terms, or exhaustive hundreds? Rec: start focused, expand over time.
+Rename strategy when caught: (A) strip entity entirely, (B) auto-rename to generic equivalent ("Beholder" → "Eldritch Eye Tyrant"), (C) flag for human review? Rec: auto-rename + log warning.
+Open 5e dependency model: Runtime API calls or offline import/periodic refresh? Rec: offline import to avoid runtime dependency on third-party API.

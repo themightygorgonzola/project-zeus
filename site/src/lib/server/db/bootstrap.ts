@@ -66,6 +66,22 @@ export async function bootstrapDatabase() {
 	`);
 
 	await dbClient.execute(`
+		CREATE TABLE IF NOT EXISTS adventure_chat (
+			id TEXT PRIMARY KEY NOT NULL,
+			adventure_id TEXT NOT NULL,
+			user_id TEXT NOT NULL,
+			username TEXT NOT NULL,
+			text TEXT NOT NULL,
+			mentions_json TEXT NOT NULL DEFAULT '[]',
+			retro_invoked INTEGER NOT NULL DEFAULT 0,
+			consumed_by_turn INTEGER,
+			created_at INTEGER NOT NULL,
+			FOREIGN KEY (adventure_id) REFERENCES adventures(id),
+			FOREIGN KEY (user_id) REFERENCES users(id)
+		)
+	`);
+
+	await dbClient.execute(`
 		CREATE TABLE IF NOT EXISTS adventure_turns (
 			id TEXT PRIMARY KEY NOT NULL,
 			adventure_id TEXT NOT NULL,
@@ -113,6 +129,12 @@ export async function bootstrapDatabase() {
 	);
 	await dbClient.execute(
 		'CREATE INDEX IF NOT EXISTS adventure_turns_turn_number_idx ON adventure_turns(adventure_id, turn_number)'
+	);
+	await dbClient.execute(
+		'CREATE INDEX IF NOT EXISTS adventure_chat_adventure_id_idx ON adventure_chat(adventure_id)'
+	);
+	await dbClient.execute(
+		'CREATE INDEX IF NOT EXISTS adventure_chat_created_at_idx ON adventure_chat(adventure_id, created_at)'
 	);
 
 	bootstrapped = true;

@@ -941,7 +941,25 @@ function resolveStartingEquipment(input: CharacterCreateInput, backgroundEquipme
 }
 
 function itemFromLabel(label: string, equipPrimary = false): PlayerCharacter['inventory'][number] {
-	const { baseName, quantity } = parseItemLabel(label);
+	let { baseName, quantity } = parseItemLabel(label);
+
+	// Handle word-quantity prefixes like "Two Handaxes" → weapon "Handaxe", quantity 2.
+	// This covers barbarian starting equipment and similar patterns.
+	const WORD_QUANTITY_PREFIX: Array<[string, number]> = [
+		['two ', 2], ['three ', 3], ['four ', 4], ['five ', 5], ['a pair of ', 2],
+	];
+	for (const [prefix, count] of WORD_QUANTITY_PREFIX) {
+		if (baseName.toLowerCase().startsWith(prefix)) {
+			const remainder = baseName.slice(prefix.length);
+			// Try singular form too (strip trailing 's': "Handaxes" → "Handaxe")
+			const singular = remainder.endsWith('s') ? remainder.slice(0, -1) : remainder;
+			if (getWeapon(remainder) || getWeapon(singular)) {
+				baseName = getWeapon(remainder) ? remainder : singular;
+				quantity = count;
+				break;
+			}
+		}
+	}
 
 	// Resolve generic placeholder labels to a canonical weapon name.
 	// "Martial Weapon" → longsword, "Simple Weapon" → handaxe.
@@ -999,6 +1017,24 @@ function itemFromLabel(label: string, equipPrimary = false): PlayerCharacter['in
 
 	const gear = getGear(baseName);
 	if (gear) {
+		if (gear.category === 'ammunition') {
+			const AMMO_FOR_MAP: Record<string, string[]> = {
+				'arrows-20': ['longbow', 'shortbow'],
+				'bolts-20': ['light-crossbow', 'heavy-crossbow', 'hand-crossbow'],
+			};
+			return {
+				id: ulid(),
+				name: gear.displayName,
+				category: 'ammunition',
+				ammoFor: AMMO_FOR_MAP[gear.name] ?? [],
+				description: gear.description,
+				value: parseCurrencyValue(gear.cost),
+				quantity,
+				weight: gear.weight,
+				rarity: 'common',
+				attunement: false
+			};
+		}
 		return {
 			id: ulid(),
 			name: gear.displayName,

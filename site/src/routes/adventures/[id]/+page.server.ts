@@ -25,6 +25,11 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 		redirect(302, `/adventures/${params.id}/lobby`);
 	}
 
+	// Completed adventures have their own summary view
+	if (adventure[0].status === 'completed') {
+		redirect(302, `/adventures/${params.id}/summary`);
+	}
+
 	// Verify membership
 	const membership = await db
 		.select()

@@ -19,6 +19,6 @@
 		border: 1px solid var(--border);
 		border-radius: var(--radius-lg);
 		box-shadow: var(--shadow);
-		backdrop-filter: blur(18px);
+		backdrop-filter: blur(var(--blur-glass));
 	}
 </style>

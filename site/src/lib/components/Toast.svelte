@@ -11,7 +11,7 @@
 		item: 'var(--accent-2)',
 		location: 'var(--accent)',
 		time: 'var(--warning)',
-		quest: '#c084fc',
+		quest: 'var(--quest-accent)',
 		combat: 'var(--danger)',
 		info: 'var(--text-muted)'
 	};
@@ -72,8 +72,8 @@
 		border: 1px solid var(--toast-accent);
 		border-left: 3px solid var(--toast-accent);
 		border-radius: 12px;
-		background: rgba(15, 28, 48, 0.95);
-		backdrop-filter: blur(12px);
+		background: var(--toast-bg);
+		backdrop-filter: blur(var(--blur-glass));
 		box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
 		cursor: pointer;
 		animation: toast-slide-in 0.3s ease-out;
@@ -84,7 +84,7 @@
 	}
 
 	.toast-card:hover {
-		background: rgba(20, 36, 60, 0.97);
+		background: var(--toast-bg-hover);
 		border-color: var(--toast-accent);
 	}
 

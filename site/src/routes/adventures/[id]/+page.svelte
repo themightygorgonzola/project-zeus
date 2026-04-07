@@ -35,7 +35,14 @@
 				.map((character) => [character.userId, character])
 		)
 	);
-	let partyCharacters = $state<Record<string, PlayerCharacter>>({});
+	// Initialize from server data synchronously so currentCharacter is known on first render.
+	// Avoids a flash of the character-creation screen while the $effect below runs.
+	let partyCharacters = $state<Record<string, PlayerCharacter>>(
+		Object.fromEntries(
+			(((data.gameState as { characters?: PlayerCharacter[] } | undefined)?.characters ?? []) as PlayerCharacter[])
+				.map((character) => [character.userId, character])
+		)
+	);
 	let currentCharacter = $derived(partyCharacters[currentUserId] ?? null);
 	let currentUsername = $derived(
 		((data.members as Array<{ userId: string; username: string }>)
@@ -122,8 +129,12 @@
 
 	// Lock body scroll while on adventure page
 	$effect(() => {
+		document.documentElement.style.overflow = 'hidden';
 		document.body.style.overflow = 'hidden';
-		return () => { document.body.style.overflow = ''; };
+		return () => {
+			document.documentElement.style.overflow = '';
+			document.body.style.overflow = '';
+		};
 	});
 
 	$effect(() => {
@@ -270,9 +281,9 @@
 		return member?.username ?? 'Unknown';
 	}
 
-	async function scrollChatToBottom() {
+	async function scrollChatToBottom(behavior: ScrollBehavior = 'smooth') {
 		await tick();
-		chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' });
+		chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior });
 	}
 
 	function ensurePendingGmMessage() {
@@ -808,7 +819,7 @@
 	onMount(() => {
 		hydrateTranscript();
 		connectPartyKit();
-		scrollChatToBottom();
+		scrollChatToBottom('instant');
 		startPartyPoll();
 	});
 	onDestroy(() => { disconnectPartyKit(); stopPartyPoll(); });
@@ -832,9 +843,8 @@
 			</div>
 		</div>
 
-		<div class="adventure-grid">
-			<!-- LEFT SIDEBAR: Party + Location + Quests -->
-			<div class="side-column left-sidebar">
+		<!-- LEFT SIDEBAR: Party + Location + Quests -->
+		<div class="side-column left-sidebar">
 				<!-- GM Card -->
 				<GlassPanel>
 					<button
@@ -1105,8 +1115,7 @@
 					clock={gameState?.clock}
 					adventureId={adventureId}
 					onCreated={handleCharacterCreated}
-				/>
-			</div>
+			/>
 		</div>
 	</div>
 </div>
@@ -1124,30 +1133,36 @@
 	/* ===== Layout ===== */
 	.adventure-screen {
 		height: calc(100dvh - 3.5rem);
-		display: flex;
-		flex-direction: column;
-		gap: 0;
-		padding: 0.3rem 0 0;
+		display: grid;
+		grid-template-columns: 240px minmax(0, 1fr) 460px;
+		grid-template-rows: auto 1fr;
+		grid-template-areas:
+			"header header journal"
+			"left   main   journal";
+		column-gap: 0.85rem;
+		row-gap: 0;
+		padding: 0.3rem 0 1.5rem;
 		overflow: hidden;
+		--shadow: none;
 	}
 
 	.adventure-header {
+		grid-area: header;
 		display: flex;
-		align-items: center;
-		gap: 0.85rem;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.2rem;
 		padding: 0 0 0.4rem;
-		flex-shrink: 0;
 		min-width: 0;
 	}
 
 	.adventure-header h1 {
 		margin: 0;
-		font-size: 1rem;
+		font-size: 1.15rem;
 		font-weight: 700;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		flex-shrink: 1;
 	}
 
 	.header-meta {
@@ -1166,15 +1181,7 @@
 		color: var(--text-muted);
 	}
 
-	.adventure-grid {
-		display: grid;
-		grid-template-columns: 240px minmax(0, 1fr) 460px;
-		gap: 0.85rem;
-		flex: 1;
-		min-height: 0;
-		align-items: start;
-		overflow: hidden;
-	}
+	.adventure-grid-removed { display: none; } /* placeholder — adventure-grid wrapper removed; .adventure-screen is now the grid */
 
 	.side-column {
 		display: flex;
@@ -1182,21 +1189,28 @@
 		gap: 0.85rem;
 	}
 
-	.journal-sidebar {
-		position: sticky;
-		top: 0.5rem;
-		max-height: calc(100dvh - 4.5rem);
+	.left-sidebar {
+		grid-area: left;
 		overflow-y: auto;
 		overflow-x: hidden;
+		min-height: 0;
+	}
+
+	.journal-sidebar {
+		grid-area: journal;
+		overflow-y: auto;
+		overflow-x: hidden;
+		min-height: 0;
 	}
 
 	.main-column {
+		grid-area: main;
+		grid-row: 1 / -1;
 		display: flex;
 		flex-direction: column;
 		gap: 0.85rem;
 		min-width: 0;
-		align-self: stretch;
-		height: 100%;
+		min-height: 0;
 		overflow: hidden;
 	}
 
@@ -1312,7 +1326,7 @@
 	.gm-name {
 		font-weight: 700;
 		font-size: 0.88rem;
-		color: #f5c842;
+		color: var(--gm-accent, #f5c842);
 	}
 
 	.gm-status {
@@ -1572,7 +1586,7 @@
 	}
 
 	.mention-hint {
-		color: #f5c842;
+		color: var(--gm-accent, #f5c842);
 		font-weight: 600;
 	}
 
@@ -1647,7 +1661,7 @@
 	}
 
 	.msg-gm-narration .chat-name {
-		color: #f5c842;
+		color: var(--gm-accent, #f5c842);
 	}
 
 	.msg-gm-narration .chat-text {
@@ -1663,7 +1677,7 @@
 	}
 
 	.msg-gm-thinking .chat-name {
-		color: #f5c842;
+		color: var(--gm-accent, #f5c842);
 	}
 
 	/* Message kind: mechanic */
@@ -1674,7 +1688,7 @@
 	}
 
 	.msg-mechanic .chat-name {
-		color: #64c8ff;
+		color: var(--mechanic-accent, #64c8ff);
 	}
 
 	.msg-mechanic .chat-text {
@@ -1714,7 +1728,7 @@
 	}
 
 	.msg-roll-request .chat-name {
-		color: #a078ff;
+		color: var(--roll-accent, #a078ff);
 	}
 
 	.roll-request-card {
@@ -1844,7 +1858,7 @@
 		width: 6px;
 		height: 6px;
 		border-radius: 50%;
-		background: #f5c842;
+		background: var(--gm-accent, #f5c842);
 		opacity: 0.4;
 		animation: thinking 1.2s ease-in-out infinite;
 	}
@@ -1986,32 +2000,35 @@
 
 	.btn-gm {
 		background: rgba(245, 200, 66, 0.18);
-		color: #f5c842;
+		color: var(--gm-accent, #f5c842);
 		border: 1px solid rgba(245, 200, 66, 0.35);
 	}
 
 	/* ===== Mention highlight (rendered via formatMessageText) ===== */
 	:global(.mention) {
-		color: #f5c842;
+		color: var(--gm-accent, #f5c842);
 		font-weight: 600;
 	}
 
 	/* ===== Responsive ===== */
 	@media (max-width: 1400px) {
-		.adventure-grid {
+		.adventure-screen {
 			grid-template-columns: 220px minmax(0, 1fr) 420px;
 		}
 	}
 
 	@media (max-width: 1300px) {
-		.adventure-grid {
+		.adventure-screen {
 			grid-template-columns: 200px minmax(0, 1fr) 380px;
 		}
 	}
 
 	@media (max-width: 1100px) {
-		.adventure-grid {
+		.adventure-screen {
 			grid-template-columns: minmax(0, 1fr) 360px;
+			grid-template-areas:
+				"header journal"
+				"main   journal";
 		}
 
 		.left-sidebar {
@@ -2027,15 +2044,18 @@
 		.adventure-screen {
 			height: auto;
 			overflow: visible;
+			display: flex;
+			flex-direction: column;
 		}
 
-		.adventure-grid {
-			grid-template-columns: 1fr;
-			overflow: visible;
+		.left-sidebar {
+			display: flex;
+			order: 1;
 		}
 
 		.main-column {
-			align-self: auto;
+			order: 2;
+			min-height: 0;
 			height: auto;
 			overflow: visible;
 		}
@@ -2044,8 +2064,9 @@
 			flex: none;
 		}
 
-		.left-sidebar {
-			order: 1;
+		.journal-sidebar {
+			order: 3;
+			max-height: none;
 		}
 
 		.main-chat-panel {

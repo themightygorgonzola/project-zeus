@@ -348,7 +348,8 @@ export function rollInitiative(
  */
 export function linkEncounterToQuests(
 	quests: Quest[],
-	creatures: NPC[]
+	creatures: NPC[],
+	partyLocationId?: string
 ): string[] {
 	const linkedIds: string[] = [];
 	const creatureNames = creatures.map(c => c.name.toLowerCase());
@@ -357,6 +358,19 @@ export function linkEncounterToQuests(
 		if (quest.status !== 'active') continue;
 		for (const obj of quest.objectives) {
 			if (obj.done) continue;
+
+			// Location-based match: defeat-encounter objectives whose target is the
+			// current party location link automatically, regardless of creature name.
+			if (
+				partyLocationId &&
+				obj.type === 'defeat-encounter' &&
+				obj.linkedEntityId === partyLocationId
+			) {
+				linkedIds.push(obj.id);
+				continue; // location match is definitive; skip name check
+			}
+
+			// Fallback: name-based match (existing logic unchanged)
 			const objLower = obj.text.toLowerCase();
 			for (const name of creatureNames) {
 				// Match full name or individual words (e.g. "goblin" in "Goblin Archer")
@@ -410,7 +424,7 @@ export function createEncounter(
 		combatants,
 		status: 'active',
 		startedAt: Date.now(),
-		linkedObjectiveIds: linkEncounterToQuests(state.quests, creatures)
+		linkedObjectiveIds: linkEncounterToQuests(state.quests, creatures, state.partyLocationId ?? undefined)
 	};
 
 	// Populate combatant snapshots from authoritative game state.

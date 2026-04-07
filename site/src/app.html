@@ -5,6 +5,51 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.ico" />
 		<title>Adventure Awaits</title>
+		<!-- Theme fonts — preconnect first to reduce latency -->
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+		<!-- Single request covers all 8 themes; display=swap prevents invisible text flash -->
+		<!-- Original 4 kept themes: Cinzel, Crimson Pro, IM Fell English, Lora, Playfair Display, Space Grotesk -->
+		<!-- New 4 transformed themes: Rye + Arvo (Dusty Trail), Uncial Antiqua + Nunito (Grove Circle), Orbitron + Rajdhani (Forged Steel), Cinzel Decorative + Spectral (Ashen Gate) -->
+		<link
+			rel="stylesheet"
+			href="https://fonts.googleapis.com/css2?family=Arvo:wght@400;600&family=Cinzel+Decorative:wght@400;700&family=Cinzel:wght@400;600;700&family=Crimson+Pro:wght@400;600&family=IM+Fell+English&family=Lora:wght@400;600&family=Nunito:wght@400;600;700&family=Orbitron:wght@400;600;700&family=Playfair+Display:wght@600;700&family=Rajdhani:wght@400;600&family=Rye&family=Space+Grotesk:wght@400;600;700&family=Spectral:wght@400;600&family=Uncial+Antiqua&display=swap"
+		/>
+		<!-- Hide page until theme is applied — prevents any flash of unstyled/wrong-theme content.
+		     The IIFE below adds .fouc-ready immediately, so the hidden state is never visible. -->
+		<style>html:not(.fouc-ready) { visibility: hidden; }</style>
+		<!-- Blocking theme restore — runs synchronously before first paint to eliminate FOUC.
+		     Reads the user's saved theme from localStorage and applies it to <html> immediately.
+		     No import/module syntax — must be plain IIFE so it executes inline. -->
+		<script>
+			(function () {
+				var VALID = [
+					'arcane-celestial',
+					'dark-academia',
+					'void-astral',
+					'silver-scroll',
+					'forge-iron',
+					'morning-mist',
+					'midnight-court',
+					'clean-slate',
+					'blood-oath',
+					'vellum-quill',
+					'sakura-court',
+					'frozen-spire'
+				];
+				try {
+					var saved = localStorage.getItem('nornyx-theme');
+					if (saved && VALID.indexOf(saved) !== -1) {
+						document.documentElement.dataset.theme = saved;
+					}
+				} catch (e) {
+					// localStorage unavailable (private browsing, security policy) — use default theme
+				}
+				// Always reveal the page — must be outside try/catch so it fires even if
+				// localStorage is blocked (private browsing). First visible frame = correct theme.
+				document.documentElement.classList.add('fouc-ready');
+			})();
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

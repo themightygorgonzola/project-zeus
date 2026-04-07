@@ -1,8 +1,16 @@
 <script lang="ts">
 	import AdventureCard from '$components/AdventureCard.svelte';
 	import GlassPanel from '$components/GlassPanel.svelte';
+	import { invalidateAll } from '$app/navigation';
 
 	let { data } = $props();
+
+	function handleAdventureAction() {
+		invalidateAll();
+	}
+
+	const activeAdventures = $derived(data.adventures.filter((a) => a.status !== 'completed'));
+	const completedAdventures = $derived(data.adventures.filter((a) => a.status === 'completed'));
 </script>
 
 <svelte:head>
@@ -28,11 +36,38 @@
 			</div>
 		</GlassPanel>
 	{:else}
-		<div class="adventures-grid">
-			{#each data.adventures as adventure}
-				<AdventureCard {adventure} memberCount={adventure.memberCount} />
-			{/each}
-		</div>
+		<!-- ── Active adventures ── -->
+		{#if activeAdventures.length > 0}
+			<div class="adventures-grid">
+				{#each activeAdventures as adventure}
+					<AdventureCard
+						{adventure}
+						memberCount={adventure.memberCount}
+						isOwner={adventure.ownerId === data.user?.id}
+						onAction={handleAdventureAction}
+					/>
+				{/each}
+			</div>
+		{:else}
+			<p class="none-active text-muted">No active adventures. <a href="/adventures/new">Start one?</a></p>
+		{/if}
+
+		<!-- ── Completed divider ── -->
+		{#if completedAdventures.length > 0}
+			<div class="section-divider">
+				<span class="divider-label">Completed</span>
+			</div>
+			<div class="adventures-grid adventures-grid-completed">
+				{#each completedAdventures as adventure}
+					<AdventureCard
+						{adventure}
+						memberCount={adventure.memberCount}
+						isOwner={adventure.ownerId === data.user?.id}
+						onAction={handleAdventureAction}
+					/>
+				{/each}
+			</div>
+		{/if}
 	{/if}
 </div>
 
@@ -57,6 +92,49 @@
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
 		gap: 1.25rem;
+	}
+
+	.none-active {
+		font-size: 0.9rem;
+		margin: 0 0 0.5rem;
+	}
+
+	/* ── Section divider ── */
+	.section-divider {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		margin: 2.25rem 0 1.5rem;
+	}
+
+	.section-divider::before,
+	.section-divider::after {
+		content: '';
+		flex: 1;
+		height: 1px;
+		background: var(--border);
+	}
+
+	.divider-label {
+		font-size: 0.7rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--text-muted);
+		white-space: nowrap;
+		padding: 0 0.25rem;
+	}
+
+	/* Completed cards — slightly muted until hovered */
+	.adventures-grid-completed {
+		opacity: 0.72;
+		filter: saturate(0.55);
+		transition: opacity 0.25s, filter 0.25s;
+	}
+
+	.adventures-grid-completed:hover {
+		opacity: 1;
+		filter: saturate(1);
 	}
 
 	.empty-state {

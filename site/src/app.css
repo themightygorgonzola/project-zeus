@@ -1,5 +1,6 @@
 /* ─── Design Tokens ─────────────────────────────────────── */
 :root {
+	/* Core palette */
 	--bg: #07111f;
 	--bg-alt: #0d1b2f;
 	--surface: rgba(15, 28, 48, 0.88);
@@ -13,7 +14,414 @@
 	--shadow: 0 22px 60px rgba(0, 0, 0, 0.35);
 	--radius: 18px;
 	--radius-lg: 24px;
-	font-family: Inter, 'Segoe UI', system-ui, sans-serif;
+
+	/* Extended theme tokens — used by components instead of hardcoded values */
+	--nav-bg: rgba(7, 17, 31, 0.85);
+	--toast-bg: rgba(15, 28, 48, 0.95);
+	--toast-bg-hover: rgba(20, 36, 60, 0.97);
+	--quest-accent: #c084fc;
+	--orb-3-color: #a855f7;
+	--card-hover-border: rgba(124, 156, 255, 0.4);
+	--blur-glass: 18px;
+	--body-gradient: radial-gradient(circle at top, rgba(124, 156, 255, 0.18), transparent 30%),
+		linear-gradient(180deg, #091220 0%, #040912 100%);
+
+	/* Typography */
+	--font-display: 'Cinzel', serif;
+	--font-ui: Inter, 'Segoe UI', system-ui, sans-serif;
+}
+
+/* ─── Theme Overrides ────────────────────────────────────── */
+/* 1. arcane-celestial (default — same as :root, listed for explicitness) */
+[data-theme='arcane-celestial'] {
+	--bg: #07111f;
+	--bg-alt: #0d1b2f;
+	--surface: rgba(15, 28, 48, 0.88);
+	--border: rgba(120, 164, 255, 0.22);
+	--text: #edf3ff;
+	--text-muted: #9db2d1;
+	--accent: #7c9cff;
+	--accent-2: #34d3a2;
+	--danger: #ff6d8a;
+	--warning: #ffd36b;
+	--shadow: 0 22px 60px rgba(0, 0, 0, 0.35);
+	--radius: 18px;
+	--radius-lg: 24px;
+	--nav-bg: rgba(7, 17, 31, 0.85);
+	--toast-bg: rgba(15, 28, 48, 0.95);
+	--toast-bg-hover: rgba(20, 36, 60, 0.97);
+	--quest-accent: #c084fc;
+	--orb-3-color: #a855f7;
+	--card-hover-border: rgba(124, 156, 255, 0.4);
+	--blur-glass: 18px;
+	--body-gradient: radial-gradient(circle at top, rgba(124, 156, 255, 0.18), transparent 30%),
+		linear-gradient(180deg, #091220 0%, #040912 100%);
+	--font-display: 'Cinzel', serif;
+	--font-ui: Inter, 'Segoe UI', system-ui, sans-serif;
+	color-scheme: dark;
+}
+
+/* 2. dark-academia — Spellbook & parchment warmth */
+/* 2. dark-academia → Dusty Trail — Western / Frontier */
+[data-theme='dark-academia'] {
+	--bg: #1c0e06;
+	--bg-alt: #261408;
+	--surface: rgba(28, 14, 6, 0.90);
+	--border: rgba(200, 130, 60, 0.30);
+	--text: #f2e8d0;
+	--text-muted: #9a7a50;
+	--accent: #d4763a;
+	--accent-2: #b5a040;
+	--danger: #b83224;
+	--warning: #c8920a;
+	--shadow: 0 8px 32px rgba(0, 0, 0, 0.60);
+	--radius: 4px;
+	--radius-lg: 8px;
+	--nav-bg: rgba(18, 8, 2, 0.92);
+	--toast-bg: rgba(28, 14, 6, 0.97);
+	--toast-bg-hover: rgba(38, 20, 8, 0.99);
+	--quest-accent: #a05a1a;
+	--orb-3-color: #6b3010;
+	--card-hover-border: rgba(212, 118, 58, 0.45);
+	--blur-glass: 2px;
+	--body-gradient:
+		repeating-linear-gradient(
+			90deg,
+			rgba(0, 0, 0, 0.06) 0px,
+			rgba(0, 0, 0, 0.06) 1px,
+			transparent 1px,
+			transparent 28px
+		),
+		linear-gradient(180deg, #3a1e08 0%, #200e04 40%, #1c0e06 100%);
+	--font-display: 'Rye', serif;
+	--font-ui: 'Arvo', Georgia, serif;
+	color-scheme: dark;
+}
+
+/* 3. void-astral — Cosmic AI narrator */
+[data-theme='void-astral'] {
+	--bg: #020408;
+	--bg-alt: #060c14;
+	--surface: rgba(6, 8, 18, 0.92);
+	--border: rgba(129, 140, 248, 0.18);
+	--text: #e0e7ff;
+	--text-muted: #6b7280;
+	--accent: #818cf8;
+	--accent-2: #4ade80;
+	--danger: #f87171;
+	--warning: #fbbf24;
+	--shadow: 0 22px 60px rgba(0, 0, 0, 0.55);
+	--radius: 18px;
+	--radius-lg: 24px;
+	--nav-bg: rgba(2, 4, 8, 0.90);
+	--toast-bg: rgba(6, 8, 18, 0.97);
+	--toast-bg-hover: rgba(10, 12, 28, 0.99);
+	--quest-accent: #7c3aed;
+	--orb-3-color: #312e81;
+	--card-hover-border: rgba(129, 140, 248, 0.4);
+	--blur-glass: 24px;
+	--body-gradient: radial-gradient(circle at 50% 0%, #0d0b2b 0%, #020408 60%);
+	--font-display: 'Space Grotesk', sans-serif;
+	--font-ui: 'Space Grotesk', system-ui, sans-serif;
+	color-scheme: dark;
+}
+
+/* 4. silver-scroll — Light, airy, map-room clarity */
+[data-theme='silver-scroll'] {
+	--bg: #f5f4f0;
+	--bg-alt: #eceae4;
+	--surface: rgba(255, 254, 250, 0.92);
+	--border: rgba(60, 80, 120, 0.15);
+	--text: #1a1f2e;
+	--text-muted: #5a6480;
+	--accent: #3b5bdb;
+	--accent-2: #0ca678;
+	--danger: #e03131;
+	--warning: #e67700;
+	--shadow: 0 4px 20px rgba(0, 0, 0, 0.10);
+	--radius: 18px;
+	--radius-lg: 24px;
+	--nav-bg: rgba(245, 244, 240, 0.92);
+	--toast-bg: rgba(255, 254, 250, 0.97);
+	--toast-bg-hover: rgba(240, 238, 232, 0.99);
+	--quest-accent: #7048e8;
+	--orb-3-color: #7048e8;
+	--card-hover-border: rgba(59, 91, 219, 0.35);
+	--blur-glass: 12px;
+	--body-gradient: linear-gradient(160deg, #f5f4f0 0%, #e8e5dc 100%);
+	--font-display: 'Cinzel', serif;
+	--font-ui: Inter, 'Segoe UI', system-ui, sans-serif;
+	color-scheme: light;
+}
+
+/* 5. forge-iron → Ashen Gate — Infernal / Hellfire */
+[data-theme='forge-iron'] {
+	--bg: #0d0402;
+	--bg-alt: #160602;
+	--surface: rgba(22, 6, 2, 0.92);
+	--border: rgba(255, 80, 20, 0.25);
+	--text: #ffe8d0;
+	--text-muted: #7a4030;
+	--accent: #ff4500;
+	--accent-2: #ffaa00;
+	--danger: #ff2020;
+	--warning: #ffcc00;
+	--shadow: 0 22px 60px rgba(200, 40, 0, 0.45);
+	--radius: 14px;
+	--radius-lg: 20px;
+	--nav-bg: rgba(10, 2, 0, 0.92);
+	--toast-bg: rgba(22, 6, 2, 0.97);
+	--toast-bg-hover: rgba(32, 10, 4, 0.99);
+	--quest-accent: #cc2200;
+	--orb-3-color: #7c1a00;
+	--card-hover-border: rgba(255, 69, 0, 0.50);
+	--blur-glass: 16px;
+	--body-gradient:
+		radial-gradient(ellipse at 0% 100%, rgba(180, 30, 0, 0.45) 0%, transparent 50%),
+		radial-gradient(ellipse at 100% 100%, rgba(160, 60, 0, 0.35) 0%, transparent 45%),
+		radial-gradient(ellipse at 50% 100%, rgba(220, 50, 0, 0.30) 0%, transparent 40%),
+		linear-gradient(180deg, #0d0402 0%, #0a0200 100%);
+	--font-display: 'Cinzel Decorative', 'Cinzel', serif;
+	--font-ui: 'Spectral', Georgia, serif;
+	color-scheme: dark;
+}
+
+/* 6. morning-mist → Grove Circle — Druidic / Nature */
+[data-theme='morning-mist'] {
+	--bg: #0a1a08;
+	--bg-alt: #121f0e;
+	--surface: rgba(12, 24, 8, 0.90);
+	--border: rgba(80, 160, 40, 0.22);
+	--text: #e8f0d8;
+	--text-muted: #7a9060;
+	--accent: #7ab648;
+	--accent-2: #c17f24;
+	--danger: #c03030;
+	--warning: #c89010;
+	--shadow: 0 16px 48px rgba(10, 40, 10, 0.50);
+	--radius: 32px;
+	--radius-lg: 40px;
+	--nav-bg: rgba(8, 16, 6, 0.92);
+	--toast-bg: rgba(12, 24, 8, 0.97);
+	--toast-bg-hover: rgba(18, 32, 12, 0.99);
+	--quest-accent: #4a8c20;
+	--orb-3-color: #2a5c10;
+	--card-hover-border: rgba(122, 182, 72, 0.40);
+	--blur-glass: 14px;
+	--body-gradient:
+		radial-gradient(ellipse at 70% 30%, rgba(150, 100, 20, 0.20) 0%, transparent 50%),
+		radial-gradient(ellipse at 20% 80%, rgba(30, 80, 10, 0.30) 0%, transparent 40%),
+		linear-gradient(180deg, #0e2008 0%, #0a1a08 60%, #060e04 100%);
+	--font-display: 'Uncial Antiqua', serif;
+	--font-ui: 'Nunito', Inter, system-ui, sans-serif;
+	color-scheme: dark;
+}
+
+/* 7. midnight-court — Regal purple bardic drama */
+[data-theme='midnight-court'] {
+	--bg: #0d0814;
+	--bg-alt: #150f1e;
+	--surface: rgba(21, 15, 30, 0.90);
+	--border: rgba(180, 100, 220, 0.22);
+	--text: #f0eaff;
+	--text-muted: #9070b0;
+	--accent: #c084fc;
+	--accent-2: #f59e0b;
+	--danger: #fb7185;
+	--warning: #fde68a;
+	--shadow: 0 22px 60px rgba(0, 0, 0, 0.45);
+	--radius: 18px;
+	--radius-lg: 24px;
+	--nav-bg: rgba(13, 8, 20, 0.90);
+	--toast-bg: rgba(21, 15, 30, 0.97);
+	--toast-bg-hover: rgba(30, 20, 42, 0.99);
+	--quest-accent: #a855f7;
+	--orb-3-color: #7c3aed;
+	--card-hover-border: rgba(192, 132, 252, 0.4);
+	--blur-glass: 20px;
+	--body-gradient: radial-gradient(circle at top right, #1a0d2e 0%, #070410 100%);
+	--font-display: 'Playfair Display', serif;
+	--font-ui: Inter, 'Segoe UI', system-ui, sans-serif;
+	color-scheme: dark;
+}
+
+/* 8. clean-slate — Accessibility-first, zero decoration */
+/* 8. clean-slate → Forged Steel — Cold Steel / Armory */
+[data-theme='clean-slate'] {
+	--bg: #0e0e10;
+	--bg-alt: #161618;
+	--surface: rgba(20, 20, 24, 0.95);
+	--border: rgba(200, 208, 220, 0.18);
+	--text: #dce0e8;
+	--text-muted: #6c7280;
+	--accent: #c0c8d8;
+	--accent-2: #5b8fcc;
+	--danger: #e84040;
+	--warning: #d4a010;
+	--shadow: 0 12px 40px rgba(0, 0, 0, 0.70), 0 1px 0 rgba(255, 255, 255, 0.04);
+	--radius: 6px;
+	--radius-lg: 10px;
+	--nav-bg: rgba(10, 10, 12, 0.96);
+	--toast-bg: rgba(20, 20, 24, 0.98);
+	--toast-bg-hover: rgba(28, 28, 32, 0.99);
+	--quest-accent: #8899bb;
+	--orb-3-color: #2c3040;
+	--card-hover-border: rgba(192, 200, 216, 0.35);
+	--blur-glass: 8px;
+	--body-gradient:
+		repeating-linear-gradient(
+			135deg,
+			rgba(255, 255, 255, 0.015) 0px,
+			rgba(255, 255, 255, 0.015) 1px,
+			transparent 1px,
+			transparent 6px
+		),
+		linear-gradient(180deg, #0e0e10 0%, #0a0a0c 100%);
+	--font-display: 'Orbitron', sans-serif;
+	--font-ui: 'Rajdhani', Inter, system-ui, sans-serif;
+	color-scheme: dark;
+}
+
+/* 9. blood-oath — War Council / Dark Gold Pact */
+[data-theme='blood-oath'] {
+	--bg: #110204;
+	--bg-alt: #1c0408;
+	--surface: rgba(20, 2, 6, 0.93);
+	--border: rgba(139, 26, 26, 0.28);
+	--text: #f0d8d0;
+	--text-muted: #7a3030;
+	--accent: #b8960a;
+	--accent-2: #8b1a1a;
+	--danger: #e03030;
+	--warning: #d4a010;
+	--shadow: 0 20px 56px rgba(100, 10, 10, 0.55);
+	--radius: 16px;
+	--radius-lg: 22px;
+	--nav-bg: rgba(10, 0, 2, 0.94);
+	--toast-bg: rgba(20, 2, 6, 0.97);
+	--toast-bg-hover: rgba(30, 4, 8, 0.99);
+	--quest-accent: #8b6a00;
+	--orb-3-color: #5c1010;
+	--card-hover-border: rgba(184, 150, 10, 0.40);
+	--blur-glass: 14px;
+	--body-gradient:
+		radial-gradient(ellipse at 50% 100%, rgba(139, 26, 26, 0.50) 0%, transparent 60%),
+		radial-gradient(ellipse at 15% 90%, rgba(100, 10, 10, 0.30) 0%, transparent 40%),
+		linear-gradient(180deg, #110204 0%, #0a0102 100%);
+	--font-display: 'Cinzel', serif;
+	--font-ui: 'Spectral', Georgia, serif;
+	color-scheme: dark;
+}
+
+/* 10. vellum-quill — Manuscript / Aged Parchment */
+[data-theme='vellum-quill'] {
+	--bg: #f0e6cc;
+	--bg-alt: #e6d8b4;
+	--surface: rgba(252, 242, 218, 0.92);
+	--border: rgba(74, 44, 14, 0.18);
+	--text: #2c1a08;
+	--text-muted: #7a6040;
+	--accent: #4a2c0e;
+	--accent-2: #8b2020;
+	--danger: #b02020;
+	--warning: #a06010;
+	--shadow: 0 4px 16px rgba(74, 44, 14, 0.18);
+	--radius: 10px;
+	--radius-lg: 16px;
+	--nav-bg: rgba(240, 230, 204, 0.95);
+	--toast-bg: rgba(252, 242, 218, 0.97);
+	--toast-bg-hover: rgba(240, 228, 200, 0.99);
+	--quest-accent: #6a3c0e;
+	--orb-3-color: #8b4410;
+	--card-hover-border: rgba(74, 44, 14, 0.30);
+	--blur-glass: 6px;
+	--body-gradient:
+		radial-gradient(ellipse at 50% 50%, rgba(240, 200, 140, 0.35) 0%, transparent 65%),
+		linear-gradient(160deg, #f0e6cc 0%, #e4d4b0 100%);
+	--font-display: 'IM Fell English', serif;
+	--font-ui: 'Crimson Pro', Georgia, serif;
+	color-scheme: light;
+}
+
+/* 11. sakura-court — Cherry Blossom / Spring Court */
+[data-theme='sakura-court'] {
+	--bg: #f7eef0;
+	--bg-alt: #eedde2;
+	--surface: rgba(255, 248, 250, 0.92);
+	--border: rgba(192, 88, 120, 0.15);
+	--text: #2c1018;
+	--text-muted: #8a5060;
+	--accent: #c05878;
+	--accent-2: #c8a840;
+	--danger: #c03040;
+	--warning: #c09020;
+	--shadow: 0 8px 32px rgba(160, 60, 90, 0.12);
+	--radius: 28px;
+	--radius-lg: 36px;
+	--nav-bg: rgba(247, 238, 240, 0.94);
+	--toast-bg: rgba(255, 248, 250, 0.97);
+	--toast-bg-hover: rgba(242, 233, 238, 0.99);
+	--quest-accent: #a83860;
+	--orb-3-color: #d090a8;
+	--card-hover-border: rgba(192, 88, 120, 0.35);
+	--blur-glass: 20px;
+	--body-gradient:
+		radial-gradient(ellipse at 30% 20%, rgba(200, 160, 180, 0.15) 0%, transparent 50%),
+		radial-gradient(ellipse at 70% 80%, rgba(210, 180, 190, 0.12) 0%, transparent 45%),
+		linear-gradient(160deg, #f7eef0 0%, #f0e4eb 100%);
+	--font-display: 'Lora', serif;
+	--font-ui: Inter, 'Segoe UI', system-ui, sans-serif;
+	color-scheme: light;
+}
+
+/* 12. frozen-spire — Ice Tower / Glacier Crystal */
+[data-theme='frozen-spire'] {
+	--bg: #e8f0f8;
+	--bg-alt: #d8e8f4;
+	--surface: rgba(240, 248, 255, 0.92);
+	--border: rgba(32, 96, 160, 0.15);
+	--text: #0c1c30;
+	--text-muted: #5070a0;
+	--accent: #1a5ca8;
+	--accent-2: #c8ddf0;
+	--danger: #d03040;
+	--warning: #c08020;
+	--shadow: 0 8px 36px rgba(30, 60, 120, 0.15);
+	--radius: 20px;
+	--radius-lg: 26px;
+	--nav-bg: rgba(232, 240, 248, 0.94);
+	--toast-bg: rgba(240, 248, 255, 0.97);
+	--toast-bg-hover: rgba(228, 240, 252, 0.99);
+	--quest-accent: #3070b0;
+	--orb-3-color: #7ab0e0;
+	--card-hover-border: rgba(26, 92, 168, 0.30);
+	--blur-glass: 22px;
+	--body-gradient:
+		radial-gradient(ellipse at 50% 110%, rgba(32, 96, 160, 0.25) 0%, transparent 50%),
+		radial-gradient(ellipse at 80% 0%, rgba(200, 225, 245, 0.30) 0%, transparent 40%),
+		linear-gradient(180deg, #e8f0f8 0%, #d8eaf6 60%, #c8ddf0 100%);
+	--font-display: 'Cinzel', serif;
+	--font-ui: Inter, 'Segoe UI', system-ui, sans-serif;
+	/* Adventure chat: override hardcoded accent colors for legibility on light bg */
+	--gm-accent: #7a3c00;        /* deep amber — GM name, thinking dots */
+	--mechanic-accent: #1a5ca8;  /* reuse dark blue — mechanic label */
+	--roll-accent: #4a1a8a;      /* dark purple — roll-request label */
+	color-scheme: light;
+}
+
+/* Frozen Spire — Active badge needs dark glowing blue for contrast on the
+   light background; --accent-2 (#c8ddf0) is too light to read. */
+[data-theme='frozen-spire'] .badge-active {
+	background: rgba(26, 92, 168, 0.12);
+	color: #1a5ca8;
+	text-shadow: 0 0 10px rgba(26, 92, 168, 0.55);
+	box-shadow: 0 0 8px rgba(26, 92, 168, 0.12);
+}
+
+/* Frozen Spire — Multiplayer badge: --accent-2 (#c8ddf0) is near-white, no contrast. */
+[data-theme='frozen-spire'] .badge-multiplayer {
+	background: rgba(26, 92, 168, 0.12);
+	color: #1a5ca8;
 }
 
 /* ─── Reset ─────────────────────────────────────────────── */
@@ -24,16 +432,17 @@
 }
 
 html {
+	/* color-scheme is set per-theme via [data-theme] blocks above;
+	   default (no attribute) falls back to dark. */
 	color-scheme: dark;
+	font-family: var(--font-ui);
 }
 
 body {
 	margin: 0;
 	min-height: 100vh;
 	color: var(--text);
-	background:
-		radial-gradient(circle at top, rgba(124, 156, 255, 0.18), transparent 30%),
-		linear-gradient(180deg, #091220 0%, #040912 100%);
+	background: var(--body-gradient);
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
 }
@@ -67,27 +476,28 @@ a:hover {
 	border-radius: 14px;
 	font-size: 0.95rem;
 	font-weight: 600;
+	font-family: var(--font-ui);
 	cursor: pointer;
 	transition: all 0.2s ease;
 	text-decoration: none;
 }
 
 .btn:hover {
-	border-color: rgba(124, 156, 255, 0.5);
+	border-color: var(--card-hover-border);
 	transform: translateY(-1px);
 	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 	text-decoration: none;
 }
 
 .btn-primary {
-	background: linear-gradient(135deg, var(--accent), #5b7cff);
+	background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, black));
 	border-color: var(--accent);
 	color: #fff;
 }
 
 .btn-primary:hover {
-	border-color: #99b5ff;
-	box-shadow: 0 4px 24px rgba(124, 156, 255, 0.3);
+	border-color: color-mix(in srgb, var(--accent) 70%, white);
+	box-shadow: 0 4px 24px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 .btn-ghost {
@@ -126,11 +536,14 @@ a:hover {
 .badge-lobby {
 	background: rgba(255, 211, 107, 0.15);
 	color: var(--warning);
+	text-shadow: 0 0 10px color-mix(in srgb, var(--warning) 70%, transparent);
 }
 
 .badge-active {
-	background: rgba(52, 211, 162, 0.15);
+	background: rgba(52, 211, 162, 0.18);
 	color: var(--accent-2);
+	text-shadow: 0 0 12px color-mix(in srgb, var(--accent-2) 75%, transparent);
+	box-shadow: 0 0 10px color-mix(in srgb, var(--accent-2) 15%, transparent);
 }
 
 .badge-completed {

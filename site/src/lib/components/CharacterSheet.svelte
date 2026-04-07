@@ -34,10 +34,18 @@
 			<p>{format(character.race)} {format(character.subrace)} · {character.classes.length > 1 ? character.classes.map((cl) => `${format(cl.name)} ${cl.level}`).join(' / ') : format(character.classes[0]?.name ?? 'unknown')} {character.classes[0]?.subclass ? `(${format(character.classes[0].subclass)})` : ''}</p>
 			<p class="muted">{character.background ? format(character.background) : 'No background'} · {character.alignment ? format(character.alignment) : 'Unaligned'}</p>
 		</div>
-		<div class="core-stats">
-			<div><span>HP</span><strong>{character.hp}/{character.maxHp}</strong></div>
-			<div><span>AC</span><strong>{character.ac}</strong></div>
-			<div><span>Prof</span><strong>+{character.proficiencyBonus}</strong></div>
+		<div class="stats-block">
+			<div class="hp-bar">
+				<span>HP</span>
+				<strong>{character.hp}/{character.maxHp}</strong>
+			</div>
+			<p class="passive-line">Passive Perception: {character.passivePerception}</p>
+			<div class="core-stats">
+				<div><span>AC</span><strong>{character.ac}</strong></div>
+				<div><span>Proficiency</span><strong>+{character.proficiencyBonus}</strong></div>
+				<div><span>Speed</span><strong>{character.speed} ft</strong></div>
+				<div><span>Initiative</span><strong>{signed(abilityModifier(character.abilities.dex))}</strong></div>
+			</div>
 		</div>
 	</div>
 
@@ -55,8 +63,6 @@
 		<section>
 			<h3>Combat</h3>
 			<ul>
-				<li>Speed: {character.speed} ft</li>
-				<li>Passive Perception: {character.passivePerception}</li>
 				<li>Hit Dice Remaining: {getTotalHitDiceRemaining(character)}</li>
 				<li>Conditions: {character.conditions.length ? character.conditions.map(format).join(', ') : 'None'}</li>
 			</ul>
@@ -135,11 +141,31 @@
 		gap: 0.75rem;
 	}
 
-	.core-stats {
-		grid-template-columns: repeat(3, minmax(0, 1fr));
-		min-width: 220px;
+	.stats-block {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		min-width: 280px;
 	}
 
+	.hp-bar {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+	}
+	.hp-bar span { font-size: 0.78rem; color: var(--text-muted); }
+	.hp-bar strong { font-size: 1.1rem; }
+
+	.passive-line { font-size: 0.85rem; color: var(--text-muted); }
+
+	.core-stats {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		min-width: 280px;
+	}
+
+	.core-stats span { font-size: 0.7rem; }
+
+	.hp-bar,
 	.core-stats div,
 	.ability-card,
 	section {
@@ -186,6 +212,14 @@
 		.meta-grid {
 			grid-template-columns: 1fr;
 			display: grid;
+		}
+
+		.stats-block {
+			min-width: unset;
+		}
+
+		.core-stats {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
 		}
 
 		.ability-grid {

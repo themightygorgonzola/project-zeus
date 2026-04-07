@@ -162,16 +162,17 @@ function objective(
  * trade routes, and religious tensions. Each quest uses typed objectives
  * with linkedEntityId for deterministic auto-tracking.
  *
- * Returns { quests, npcs } — caller adds both to GameState.
+ * Returns { quests, npcs, extraLocations } — caller adds all three to GameState.
  */
 export function seedQuestGraph(
 	startLocation: Location,
 	nearbyLocations: Location[],
 	world: PrototypeWorld,
 	startSettlement: SettlementEntry
-): { quests: Quest[]; npcs: NPC[] } {
+): { quests: Quest[]; npcs: NPC[]; extraLocations: Location[] } {
 	const quests: Quest[] = [];
 	const npcs: NPC[] = [];
+	const extraLocations: Location[] = [];
 
 	const startState = world.politics.states.find((s) => s.i === startSettlement.state);
 	const allLocations = [startLocation, ...nearbyLocations];
@@ -191,6 +192,24 @@ export function seedQuestGraph(
 		? world.lore.notes[0].legend
 		: 'Strange creatures have been spotted in the surrounding wilds.';
 
+	// Seed a wilderness location as the investigation target so both the
+	// visit-location and defeat-encounter objectives have a linked entity ID.
+	// This enables deterministic auto-tracking without relying on AI name-matching.
+	const troubleLocationId = ulid();
+	const troubleLocation: Location = {
+		id: troubleLocationId,
+		name: `The Wilds Near ${startSettlement.name}`,
+		regionRef: null,
+		type: 'wilderness',
+		description: `A troubled area near ${startSettlement.name} from which strange disturbances have been reported.`,
+		connections: [startLocation.id],
+		npcs: [],
+		features: [],
+		visited: false,
+		groundItems: []
+	};
+	extraLocations.push(troubleLocation);
+
 	quests.push({
 		id: ulid(),
 		name: `Trouble Near ${startSettlement.name}`,
@@ -199,8 +218,8 @@ export function seedQuestGraph(
 		description: `The people of ${startSettlement.name} are worried. ${loreHook} Someone needs to investigate and deal with the threat before it grows worse.`,
 		objectives: [
 			objective(`Speak with ${questGiver.name} to learn about the threat`, 'talk-to', questGiver.id, questGiver.name),
-			objective('Investigate the source of the disturbance', 'visit-location'),
-			objective('Defeat the creatures causing the disturbance', 'defeat-encounter')
+			objective('Investigate the source of the disturbance', 'visit-location', troubleLocationId, troubleLocation.name),
+			objective('Defeat the creatures causing the disturbance', 'defeat-encounter', troubleLocationId, troubleLocation.name)
 		],
 		rewards: { xp: 100, gold: startState ? 25 : 15, items: [], reputationChanges: [{ npcId: questGiver.id, delta: 10 }] },
 		recommendedLevel: 1,
@@ -335,7 +354,7 @@ export function seedQuestGraph(
 	);
 	npcs.push(tavernKeeper);
 
-	return { quests, npcs };
+	return { quests, npcs, extraLocations };
 }
 
 // ---------------------------------------------------------------------------
@@ -671,10 +690,17 @@ export function bootstrapAdventureContent(
 	const settlement = world.politics.settlements.find((s) => s.i === startLocation.regionRef)
 		?? world.politics.settlements[0];
 
-	// 4. Seed the quest graph (quests + linked NPCs)
-	const { quests, npcs } = seedQuestGraph(startLocation, nearbyLocations, world, settlement);
+	// 4. Seed the quest graph (quests + linked NPCs + quest-target locations)
+	const { quests, npcs, extraLocations } = seedQuestGraph(startLocation, nearbyLocations, world, settlement);
 	state.npcs.push(...npcs);
 	state.quests.push(...quests);
+	// Push quest-target locations and connect them to the start location
+	state.locations.push(...extraLocations);
+	for (const loc of extraLocations) {
+		if (!startLocation.connections.includes(loc.id)) {
+			startLocation.connections.push(loc.id);
+		}
+	}
 
 	// Wire NPC IDs into the starting location
 	const startNpcIds = npcs.filter((n) => n.locationId === startLocation.id).map((n) => n.id);

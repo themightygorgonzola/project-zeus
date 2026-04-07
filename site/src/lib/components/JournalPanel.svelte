@@ -187,15 +187,15 @@
 							<strong class="core-value">{pc.speed}<small>ft</small></strong>
 						</div>
 						<div class="core-stat">
-							<span class="core-label">Init</span>
+							<span class="core-label">Initiative</span>
 							<strong class="core-value">{signed(abilityModifier(pc.abilities.dex))}</strong>
 						</div>
 						<div class="core-stat">
-							<span class="core-label">Prof</span>
+							<span class="core-label">Proficiency</span>
 							<strong class="core-value">+{pc.proficiencyBonus}</strong>
 						</div>
 						<div class="core-stat">
-							<span class="core-label">Passive Perc</span>
+							<span class="core-label">Passive Perception</span>
 							<strong class="core-value">{pc.passivePerception}</strong>
 						</div>
 					</div>
@@ -666,7 +666,7 @@
 	.tab-content {
 		flex: 1;
 		overflow-y: auto;
-		padding: 1rem;
+		padding: 1rem 1rem 2.5rem;
 		scrollbar-width: thin;
 	}
 
@@ -790,7 +790,7 @@
 		border-radius: 12px;
 		gap: 0.1rem;
 	}
-	.core-label { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+	.core-label { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); text-align: center; white-space: normal; line-height: 1.2; }
 	.core-value { font-size: 1.1rem; font-weight: 700; }
 	.core-value small { font-size: 0.62rem; color: var(--text-muted); margin-left: 1px; }
 

@@ -1723,6 +1723,40 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 				if (typeof item.weight !== 'number') item.weight = 0;
 				if (typeof item.rarity !== 'string') item.rarity = 'common';
 				if (typeof item.attunement !== 'boolean') item.attunement = false;
+				// Consumables must have at least 1 charge — the AI frequently omits or zeros this.
+				if (item.category === 'consumable') {
+					if (typeof item.charges !== 'number' || (item.charges as number) < 1) item.charges = 1;
+					if (typeof item.maxCharges !== 'number' || (item.maxCharges as number) < 1) item.maxCharges = item.charges as number;
+				}
+				// Ammunition must have an ammoFor array — the AI may omit it entirely.
+				if (item.category === 'ammunition') {
+					if (!Array.isArray(item.ammoFor)) item.ammoFor = [];
+				}
+				// B4: Dedup — skip if an item with the same name or weaponName already exists in inventory.
+				const targetChar = state.characters.find((c) => c.id === ig.characterId);
+				if (targetChar) {
+					const normName = (s: string) => s.trim().toLowerCase();
+					const itemName = normName(item.name as string);
+					const itemWeaponName =
+						item.category === 'weapon' && typeof item.weaponName === 'string'
+							? normName(item.weaponName as string)
+							: null;
+					const isDuplicate = targetChar.inventory.some((inv) => {
+						if (normName(inv.name) === itemName) return true;
+						if (itemWeaponName !== null) {
+							const wi = inv as unknown as Record<string, unknown>;
+							if (typeof wi.weaponName === 'string' && normName(wi.weaponName) === itemWeaponName)
+								return true;
+						}
+						return false;
+					});
+					if (isDuplicate) {
+						console.warn(
+							`[sanitize] itemsGained[${i}] "${item.name as string}" already exists in character ${ig.characterId}'s inventory — stripped (B4 dedup)`
+						);
+						return false;
+					}
+				}
 				return true;
 			});
 			if (clean.itemsGained.length === 0) delete clean.itemsGained;

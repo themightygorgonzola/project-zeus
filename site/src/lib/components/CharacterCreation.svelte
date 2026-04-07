@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
 	import { onMount } from 'svelte';
 	import { abilityModifier, computeRacialBonuses, pointBuy, STANDARD_ARRAY } from '$lib/game';
 	import type {
@@ -84,8 +84,7 @@
 		{ value: 'chaotic-neutral', label: 'Chaotic Neutral' },
 		{ value: 'lawful-evil', label: 'Lawful Evil' },
 		{ value: 'neutral-evil', label: 'Neutral Evil' },
-		{ value: 'chaotic-evil', label: 'Chaotic Evil' },
-		{ value: 'unaligned', label: 'Unaligned' }
+		{ value: 'chaotic-evil', label: 'Chaotic Evil' }
 	] as const;
 	const steps = [
 		{ id: 'ancestry', label: 'Ancestry' },
@@ -104,6 +103,14 @@
 	let submitError = $state('');
 	let errors = $state<Record<string, string[]>>({});
 	let rolledSeed = $state(0);
+	let savedStandard = $state<Partial<Record<AbilityName, number>>>({});
+	let savedPointBuy = $state<AbilityScores>({ str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 });
+	let savedRolled   = $state<AbilityScores>({ str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 });
+	let rolledDice    = $state<Record<AbilityName, number[]>>({ str: [], dex: [], con: [], int: [], wis: [], cha: [] });
+	type StandardDragSrc = { value: number; from: 'pool' } | { value: number; from: 'slot'; ability: AbilityName };
+	let standardSlots  = $state<Partial<Record<AbilityName, number>>>({});
+	let dragSource     = $state<StandardDragSrc | null>(null);
+	let dragOverTarget = $state<AbilityName | 'pool' | null>(null);
 
 	let form = $state<CharacterCreateInput>({
 		name: '',
@@ -127,6 +134,11 @@
 
 	let raceDef = $derived(getRace(form.race));
 	let subraceDef = $derived(form.subrace ? getSubrace(form.race, form.subrace) : undefined);
+	let effectiveDarkvision = $derived(
+		(subraceDef?.traits.flatMap(t => t.effects).find(e => e.tag === 'darkvision') as { tag: 'darkvision'; range: number } | undefined)?.range
+		?? raceDef?.darkvision
+		?? 0
+	);
 	let classDef = $derived(getClass(form.class));
 	let backgroundDef = $derived(form.background ? getBackground(form.background) : undefined);
 	let raceTraits = $derived(collectRacialTraits(form.race, form.subrace));
@@ -155,6 +167,10 @@
 			: 0
 	);
 	let pointBuySummary = $derived(form.abilityAssignment ? pointBuy(form.abilityAssignment) : { spent: 0, remaining: 27, valid: false, invalidAbilities: [] });
+	let standardPool = $derived.by(() => {
+		const used = new Set(Object.values(standardSlots).filter((v): v is number => v !== undefined));
+		return STANDARD_ARRAY.filter(v => !used.has(v));
+	});
 	let extraLanguageChoices = $derived(countExtraLanguageChoices());
 	let baseLanguages = $derived([
 		...(raceDef?.languages ?? []),
@@ -265,7 +281,7 @@
 	}
 
 	function formatLabel(value: string | undefined): string {
-		if (!value) return 'â€”';
+		if (!value) return '—';
 		return value
 			.split('-')
 			.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -429,41 +445,96 @@
 	}
 
 	function setStatMethod(method: CharacterCreateInput['statMethod']) {
+		// Save the departing method's assignment before switching
+		if (form.abilityAssignment) {
+			if (form.statMethod === 'standard') savedStandard = { ...standardSlots };
+			else if (form.statMethod === 'point-buy') savedPointBuy = { ...form.abilityAssignment };
+			else if (form.statMethod === 'rolled') savedRolled = { ...form.abilityAssignment };
+		}
 		form.statMethod = method;
 		if (method === 'standard') {
-			form.abilityAssignment = { str: 15, dex: 13, con: 14, int: 12, wis: 10, cha: 8 };
+			syncStandardSlots();
+			syncStandardAssignment();
 		}
 		if (method === 'point-buy') {
-			form.abilityAssignment = { str: 15, dex: 14, con: 13, int: 10, wis: 10, cha: 8 };
+			form.abilityAssignment = { ...savedPointBuy };
+			syncSpellState();
 		}
 		if (method === 'rolled') {
-			rerollStats();
+			if (rolledSeed === 0) {
+				rerollStats();
+			} else {
+				form.abilityAssignment = { ...savedRolled };
+				syncSpellState();
+			}
 		}
+	}
+
+	function syncStandardSlots() {
+		standardSlots = { ...savedStandard } as Partial<Record<AbilityName, number>>;
+	}
+	function syncStandardAssignment() {
+		const base: AbilityScores = { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 };
+		form.abilityAssignment = { ...base, ...(standardSlots as AbilityScores) };
+		syncSpellState();
+	}
+	function startDrag(src: StandardDragSrc) { dragSource = src; }
+	function endDrag() { dragSource = null; dragOverTarget = null; }
+	function dropOnSlot(target: AbilityName) {
+		const src = dragSource;
+		if (!src) return;
+		const next = { ...standardSlots };
+		const prev = next[target];
+		if (src.from === 'slot') {
+			if (prev !== undefined) next[src.ability] = prev;
+			else delete next[src.ability];
+		}
+		next[target] = src.value;
+		standardSlots = next;
+		syncStandardAssignment();
+		dragSource = null;
+		dragOverTarget = null;
+	}
+	function dropOnPool() {
+		const src = dragSource;
+		if (!src || src.from !== 'slot') return;
+		const next = { ...standardSlots };
+		delete next[src.ability];
+		standardSlots = next;
+		syncStandardAssignment();
+		dragSource = null;
+		dragOverTarget = null;
 	}
 
 	function updateAbility(ability: AbilityName, value: string) {
 		const next = Number(value);
 		if (!form.abilityAssignment || Number.isNaN(next)) return;
-		form.abilityAssignment = { ...form.abilityAssignment, [ability]: next };
+		const min = form.statMethod === 'rolled' ? 3 : 8;
+		const max = form.statMethod === 'rolled' ? 18 : 15;
+		form.abilityAssignment = { ...form.abilityAssignment, [ability]: Math.min(max, Math.max(min, next)) };
 		syncSpellState();
 	}
 
 	function rerollStats() {
-		const rolls = Array.from({ length: 6 }, () => roll4d6DropLowest()).sort((a, b) => b - a);
+		const rollResults = Array.from({ length: 6 }, () => roll4d6DropLowest()).sort((a, b) => b.total - a.total);
 		const priority = getClass(form.class)?.primaryAbility ?? abilityOrder;
 		const ordered = [...priority, ...abilityOrder.filter((ability) => !priority.includes(ability))].slice(0, 6);
 		const assignment: AbilityScores = { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 };
+		const dmap: Record<AbilityName, number[]> = { str: [], dex: [], con: [], int: [], wis: [], cha: [] };
 		ordered.forEach((ability, index) => {
-			assignment[ability] = rolls[index];
+			assignment[ability] = rollResults[index].total;
+			dmap[ability] = rollResults[index].dice;
 		});
 		rolledSeed += 1;
+		rolledDice = dmap;
+		savedRolled = { ...assignment };
 		form.abilityAssignment = assignment;
 		syncSpellState();
 	}
 
-	function roll4d6DropLowest() {
-		const rolls = Array.from({ length: 4 }, () => Math.floor(Math.random() * 6) + 1).sort((a, b) => a - b);
-		return rolls[1] + rolls[2] + rolls[3];
+	function roll4d6DropLowest(): { total: number; dice: number[] } {
+		const dice = Array.from({ length: 4 }, () => Math.floor(Math.random() * 6) + 1).sort((a, b) => a - b);
+		return { total: dice[1] + dice[2] + dice[3], dice };
 	}
 
 	function toggleSkill(skill: SkillName, field: 'chosenSkills' | 'bonusSkillChoices', max: number) {
@@ -639,8 +710,10 @@
 		if (step === 3) {
 			if (!form.abilityAssignment) {
 				issues.push({ field: 'abilityAssignment', message: 'Assign your ability scores.' });
+			} else if (form.statMethod === 'standard' && standardPool.length > 0) {
+				issues.push({ field: 'abilityAssignment', message: `Assign all 6 values. Unplaced: ${standardPool.join(', ')}.` });
 			} else if (form.statMethod === 'point-buy' && !pointBuySummary.valid) {
-				issues.push({ field: 'abilityAssignment', message: 'Spend exactly 27 points for point buy.' });
+				issues.push({ field: 'abilityAssignment', message: 'Point buy: spend exactly 27 points. Scores must be 8—15 before racial bonuses.' });
 			}
 		}
 
@@ -794,7 +867,7 @@
 					<div class="error-strip" role="alert">
 						<strong>{submitError || 'Fix the issues below'}</strong>
 						{#each currentStepErrors as msg}
-							<span class="err-item">â€¢ {msg}</span>
+							<span class="err-item">• {msg}</span>
 						{/each}
 					</div>
 				{/if}
@@ -802,7 +875,7 @@
 				<!-- â”€â”€â”€ Body â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
 				<div class="cc-body">
 
-				<!-- â•â• STEP 0 Â· ANCESTRY â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+				<!-- â•â• STEP 0 · ANCESTRY â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 				{#if currentStep === 0}
 					<div class="split-pane">
 						<aside class="option-list">
@@ -815,7 +888,7 @@
 									onclick={() => setRace(race.name as any)}
 								>
 									<strong>{race.displayName}</strong>
-									<span class="option-sub">{race.description.length > 70 ? race.description.slice(0, 70) + 'â€¦' : race.description}</span>
+									<span class="option-sub">{race.description}</span>
 								</button>
 							{/each}
 						</aside>
@@ -827,14 +900,63 @@
 
 								<div class="tag-row">
 									<span class="tag">Speed {raceDef.speed} ft.</span>
-									<span class="tag">{raceDef.size}</span>
-									{#if raceDef.darkvision > 0}
-										<span class="tag">Darkvision {raceDef.darkvision} ft.</span>
+									<span class="tag">Size: {raceDef.size}</span>
+									{#if effectiveDarkvision > 0}
+										<span class="tag">Darkvision {effectiveDarkvision} ft.</span>
 									{/if}
-									{#each raceDef.languages as lang}
-										<span class="tag">{lang}</span>
-									{/each}
+									<span class="tag">Languages: {[...raceDef.languages, ...(subraceDef?.extraLanguages ?? [])].join(', ')}</span>
 								</div>
+
+								<!-- Subraces -->
+								{#if raceDef.subraces.length > 0}
+									<div class="detail-section">
+										<h4>Subrace</h4>
+										{#if raceDef.name === 'dragonborn'}
+											<div class="subrace-dragon-grid">
+												<div class="dragon-col-header">Chromatic</div>
+												<div class="dragon-col-header">Metallic</div>
+												{#each [['red','gold'],['orange','brass'],['_sep_',''],['blue','bronze'],['_sep_',''],['white','silver'],['_sep_',''],['black','copper'],['_sep_',''],['green','lead']] as pair}
+													{#if pair[0] === '_sep_'}
+														<div class="dragon-sep"></div>
+													{:else}
+														{#each pair as srName}
+															{#if srName}
+																{@const sr = raceDef.subraces.find(s => s.name === srName)}
+																{#if sr}
+																	{@const breathEff = sr.traits[0]?.effects.find(e => e.tag === 'breath-weapon') as any}
+																	<button type="button" class="choice-card" class:selected={form.subrace === sr.name} onclick={() => setSubrace(sr.name)}>
+																		<strong>{sr.displayName}</strong>
+																		<small>{sr.traits[0]?.name}{breathEff ? ' — ' + breathEff.shape[0].toUpperCase() + breathEff.shape.slice(1) : ''}</small>
+																	</button>
+																{/if}
+															{:else}
+																<div class="dragon-empty"></div>
+															{/if}
+														{/each}
+													{/if}
+												{/each}
+											</div>
+										{:else}
+											<div class="card-list">
+												{#if raceDef.name === 'human'}
+													<button type="button" class="choice-card" class:selected={!form.subrace} onclick={() => setSubrace(undefined)}>
+														<strong>Standard Human</strong>
+														<small>+1 to all ability scores</small>
+													</button>
+												{/if}
+												{#each raceDef.subraces as sr}
+													<button type="button" class="choice-card" class:selected={form.subrace === sr.name} onclick={() => setSubrace(sr.name)}>
+														<strong>{sr.displayName}</strong>
+														<small>{sr.traits.map(t => t.name).join(', ')}</small>
+													</button>
+												{/each}
+											</div>
+										{/if}
+										{#if fieldError('subrace')}
+											<p class="field-error">{fieldError('subrace')}</p>
+										{/if}
+									</div>
+								{/if}
 
 								<!-- Ability bonuses -->
 								{#if Object.values(racialBonuses).some(v => v !== 0)}
@@ -860,30 +982,6 @@
 												<p>{trait.description}</p>
 											</div>
 										{/each}
-									</div>
-								{/if}
-
-								<!-- Subraces -->
-								{#if raceDef.subraces.length > 0}
-									<div class="detail-section">
-										<h4>Subrace</h4>
-										<div class="card-list">
-											{#if raceDef.name === 'human'}
-												<button type="button" class="choice-card" class:selected={!form.subrace} onclick={() => setSubrace(undefined)}>
-													<strong>Standard Human</strong>
-													<small>+1 to all ability scores</small>
-												</button>
-											{/if}
-											{#each raceDef.subraces as sr}
-												<button type="button" class="choice-card" class:selected={form.subrace === sr.name} onclick={() => setSubrace(sr.name)}>
-													<strong>{sr.displayName}</strong>
-													<small>{sr.traits.map(t => t.name).join(', ')}</small>
-												</button>
-											{/each}
-										</div>
-										{#if fieldError('subrace')}
-											<p class="field-error">{fieldError('subrace')}</p>
-										{/if}
 									</div>
 								{/if}
 
@@ -914,7 +1012,7 @@
 												<button type="button" class="choice-card" class:selected={form.variantHumanFeat === feat.name} onclick={() => (form.variantHumanFeat = feat.name)}>
 													<strong>{feat.displayName}</strong>
 													{#if feat.description}
-														<small>{feat.description.length > 100 ? feat.description.slice(0, 100) + 'â€¦' : feat.description}</small>
+														<small>{feat.description}</small>
 													{/if}
 												</button>
 											{/each}
@@ -928,7 +1026,7 @@
 						</div>
 					</div>
 
-				<!-- â•â• STEP 1 Â· CLASS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+				<!-- â•â• STEP 1 · CLASS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 				{:else if currentStep === 1}
 					<div class="split-pane">
 						<aside class="option-list">
@@ -1015,7 +1113,7 @@
 									<h4>Subclass</h4>
 									<div class="choice-card flat">
 										<strong>{classDef.subclass.displayName}</strong>
-										<small>{classDef.subclass.description.length > 120 ? classDef.subclass.description.slice(0, 120) + 'â€¦' : classDef.subclass.description}</small>
+										<small>{classDef.subclass.description.length > 120 ? classDef.subclass.description.slice(0, 120) + '…' : classDef.subclass.description}</small>
 										<span class="hint">Chosen at level {classDef.subclassLevel}</span>
 									</div>
 								</div>
@@ -1027,7 +1125,7 @@
 						</div>
 					</div>
 
-				<!-- â•â• STEP 2 Â· BACKGROUND â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+				<!-- â•â• STEP 2 · BACKGROUND â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 				{:else if currentStep === 2}
 					<div class="split-pane">
 						<aside class="option-list">
@@ -1110,7 +1208,7 @@
 						</div>
 					</div>
 
-				<!-- â•â• STEP 3 Â· ABILITIES â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+				<!-- â•â• STEP 3 · ABILITIES â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 				{:else if currentStep === 3}
 					<div class="scroll-pane">
 						<div class="pane-content">
@@ -1144,29 +1242,44 @@
 									<span>Points spent: <strong>{pointBuySummary.spent}</strong> / 27</span>
 									<span>Remaining: <strong>{pointBuySummary.remaining}</strong></span>
 								</div>
+								<p class="hint">Each score: 8 (0 pts) to 15 (9 pts) — total budget: 27 pts</p>
 							{/if}
 
-							<div class="ability-grid-builder">
-								{#each abilityOrder as ability}
-									{@const base = form.abilityAssignment?.[ability] ?? 10}
-									{@const racial = racialBonuses[ability] ?? 0}
-									{@const flex = form.abilityChoiceBonuses?.[ability] ?? 0}
-									{@const total = previewAbilities[ability]}
-									{@const mod = abilityModifier(total)}
-									<div class="ability-builder-card">
+							<div class="ability-grid-builder" class:rolled={form.statMethod === 'rolled'}>
+							{#each abilityOrder as ability}
+								{@const base = form.abilityAssignment?.[ability] ?? 10}
+								{@const racial = racialBonuses[ability] ?? 0}
+								{@const flex = form.abilityChoiceBonuses?.[ability] ?? 0}
+								{@const total = previewAbilities[ability]}
+								{@const mod = abilityModifier(total)}
+								<div class="ability-builder-card" class:rolled-card={form.statMethod === 'rolled'}>
+									<div class="ab-left">
 										<span class="ab-label">{abilityLabels[ability]}</span>
-										<div class="ab-control">
-											<button type="button" class="ab-btn" onclick={() => updateAbility(ability, String(base - 1))} disabled={form.statMethod === 'standard'}>âˆ’</button>
-											<input
-												type="number"
-												class="ab-input"
-												min={form.statMethod === 'rolled' ? 3 : 8}
-												max={form.statMethod === 'rolled' ? 18 : 15}
-												value={base}
-												oninput={(e) => updateAbility(ability, (e.currentTarget as HTMLInputElement).value)}
-											/>
-											<button type="button" class="ab-btn" onclick={() => updateAbility(ability, String(base + 1))} disabled={form.statMethod === 'standard'}>+</button>
-										</div>
+										{#if form.statMethod === 'point-buy'}
+											<div class="ab-control">
+												<button type="button" class="ab-btn" onclick={() => updateAbility(ability, String(base - 1))}>-</button>
+												<span class="ab-value">{base}</span>
+												<button type="button" class="ab-btn" onclick={() => updateAbility(ability, String(base + 1))}>+</button>
+											</div>
+										{:else if form.statMethod === 'standard'}
+											<div class="ab-drop-slot"
+												class:occupied={standardSlots[ability] !== undefined}
+												class:drag-over={dragOverTarget === ability}
+												ondragover={(e) => { e.preventDefault(); dragOverTarget = ability; }}
+												ondragleave={() => { if (dragOverTarget === ability) dragOverTarget = null; }}
+												ondrop={() => dropOnSlot(ability)}>
+												{#if standardSlots[ability] !== undefined}
+													<div class="pool-chip in-slot"
+														draggable="true"
+														ondragstart={() => startDrag({ value: standardSlots[ability]!, from: 'slot', ability })}
+														ondragend={endDrag}>
+														{standardSlots[ability]}
+													</div>
+												{:else}
+													<span class="drop-hint">drop here</span>
+												{/if}
+											</div>
+										{/if}
 										<div class="ab-breakdown">
 											{#if racial !== 0}<span class="ab-bonus">+{racial} racial</span>{/if}
 											{#if flex !== 0}<span class="ab-bonus">+{flex} flex</span>{/if}
@@ -1176,11 +1289,36 @@
 											<span class="ab-mod">({mod >= 0 ? '+' : ''}{mod})</span>
 										</div>
 									</div>
+									{#if form.statMethod === 'rolled' && rolledDice[ability].length > 0}
+										{@const d = rolledDice[ability]}
+										<div class="dice-display">
+											<span class="dice-rolled">{d[3]} · {d[2]} · {d[1]} · <s>{d[0]}</s></span>
+											<span class="dice-calc">kept: {d[1]}+{d[2]}+{d[3]} = {d[1]+d[2]+d[3]}</span>
+										</div>
+									{/if}
+									</div>
 								{/each}
 							</div>
 
 							{#if form.statMethod === 'standard'}
-								<p class="hint">Assign the values {STANDARD_ARRAY.join(', ')} to your abilities in any order.</p>
+								<div class="standard-pool"
+									class:drag-over-pool={dragOverTarget === 'pool'}
+									ondragover={(e) => { e.preventDefault(); dragOverTarget = 'pool'; }}
+									ondragleave={() => { if (dragOverTarget === 'pool') dragOverTarget = null; }}
+									ondrop={() => dropOnPool()}>
+									{#each standardPool as val (val)}
+										<div class="pool-chip"
+											draggable="true"
+											ondragstart={() => startDrag({ value: val, from: 'pool' })}
+											ondragend={endDrag}>
+											{val}
+										</div>
+									{/each}
+									{#if standardPool.length === 0}
+										<span class="pool-empty">All values assigned</span>
+									{/if}
+								</div>
+								<p class="standard-hint">Assign the values {STANDARD_ARRAY.join(', ')} to your abilities in any order.</p>
 							{/if}
 							{#if fieldError('abilityAssignment')}
 								<p class="field-error">{fieldError('abilityAssignment')}</p>
@@ -1188,7 +1326,7 @@
 						</div>
 					</div>
 
-				<!-- â•â• STEP 4 Â· SKILLS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+				<!-- â•â• STEP 4 · SKILLS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 				{:else if currentStep === 4}
 					<div class="scroll-pane">
 						<div class="pane-content">
@@ -1198,7 +1336,7 @@
 							{#if backgroundSkills.length > 0 || fixedRacialSkills.length > 0}
 								<div class="skill-section">
 									<h4>Already Proficient</h4>
-									<p class="hint">Granted by your background and race â€” these are locked in.</p>
+									<p class="hint">Granted by your background and race — these are locked in.</p>
 									<div class="pill-row">
 										{#each backgroundSkills as sk}
 											<span class="pill locked">{formatLabel(sk)}</span>
@@ -1287,7 +1425,7 @@
 						</div>
 					</div>
 
-				<!-- â•â• STEP 5 Â· MAGIC & GEAR â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+				<!-- â•â• STEP 5 · MAGIC & GEAR â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 				{:else if currentStep === 5}
 					<div class="scroll-pane">
 						<div class="pane-content">
@@ -1388,7 +1526,7 @@
 						</div>
 					</div>
 
-				<!-- â•â• STEP 6 Â· IDENTITY â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+				<!-- â•â• STEP 6 · IDENTITY â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 				{:else if currentStep === 6}
 					<div class="scroll-pane">
 						<div class="pane-content identity-pane">
@@ -1424,7 +1562,7 @@
 							<div class="summary-card">
 								<div class="summary-header">
 									<h4>{form.name || 'Unnamed Adventurer'}</h4>
-									<span class="hint">{raceDef?.displayName}{form.subrace ? ` (${subraceDef?.displayName ?? formatLabel(form.subrace)})` : ''} Â· {classDef?.displayName} Â· {backgroundDef?.displayName ?? 'â€”'}</span>
+									<span class="hint">{raceDef?.displayName}{form.subrace ? ` (${subraceDef?.displayName ?? formatLabel(form.subrace)})` : ''} · {classDef?.displayName} · {backgroundDef?.displayName ?? '—'}</span>
 								</div>
 								<div class="summary-stats">
 									{#each abilityOrder as ab}
@@ -1436,7 +1574,7 @@
 									{/each}
 								</div>
 								<div class="summary-details">
-									<span>Skills: {[...backgroundSkills, ...fixedRacialSkills, ...form.chosenSkills, ...(form.bonusSkillChoices ?? [])].map(formatLabel).join(', ') || 'â€”'}</span>
+									<span>Skills: {[...backgroundSkills, ...fixedRacialSkills, ...form.chosenSkills, ...(form.bonusSkillChoices ?? [])].map(formatLabel).join(', ') || '—'}</span>
 									<span>Languages: {[...baseLanguages, ...(form.chosenLanguages ?? [])].join(', ')}</span>
 								</div>
 							</div>
@@ -1459,7 +1597,7 @@
 							<button type="button" class="btn primary" onclick={nextStep}>Continue</button>
 						{:else}
 							<button type="button" class="btn primary" onclick={submitCharacter} disabled={submitting}>
-								{submitting ? 'Creatingâ€¦' : 'Create Character'}
+								{submitting ? 'Creating…' : 'Create Character'}
 							</button>
 						{/if}
 					</div>
@@ -1781,6 +1919,29 @@
 	}
 	.choice-card small { font-size: 0.8rem; color: var(--text-muted); }
 
+	/* ── Dragonborn 2-column subrace grid ───────────────────── */
+	.subrace-dragon-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.35rem;
+	}
+	.dragon-col-header {
+		font-size: 0.75rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--text-muted);
+		text-align: center;
+		padding: 0.2rem 0;
+	}
+	.dragon-empty { /* grid placeholder — keeps column alignment */ }
+	.dragon-sep {
+		grid-column: 1 / -1;
+		border-top: 1px solid var(--border);
+		margin: 0.15rem 0;
+		opacity: 0.5;
+	}
+
 	/* â”€â”€ Proficiency grid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 	.prof-grid {
 		display: flex;
@@ -1952,24 +2113,12 @@
 		font-size: 0.85rem;
 	}
 	.ab-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-	.ab-input {
+	.ab-value {
 		width: 2.8rem;
 		text-align: center;
-		padding: 0.3rem 0;
-		border-radius: 8px;
-		border: 1px solid rgba(255,255,255,0.12);
-		background: rgba(255,255,255,0.05);
-		color: inherit;
-		font: inherit;
 		font-size: 1rem;
 		font-weight: 600;
 	}
-	.ab-input::-webkit-inner-spin-button,
-	.ab-input::-webkit-outer-spin-button {
-		-webkit-appearance: none;
-		margin: 0;
-	}
-	.ab-input { -moz-appearance: textfield; }
 	.ab-breakdown {
 		display: flex;
 		gap: 0.25rem;
@@ -1982,6 +2131,87 @@
 	.ab-total { text-align: center; }
 	.ab-total strong { font-size: 1.25rem; }
 	.ab-mod { font-size: 0.8rem; color: var(--text-muted); margin-left: 0.15rem; }
+	.ab-left {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.3rem;
+	}
+	.ability-grid-builder.rolled { grid-template-columns: repeat(3, 1fr); }
+	.ability-builder-card.rolled-card {
+		flex-direction: row;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.85rem 0.9rem;
+		min-height: 5rem;
+		gap: 0.5rem;
+	}
+	.dice-display {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 0.3rem;
+		flex: 1;
+	}
+	.dice-rolled {
+		font-size: 0.8rem;
+		color: var(--text-muted);
+		font-family: monospace;
+		letter-spacing: 0.03em;
+	}
+	.dice-rolled s {
+		color: rgba(255,96,96,0.65);
+		text-decoration-color: rgba(255,96,96,0.65);
+	}
+	.dice-calc { font-size: 0.78rem; color: var(--accent); }
+
+	/* ── Standard array drag-and-drop ──────────────────────────── */
+	.standard-pool {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		padding: 0.65rem 0.85rem;
+		border-radius: 14px;
+		border: 1px dashed var(--border);
+		min-height: 3.2rem;
+		align-items: center;
+		transition: background 0.12s, border-color 0.12s;
+	}
+	.standard-pool.drag-over-pool {
+		background: color-mix(in srgb, var(--accent) 8%, transparent);
+		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+	}
+	.pool-chip {
+		width: 2.4rem;
+		height: 2.4rem;
+		border-radius: 10px;
+		border: 1px solid var(--border);
+		background: rgba(255,255,255,0.06);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-weight: 700;
+		font-size: 1rem;
+		cursor: grab;
+		user-select: none;
+		transition: background 0.1s, transform 0.1s;
+	}
+	.pool-chip:active { cursor: grabbing; transform: scale(1.08); }
+	.pool-chip.in-slot { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+	.pool-empty { color: var(--text-muted); font-size: 0.8rem; font-style: italic; }
+	.ab-drop-slot {
+		width: 100%;
+		min-height: 2.6rem;
+		border-radius: 10px;
+		border: 1px dashed var(--border);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: border-color 0.12s, background 0.12s;
+	}
+	.ab-drop-slot.drag-over { border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: color-mix(in srgb, var(--accent) 9%, transparent); }
+	.drop-hint { font-size: 0.72rem; color: var(--text-muted); font-style: italic; }
+	.standard-hint { font-size: 1rem; color: var(--text-muted); text-align: center; margin-top: 0.25rem; }
 
 	/* â”€â”€ Skills â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 	.skill-section {
