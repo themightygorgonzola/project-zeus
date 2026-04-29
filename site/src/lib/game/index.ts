@@ -28,6 +28,10 @@ export type {
 	ConditionEffect,
 	ConditionEffectMap,
 	ConsumableItem,
+	ContainerCapacity,
+	ContainerDiscount,
+	ContainerItem,
+	ContainerType,
 	CreatureAction,
 	CreatureAttack,
 	CreatureSavingThrow,
@@ -36,6 +40,7 @@ export type {
 	CreatureTrait,
 	DeathSaves,
 	DiceResult,
+	EnhancedEncumbranceInfo,
 	EncounterOutcome,
 	EncounterTemplateTier,
 	GameClock,
@@ -354,3 +359,19 @@ export {
 	generateLocationName,
 	generateLocationDescription
 } from './travel';
+
+// Item dimensions & inventory management
+export {
+	ITEM_SU_TABLE,
+	CONTAINER_DEFAULTS,
+	getItemSU,
+	getEffectiveWU,
+	getEffectiveSU,
+	getContainerLoad,
+	canAddToContainer,
+	moveItemToContainer,
+	getCharacterTotalWU,
+	getEnhancedEncumbranceInfo,
+	computeSpaceTaken
+} from './item-dimensions';
+export type { ContainerDefaults, ContainerLoad, CanAddResult } from './item-dimensions';

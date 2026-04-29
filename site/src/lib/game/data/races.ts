@@ -21,9 +21,20 @@ export type DamageType =
 	| 'bludgeoning' | 'piercing' | 'slashing' | 'psychic';
 
 export type WeaponProficiency =
-	| 'longsword' | 'shortsword' | 'shortbow' | 'longbow'
-	| 'battleaxe' | 'handaxe' | 'light-hammer' | 'warhammer'
-	| 'rapier' | 'hand-crossbow';
+	// Simple melee
+	| 'club' | 'dagger' | 'greatclub' | 'handaxe' | 'javelin'
+	| 'light-hammer' | 'mace' | 'quarterstaff' | 'sickle' | 'spear'
+	// Simple ranged
+	| 'dart' | 'light-crossbow' | 'shortbow' | 'sling'
+	// Martial melee
+	| 'battleaxe' | 'flail' | 'glaive' | 'greataxe' | 'greatsword'
+	| 'halberd' | 'lance' | 'longsword' | 'maul' | 'morningstar'
+	| 'pike' | 'rapier' | 'scimitar' | 'shortsword' | 'trident'
+	| 'war-pick' | 'warhammer' | 'whip'
+	// Martial ranged
+	| 'blowgun' | 'hand-crossbow' | 'heavy-crossbow' | 'longbow' | 'net'
+	// Special
+	| 'unarmed';
 
 export type ArmorProficiency = 'light' | 'medium' | 'heavy' | 'shields';
 
@@ -94,6 +105,7 @@ export interface RaceDefinition {
 	name: RaceName;
 	displayName: string;
 	description: string;
+	shortDescription: string;
 	/** Base ability score increases (applied BEFORE subrace bonuses). */
 	abilityBonuses: Partial<Record<AbilityName, number>>;
 	speed: number;
@@ -120,7 +132,8 @@ export const RACES: RaceDefinition[] = [
 	{
 		name: 'human',
 		displayName: 'Human',
-		description: 'Humans are the most adaptable and ambitious people among the common races.',
+		description: 'Humans range from five to six and a half feet, with skin spanning deep ebony, warm brown, olive, tawny, and pale rose, and hair in every shade from silver-white to jet black. They fill towering kingdoms, merchant republics, frontier settlements, and wandering tribes, and occupy nearly every role from scholar and priest to warlord, artisan, and merchant.',
+		shortDescription: 'The most widespread race — ambitious, resilient, and relentless.',
 		abilityBonuses: { str: 1, dex: 1, con: 1, int: 1, wis: 1, cha: 1 },
 		speed: 30,
 		size: 'Medium',
@@ -164,7 +177,8 @@ export const RACES: RaceDefinition[] = [
 	{
 		name: 'elf',
 		displayName: 'Elf',
-		description: 'Elves are a magical people of otherworldly grace, living in the world but not entirely part of it.',
+		description: 'Elves stand five to nearly six feet with slender frames, sharply pointed ears, and ageless faces of uncanny perfection. Skin runs from deep bronze and copper through olive to moonlit pale; hair shades toward silver, ivory, honey-gold, auburn, or frost-blue. They inhabit ancient forest citadels, arcane towers, and noble courts, living centuries as rangers, scholars, artisans, and quiet-spoken guardians.',
+		shortDescription: 'Graceful and ancient, touched by magic and otherworldly beauty.',
 		abilityBonuses: { dex: 2 },
 		speed: 30,
 		size: 'Medium',
@@ -275,7 +289,8 @@ export const RACES: RaceDefinition[] = [
 	{
 		name: 'half-elf',
 		displayName: 'Half-Elf',
-		description: 'Half-elves combine what some say are the best qualities of their elf and human parents.',
+		description: 'Half-elves stand five and a half to six feet, blending sharper elven features with softer human faces, and almost always have striking eyes of grey, green, or violet. Skin spans the full human range; hair tends to earthy browns with occasional elven silver or pale gold. Natural diplomats, bards, scouts, and intelligence brokers, they belong fully to neither world.',
+		shortDescription: 'Charismatic and versatile, bridging the elven and human worlds.',
 		abilityBonuses: { cha: 2 },
 		speed: 30,
 		size: 'Medium',
@@ -314,7 +329,8 @@ export const RACES: RaceDefinition[] = [
 	{
 		name: 'half-orc',
 		displayName: 'Half-Orc',
-		description: 'Half-orcs\' grayish pigmentation, sloping foreheads, jutting jaws, prominent teeth, and towering builds make their orcish heritage plain for all to see.',
+		description: 'Half-orcs stand six to seven feet with broad, heavily muscled frames that command immediate attention. Skin runs grey-green to slate-blue and ashen brown; coarse hair — typically dark or raven-black — frames heavy brows and prominent lower tusks. They drift toward frontier outposts, warbands, city guard posts, and mercenary companies, earning respect through sheer relentless presence.',
+		shortDescription: 'Fierce and powerful, combining orcish strength with human drive.',
 		abilityBonuses: { str: 2, con: 1 },
 		speed: 30,
 		size: 'Medium',
@@ -345,7 +361,8 @@ export const RACES: RaceDefinition[] = [
 	{
 		name: 'dragonborn',
 		displayName: 'Dragonborn',
-		description: 'Dragonborn look very much like dragons standing erect in humanoid form, though they lack wings or a tail.',
+		description: 'Dragonborn stand six to six and a half feet, powerfully built and covered in fine scales whose colour mirrors their bloodline — ember-red, bone-white, deep cobalt, burnished gold, or verdigris green. Eyes tend to amber, violet, or silver. Honour-bound clans operate as knightly orders, mercenary companies, and fortress-holds, placing ancestral legacy and martial excellence above wealth or comfort.',
+		shortDescription: 'Proud dragon-kin with elemental breath and unshakeable clan honor.',
 		abilityBonuses: { str: 2, cha: 1 },
 		speed: 30,
 		size: 'Medium',
@@ -371,7 +388,7 @@ export const RACES: RaceDefinition[] = [
 			// Metallic value:     Gold → Brass → Bronze → Silver → Copper → Lead
 			{ name: 'red',    displayName: 'Red (Fire)',         abilityBonuses: {}, traits: [{ name: 'Fire Breath',      description: '15 ft. cone, fire damage.',           effects: [{ tag: 'breath-weapon', damageType: 'fire',      shape: 'cone', size: '15 ft'   }, { tag: 'resistance', damageType: 'fire'      }] }] },
 			{ name: 'gold',   displayName: 'Gold (Fire)',        abilityBonuses: {}, traits: [{ name: 'Fire Breath',      description: '15 ft. cone, fire damage.',           effects: [{ tag: 'breath-weapon', damageType: 'fire',      shape: 'cone', size: '15 ft'   }, { tag: 'resistance', damageType: 'fire'      }] }] },
-			{ name: 'orange', displayName: 'Orange (Fire)',      abilityBonuses: {}, traits: [{ name: 'Fire Breath',      description: '15 ft. cone, fire damage.',           effects: [{ tag: 'breath-weapon', damageType: 'fire',      shape: 'cone', size: '15 ft'   }, { tag: 'resistance', damageType: 'fire'      }] }] },
+			{ name: 'orange', displayName: 'Orange (Fire)',      abilityBonuses: {}, traits: [{ name: 'Fire Breath',      description: '5 by 30 ft. line, fire damage.',      effects: [{ tag: 'breath-weapon', damageType: 'fire',      shape: 'line', size: '5x30 ft' }, { tag: 'resistance', damageType: 'fire'      }] }] },
 			{ name: 'brass',  displayName: 'Brass (Fire)',       abilityBonuses: {}, traits: [{ name: 'Fire Breath',      description: '5 by 30 ft. line, fire damage.',      effects: [{ tag: 'breath-weapon', damageType: 'fire',      shape: 'line', size: '5x30 ft' }, { tag: 'resistance', damageType: 'fire'      }] }] },
 			{ name: 'blue',   displayName: 'Blue (Lightning)',   abilityBonuses: {}, traits: [{ name: 'Lightning Breath', description: '5 by 30 ft. line, lightning damage.', effects: [{ tag: 'breath-weapon', damageType: 'lightning', shape: 'line', size: '5x30 ft' }, { tag: 'resistance', damageType: 'lightning' }] }] },
 			{ name: 'bronze', displayName: 'Bronze (Lightning)', abilityBonuses: {}, traits: [{ name: 'Lightning Breath', description: '5 by 30 ft. line, lightning damage.', effects: [{ tag: 'breath-weapon', damageType: 'lightning', shape: 'line', size: '5x30 ft' }, { tag: 'resistance', damageType: 'lightning' }] }] },
@@ -388,7 +405,8 @@ export const RACES: RaceDefinition[] = [
 	{
 		name: 'tiefling',
 		displayName: 'Tiefling',
-		description: 'Tieflings are derived from human bloodlines, and in the broadest possible sense, they still look human — but their infernal heritage has left a clear imprint on their appearance.',
+		description: 'Tieflings stand five to six feet with lithe builds set apart by curving horns, slender tails, and eyes that glow amber, silver, red, or white — no pupils, no whites. Skin runs dusky lavender, deep crimson, charcoal grey, or pale ash; hair tends to jet black, dark crimson, or midnight purple. Many become lone wanderers — mages, rogues, and brokers surviving by wit alone.',
+		shortDescription: 'Infernal-touched and striking, marked by heritage and iron will.',
 		abilityBonuses: { cha: 2, int: 1 },
 		speed: 30,
 		size: 'Medium',
@@ -418,7 +436,8 @@ export const RACES: RaceDefinition[] = [
 	{
 		name: 'dwarf',
 		displayName: 'Dwarf',
-		description: 'Bold and hardy, dwarves are known as skilled warriors, miners, and workers of stone and metal.',
+		description: 'Dwarves stand four to five feet but weigh as much as a tall human, built dense with muscle and thick bone. Skin runs ruddy tan to deep clay brown; hair and beards span charcoal, reddish-brown, and bright ginger, worn in heavy braids adorned with clan-marks. Mountain holds, deep mine-cities, and fortress-smithies are home — places that produce the finest weaponcraft and stonework in any world.',
+		shortDescription: 'Hardy mountain folk prized as warriors, miners, and craftsmen.',
 		abilityBonuses: { con: 2 },
 		speed: 25,
 		size: 'Medium',
@@ -475,7 +494,8 @@ export const RACES: RaceDefinition[] = [
 	{
 		name: 'halfling',
 		displayName: 'Halfling',
-		description: 'The comforts of home are the goals of most halflings\' lives: a place to settle in peace and quiet.',
+		description: 'Halflings stand two and a half to three and a half feet with round, cheerful faces and large bare feet that rarely make a sound. Skin runs tawny to light brown; hair tends to curly chestnut, auburn, or sandy blonde. They build snug farmsteads, river-town markets, and woodland burrow-homes, living as farmers, cooks, river-traders, and surprisingly light-fingered opportunists.',
+		shortDescription: 'Small, nimble, and quietly brave — at home anywhere.',
 		abilityBonuses: { dex: 2 },
 		speed: 25,
 		size: 'Small',
@@ -535,7 +555,8 @@ export const RACES: RaceDefinition[] = [
 	{
 		name: 'gnome',
 		displayName: 'Gnome',
-		description: 'A gnome\'s energy and enthusiasm for living shines through every inch of his or her tiny body.',
+		description: 'Gnomes stand three to three and a half feet with oversized expressive eyes and faces that are rarely still. Skin runs pale cream to warm tan and slate-brown; hair grows in wild tufts of white, sandy-orange, or blue-grey. Forest gnomes hollow cozy burrow-dens in old woodland; rock gnomes build cluttered workshop-warrens of gears and fumes. Most become tinkers, illusionists, alchemists, or compulsively cheerful sages.',
+		shortDescription: 'Curious and inventive, brimming with energy and endless cleverness.',
 		abilityBonuses: { int: 2 },
 		speed: 25,
 		size: 'Small',

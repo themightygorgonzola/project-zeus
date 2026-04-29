@@ -73,6 +73,8 @@ export interface ClassDefinition {
 	subclassLabel: string;
 	spellcasting: SpellcastingConfig | null;
 	equipmentChoices: StartingEquipmentChoice[];
+	/** Guaranteed items received at character creation, regardless of player equipment choices. */
+	startingEquipment: string[];
 	/** Multiclass prerequisites: ability scores that must be ≥ 13. */
 	multiclassPrereqs: AbilityName[];
 	/** Proficiencies gained when multiclassing INTO this class. */
@@ -273,6 +275,7 @@ export const CLASSES: ClassDefinition[] = [
 			{ label: 'Ranged', options: [['Light Crossbow', 'Bolts (20)'], ['Two Handaxes']] },
 			{ label: 'Pack', options: [['Dungeoneer\'s Pack'], ['Explorer\'s Pack']] }
 		],
+		startingEquipment: [],
 		multiclassPrereqs: ['str'],
 		multiclassGrants: { armor: ['light', 'medium', 'shields'], weapons: ['simple', 'martial'], tools: [], skills: 0 }
 	},
@@ -286,7 +289,7 @@ export const CLASSES: ClassDefinition[] = [
 		primaryAbility: ['int'],
 		saveProficiencies: ['int', 'wis'],
 		armorProficiencies: [],
-		weaponProficiencies: [],
+		weaponProficiencies: ['dagger', 'dart', 'sling', 'quarterstaff', 'light-crossbow'],
 		toolProficiencies: [],
 		skillPickCount: 2,
 		skillOptions: ['arcana', 'history', 'insight', 'investigation', 'medicine', 'religion'],
@@ -324,6 +327,7 @@ export const CLASSES: ClassDefinition[] = [
 			{ label: 'Focus', options: [['Component Pouch'], ['Arcane Focus']] },
 			{ label: 'Pack', options: [['Scholar\'s Pack'], ['Explorer\'s Pack']] }
 		],
+		startingEquipment: [],
 		multiclassPrereqs: ['int'],
 		multiclassGrants: { armor: [], weapons: [], tools: [], skills: 0 }
 	},
@@ -337,7 +341,7 @@ export const CLASSES: ClassDefinition[] = [
 		primaryAbility: ['dex'],
 		saveProficiencies: ['dex', 'int'],
 		armorProficiencies: ['light'],
-		weaponProficiencies: ['simple'],
+		weaponProficiencies: ['simple', 'hand-crossbow', 'longsword', 'rapier', 'shortsword'],
 		toolProficiencies: ['thieves-tools'],
 		skillPickCount: 4,
 		skillOptions: ['acrobatics', 'athletics', 'deception', 'insight', 'intimidation', 'investigation', 'perception', 'performance', 'persuasion', 'sleight-of-hand', 'stealth'],
@@ -375,6 +379,7 @@ export const CLASSES: ClassDefinition[] = [
 			{ label: 'Ranged', options: [['Shortbow', 'Arrows (20)'], ['Shortsword']] },
 			{ label: 'Pack', options: [['Burglar\'s Pack'], ['Dungeoneer\'s Pack'], ['Explorer\'s Pack']] }
 		],
+		startingEquipment: ['Leather Armor', 'Two Daggers', "Thieves' Tools"],
 		multiclassPrereqs: ['dex'],
 		multiclassGrants: { armor: ['light'], weapons: [], tools: ['thieves-tools'], skills: 1 }
 	},
@@ -428,6 +433,7 @@ export const CLASSES: ClassDefinition[] = [
 			{ label: 'Ranged', options: [['Light Crossbow', 'Bolts (20)'], ['Simple Weapon']] },
 			{ label: 'Pack', options: [['Priest\'s Pack'], ['Explorer\'s Pack']] }
 		],
+		startingEquipment: ['Shield', 'Holy Symbol'],
 		multiclassPrereqs: ['wis'],
 		multiclassGrants: { armor: ['light', 'medium', 'shields'], weapons: [], tools: [], skills: 0 }
 	},
@@ -485,6 +491,7 @@ export const CLASSES: ClassDefinition[] = [
 			{ label: 'Weapons', options: [['Two Shortswords'], ['Two Simple Melee Weapons']] },
 			{ label: 'Pack', options: [['Dungeoneer\'s Pack'], ['Explorer\'s Pack']] }
 		],
+		startingEquipment: ['Longbow', 'Arrows (20)'],
 		multiclassPrereqs: ['dex', 'wis'],
 		multiclassGrants: { armor: ['light', 'medium', 'shields'], weapons: ['simple', 'martial'], tools: [], skills: 1 }
 	},
@@ -536,6 +543,7 @@ export const CLASSES: ClassDefinition[] = [
 			{ label: 'Secondary', options: [['Two Handaxes'], ['Simple Weapon']] },
 			{ label: 'Pack', options: [['Explorer\'s Pack']] }
 		],
+		startingEquipment: ['Four Javelins'],
 		multiclassPrereqs: ['str'],
 		multiclassGrants: { armor: ['shields'], weapons: ['simple', 'martial'], tools: [], skills: 0 }
 	},
@@ -549,7 +557,7 @@ export const CLASSES: ClassDefinition[] = [
 		primaryAbility: ['cha'],
 		saveProficiencies: ['dex', 'cha'],
 		armorProficiencies: ['light'],
-		weaponProficiencies: ['simple'],
+		weaponProficiencies: ['simple', 'hand-crossbow', 'longsword', 'rapier', 'shortsword'],
 		toolProficiencies: [],
 		skillPickCount: 3,
 		skillOptions: ['acrobatics', 'animal-handling', 'arcana', 'athletics', 'deception', 'history', 'insight', 'intimidation', 'investigation', 'medicine', 'nature', 'perception', 'performance', 'persuasion', 'religion', 'sleight-of-hand', 'stealth', 'survival'],
@@ -591,6 +599,7 @@ export const CLASSES: ClassDefinition[] = [
 			{ label: 'Pack', options: [['Diplomat\'s Pack'], ['Entertainer\'s Pack']] },
 			{ label: 'Instrument', options: [['Lute'], ['Musical Instrument']] }
 		],
+		startingEquipment: ['Leather Armor'],
 		multiclassPrereqs: ['cha'],
 		multiclassGrants: { armor: ['light'], weapons: [], tools: [], skills: 1 }
 	},
@@ -649,6 +658,7 @@ export const CLASSES: ClassDefinition[] = [
 			{ label: 'Melee', options: [['Five Javelins'], ['Simple Melee Weapon']] },
 			{ label: 'Pack', options: [['Priest\'s Pack'], ['Explorer\'s Pack']] }
 		],
+		startingEquipment: ['Chain Mail', 'Holy Symbol'],
 		multiclassPrereqs: ['str', 'cha'],
 		multiclassGrants: { armor: ['light', 'medium', 'shields'], weapons: ['simple', 'martial'], tools: [], skills: 0 }
 	},
@@ -662,7 +672,7 @@ export const CLASSES: ClassDefinition[] = [
 		primaryAbility: ['cha'],
 		saveProficiencies: ['con', 'cha'],
 		armorProficiencies: [],
-		weaponProficiencies: [],
+		weaponProficiencies: ['dagger', 'dart', 'sling', 'quarterstaff', 'light-crossbow'],
 		toolProficiencies: [],
 		skillPickCount: 2,
 		skillOptions: ['arcana', 'deception', 'insight', 'intimidation', 'persuasion', 'religion'],
@@ -700,6 +710,7 @@ export const CLASSES: ClassDefinition[] = [
 			{ label: 'Focus', options: [['Component Pouch'], ['Arcane Focus']] },
 			{ label: 'Pack', options: [['Dungeoneer\'s Pack'], ['Explorer\'s Pack']] }
 		],
+		startingEquipment: ['Two Daggers'],
 		multiclassPrereqs: ['cha'],
 		multiclassGrants: { armor: [], weapons: [], tools: [], skills: 0 }
 	},
@@ -751,6 +762,7 @@ export const CLASSES: ClassDefinition[] = [
 			{ label: 'Focus', options: [['Component Pouch'], ['Arcane Focus']] },
 			{ label: 'Pack', options: [['Scholar\'s Pack'], ['Dungeoneer\'s Pack']] }
 		],
+		startingEquipment: ['Leather Armor', 'Two Daggers'],
 		multiclassPrereqs: ['cha'],
 		multiclassGrants: { armor: ['light'], weapons: ['simple'], tools: [], skills: 0 }
 	},
@@ -764,7 +776,7 @@ export const CLASSES: ClassDefinition[] = [
 		primaryAbility: ['wis'],
 		saveProficiencies: ['int', 'wis'],
 		armorProficiencies: ['light', 'medium', 'shields'],
-		weaponProficiencies: [],
+		weaponProficiencies: ['club', 'dagger', 'dart', 'javelin', 'mace', 'quarterstaff', 'scimitar', 'sickle', 'sling', 'spear'],
 		toolProficiencies: [],
 		skillPickCount: 2,
 		skillOptions: ['arcana', 'animal-handling', 'insight', 'medicine', 'nature', 'perception', 'religion', 'survival'],
@@ -805,6 +817,7 @@ export const CLASSES: ClassDefinition[] = [
 			{ label: 'Melee', options: [['Scimitar'], ['Simple Melee Weapon']] },
 			{ label: 'Pack', options: [['Explorer\'s Pack']] }
 		],
+		startingEquipment: ['Leather Armor', 'Druidic Focus'],
 		multiclassPrereqs: ['wis'],
 		multiclassGrants: { armor: ['light', 'medium'], weapons: [], tools: [], skills: 0 }
 	},
@@ -818,7 +831,7 @@ export const CLASSES: ClassDefinition[] = [
 		primaryAbility: ['dex', 'wis'],
 		saveProficiencies: ['str', 'dex'],
 		armorProficiencies: [],
-		weaponProficiencies: ['simple'],
+		weaponProficiencies: ['simple', 'shortsword'],
 		toolProficiencies: [],
 		skillPickCount: 2,
 		skillOptions: ['acrobatics', 'athletics', 'history', 'insight', 'religion', 'stealth'],
@@ -860,6 +873,7 @@ export const CLASSES: ClassDefinition[] = [
 			{ label: 'Weapon', options: [['Shortsword'], ['Simple Weapon']] },
 			{ label: 'Pack', options: [['Dungeoneer\'s Pack'], ['Explorer\'s Pack']] }
 		],
+		startingEquipment: ['Dart (10)'],
 		multiclassPrereqs: ['dex', 'wis'],
 		multiclassGrants: { armor: [], weapons: ['simple'], tools: [], skills: 0 }
 	}

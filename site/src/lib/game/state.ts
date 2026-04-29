@@ -14,7 +14,10 @@ import type {
 	AbilityScores,
 	ClassLevel,
 	ClassSpellList,
+	Condition,
 	ConditionEffectMap,
+	ContainerCapacity,
+	ContainerType,
 	GameClock,
 	GameId,
 	GameState,
@@ -27,6 +30,7 @@ import type {
 	StateChange,
 	TurnRecord
 } from '$lib/game/types';
+import { computeSpaceTaken, CONTAINER_DEFAULTS } from '$lib/game/item-dimensions';
 import {
 	DEFAULT_CONDITION_EFFECTS,
 	GAME_STATE_VERSION
@@ -64,16 +68,23 @@ function normalizeAbilityScores(value: unknown): AbilityScores {
 function normalizeItem(value: unknown): Item {
 	const obj = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 	const category = typeof obj.category === 'string' ? obj.category : 'misc';
+	const name = typeof obj.name === 'string' ? obj.name : 'Unknown Item';
+	const weight = toNumber(obj.weight, 0);
+	// spaceTaken: use stored value if valid, otherwise compute from lookup/formula
+	const storedST = toNumber(obj.spaceTaken, 0);
+	const spaceTaken = storedST > 0 ? storedST : computeSpaceTaken(name, weight);
 	const base = {
 		id: typeof obj.id === 'string' ? obj.id : '',
-		name: typeof obj.name === 'string' ? obj.name : 'Unknown Item',
+		name,
 		category,
 		description: typeof obj.description === 'string' ? obj.description : '',
 		value: toNumber(obj.value, 0),
 		quantity: Math.max(1, toNumber(obj.quantity, 1)),
-		weight: toNumber(obj.weight, 0),
+		weight,
+		spaceTaken,
 		rarity: (typeof obj.rarity === 'string' ? obj.rarity : 'common') as ItemRarity,
-		attunement: Boolean(obj.attunement)
+		attunement: Boolean(obj.attunement),
+		isStartingEquipment: Boolean(obj.isStartingEquipment)
 	} as const;
 
 	if (category === 'weapon') {
@@ -121,6 +132,29 @@ function normalizeItem(value: unknown): Item {
 			category: 'quest',
 			questId: typeof obj.questId === 'string' ? obj.questId : undefined,
 			importance: typeof obj.importance === 'string' ? obj.importance as 'minor' | 'major' | 'critical' : undefined
+		};
+	}
+
+	if (category === 'container') {
+		const cap = obj.capacity && typeof obj.capacity === 'object' ? obj.capacity as Record<string, unknown> : {};
+		const containerType = (typeof obj.containerType === 'string' ? obj.containerType : 'other') as ContainerType;
+		const defaults = CONTAINER_DEFAULTS[containerType] ?? CONTAINER_DEFAULTS['other'];
+		// Migrate old maxWeight → maxWU; new format takes priority
+		const maxWU = typeof cap.maxWU === 'number' ? cap.maxWU
+			: typeof cap.maxWeight === 'number' ? cap.maxWeight
+			: defaults.maxWU;
+		const maxSU = typeof cap.maxSU === 'number' ? cap.maxSU : defaults.maxSU;
+		const capacity: ContainerCapacity = {
+			maxWU,
+			maxSU,
+			discounts: Array.isArray(cap.discounts) ? (cap.discounts as ContainerCapacity['discounts']) : defaults.discounts
+		};
+		return {
+			...base,
+			category: 'container',
+			containerType,
+			capacity,
+			contents: Array.isArray(obj.contents) ? obj.contents.map(normalizeItem) : []
 		};
 	}
 
@@ -310,6 +344,8 @@ function normalizeCharacter(value: unknown): PlayerCharacter {
 		passivePerception: Math.max(0, toNumber(obj.passivePerception, 10 + wisMod + (skillProficiencies.includes('perception') ? proficiencyBonus : 0))),
 		inventory: Array.isArray(obj.inventory) ? obj.inventory.map(normalizeItem) : [],
 		gold: Math.max(0, toNumber(obj.gold, 0)),
+		silver: Math.max(0, toNumber(obj.silver, 0)),
+		copper: Math.max(0, toNumber(obj.copper, 0)),
 		xp: Math.max(0, toNumber(obj.xp, 0)),
 		conditions: Array.isArray(obj.conditions)
 			? obj.conditions.filter((entry): entry is PlayerCharacter['conditions'][number] => typeof entry === 'string')
@@ -349,6 +385,10 @@ function normalizeNpc(value: unknown): NPC {
 			.map((n: unknown) => ({ turn: (n as Record<string, unknown>).turn as number, note: (n as Record<string, unknown>).note as string }));
 	}
 	if (typeof obj.archived === 'boolean') base.archived = obj.archived;
+	const VALID_CONDITIONS = new Set<string>(['blinded','charmed','deafened','frightened','grappled','incapacitated','invisible','paralyzed','petrified','poisoned','prone','restrained','stunned','unconscious','exhaustion']);
+	base.conditions = Array.isArray(obj.conditions)
+		? (obj.conditions as unknown[]).filter((c): c is Condition => typeof c === 'string' && VALID_CONDITIONS.has(c))
+		: [];
 	return base;
 }
 
@@ -415,6 +455,7 @@ export function createInitialGameState(worldSeed: string): GameState {
 		turnLog: [],
 		worldSeed,
 		nextTurnNumber: 1,
+		idleTurnCount: 0,
 		sceneFacts: [],
 		createdAt: now,
 		updatedAt: now
@@ -427,28 +468,46 @@ export function buildOpeningPreamble(state: GameState): string {
 		return 'Your adventure begins. The world waits to see what you do first.';
 	}
 
-	const localNpcs = state.npcs
-		.filter((npc) => npc.alive !== false && npc.locationId === location.id && npc.role !== 'hostile')
-		.map((npc) => npc.name);
-	const quest = state.quests.find((q) => q.status === 'available' || q.status === 'active');
-	const firstObjective = quest?.objectives.find((o) => !o.done)?.text ?? quest?.objectives[0]?.text;
 	const feature = location.features[0];
-	const timeBeat = `It is day ${state.clock.day}, ${state.clock.timeOfDay}, under ${state.clock.weather} skies.`;
+	const quest = state.quests.find((q) => q.status === 'available' || q.status === 'active');
 
-	const parts = [
-		`You begin in ${location.name}, ${location.description}`,
-		feature ? `A notable detail stands out immediately: ${feature}.` : '',
-		localNpcs.length > 0
-			? `${localNpcs.join(', ')} ${localNpcs.length === 1 ? 'is' : 'are'} nearby, close enough to approach.`
-			: '',
-		quest
-			? `A clear lead is already in front of you: ${quest.name}. ${firstObjective ? `The first step is simple — ${firstObjective}.` : quest.description}`
-			: '',
-		timeBeat,
-		'What do you do first?'
-	].filter(Boolean);
+	// Time-of-day flavour — no day count, no NPC name dump, no closing question
+	const timeStr =
+		state.clock.timeOfDay === 'dawn' ? 'The first pale light of dawn is cresting the horizon, the air cool and still.' :
+		state.clock.timeOfDay === 'morning' ? 'The morning is alive with the sounds of a waking settlement.' :
+		state.clock.timeOfDay === 'afternoon' ? 'The sun hangs high over the rooftops, the day in full motion.' :
+		state.clock.timeOfDay === 'dusk' ? 'The day is burning low, the sky bruising purple and amber at the edges.' :
+		state.clock.timeOfDay === 'night' ? 'Night has settled in, lanterns casting amber pools on the cobblestones.' :
+		'The air is still.';
 
-	return parts.join('\n\n');
+	const weatherStr =
+		state.clock.weather === 'clear' ? '' :
+		state.clock.weather === 'overcast' ? ' A grey, pressing sky sits low overhead.' :
+		state.clock.weather === 'rain' ? ' A steady rain patters against stone and timber.' :
+		state.clock.weather === 'storm' ? ' A churning storm rolls in from the distance.' :
+		state.clock.weather === 'fog' ? ' A thick fog clings to the ground and blurs the far end of the street.' :
+		state.clock.weather === 'snow' ? ' A quiet snowfall dusts the rooftops in white.' :
+		'';
+
+	const parts: string[] = [];
+
+	parts.push(`You stand in ${location.name}. ${location.description}`);
+	if (feature) parts.push(feature);
+	parts.push(timeStr + weatherStr);
+
+	// Ambient quest hook — never reveals the quest name or objective directly
+	if (quest) {
+		const questHooks = [
+			`Somewhere in the crowd, a town crier's voice rises above the noise — something about coin offered and trouble brewing — but the words blur together before you catch the whole of it.`,
+			`A loose scrap of parchment skitters past your boot, carried on a gust of wind. The letters are large and urgent, and you catch one or two words before it vanishes into the gutter.`,
+			`From a narrow alley off the main road, the sound of a child crying drifts out — soft, persistent, as though whoever it is has been at it for some time and no one has come.`,
+			`A freshly posted notice clings to the wall of the nearest building, the ink still damp. A small cluster of people have stopped to read it.`
+		];
+		const hookIdx = quest.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % questHooks.length;
+		parts.push(questHooks[hookIdx]);
+	}
+
+	return parts.filter(Boolean).join('\n\n');
 }
 
 export function createOpeningGmTurn(state: GameState): TurnRecord | null {
@@ -513,6 +572,7 @@ function migrateV1toV2(rawState: Record<string, unknown>): GameState {
 		: defaultClock();
 	state.turnLog = Array.isArray(rawState.turnLog) ? rawState.turnLog as TurnRecord[] : [];
 	state.nextTurnNumber = Math.max(1, toNumber(rawState.nextTurnNumber, 1));
+	state.idleTurnCount = typeof rawState.idleTurnCount === 'number' ? rawState.idleTurnCount : 0;
 	state.sceneFacts = Array.isArray(rawState.sceneFacts) ? rawState.sceneFacts.filter((f: unknown) => typeof f === 'string') : [];
 	state.createdAt = toNumber(rawState.createdAt, Date.now());
 	state.updatedAt = toNumber(rawState.updatedAt, state.createdAt);

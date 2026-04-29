@@ -10,6 +10,7 @@
 
 import type {
 	Condition,
+	NPC,
 	PlayerCharacter,
 	StateChange
 } from './types';
@@ -306,6 +307,87 @@ export function damageWhileUnconscious(
  */
 export function resetDeathSaves(character: PlayerCharacter): void {
 	character.deathSaves = { successes: 0, failures: 0 };
+}
+
+// ---------------------------------------------------------------------------
+// NPC Condition Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Apply a condition to an NPC, following the same cascade rules as PCs.
+ *
+ * NPCs track conditions in an optional `conditions` array (defaults to []).
+ * Returns the list of conditions actually added and a StateChange record.
+ * Mutates `npc.conditions` in-place.
+ */
+export function applyNpcCondition(
+	npc: NPC,
+	condition: Condition
+): { added: Condition[]; stateChange: StateChange } {
+	if (!npc.conditions) npc.conditions = [];
+
+	const added: Condition[] = [];
+	const stateChanges: StateChange['conditionsApplied'] = [];
+
+	if (!npc.conditions.includes(condition)) {
+		npc.conditions.push(condition);
+		added.push(condition);
+		stateChanges.push({ characterId: npc.id, condition, applied: true });
+	}
+
+	const implied = CONDITION_IMPLIES[condition];
+	if (implied) {
+		for (const c of implied) {
+			if (!npc.conditions.includes(c)) {
+				npc.conditions.push(c);
+				added.push(c);
+				stateChanges.push({ characterId: npc.id, condition: c, applied: true });
+			}
+		}
+	}
+
+	return { added, stateChange: { conditionsApplied: stateChanges } };
+}
+
+/**
+ * Remove a condition from an NPC, following cascade rules.
+ * Mutates `npc.conditions` in-place.
+ */
+export function removeNpcCondition(
+	npc: NPC,
+	condition: Condition
+): { removed: Condition[]; stateChange: StateChange } {
+	if (!npc.conditions) npc.conditions = [];
+
+	const removed: Condition[] = [];
+	const stateChanges: StateChange['conditionsApplied'] = [];
+
+	const idx = npc.conditions.indexOf(condition);
+	if (idx !== -1) {
+		npc.conditions.splice(idx, 1);
+		removed.push(condition);
+		stateChanges.push({ characterId: npc.id, condition, applied: false });
+	}
+
+	const implied = CONDITION_IMPLIES[condition];
+	if (implied) {
+		for (const cascaded of implied) {
+			if (cascaded === 'incapacitated') {
+				const otherSources = INCAPACITATED_SOURCES.filter(
+					c => c !== condition && npc.conditions!.includes(c)
+				);
+				if (otherSources.length > 0) continue;
+			}
+			const cIdx = npc.conditions.indexOf(cascaded);
+			if (cIdx !== -1) {
+				npc.conditions.splice(cIdx, 1);
+				removed.push(cascaded);
+				stateChanges.push({ characterId: npc.id, condition: cascaded, applied: false });
+			}
+		}
+	}
+
+	return { removed, stateChange: { conditionsApplied: stateChanges } };
 }
 
 // ---------------------------------------------------------------------------

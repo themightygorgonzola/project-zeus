@@ -67,7 +67,13 @@ When generating quest objectives, ALWAYS include a "type" field:
 - "custom": anything else
 
 When generating quests, ALWAYS include rewards:
-{ "xp": number, "gold": number }`;
+{ "xp": number, "gold": number }
+
+Optionally include these quest fields to make the story feel alive:
+- "failureConsequence": one sentence describing what happens in the world if this quest fails
+- "deadline": { "day": <gameDay>, "description": "plain-language deadline context" } for time-sensitive quests
+- "followUpQuestIds": array of existing quest IDs that unlock when this quest completes
+- "prerequisiteQuestIds": array of quest IDs that must be done before this quest begins`;
 }
 
 function describeLocation(loc: Location): string {
@@ -155,7 +161,21 @@ export function parseEnrichmentResponse(raw: string): StateChange {
 							xp: typeof (q.rewards as Record<string, unknown>).xp === 'number' ? (q.rewards as Record<string, unknown>).xp as number : 100,
 							gold: typeof (q.rewards as Record<string, unknown>).gold === 'number' ? (q.rewards as Record<string, unknown>).gold as number : 20
 						}
-						: { xp: 100, gold: 20 }
+						: { xp: 100, gold: 20 },
+					failureConsequence: typeof q.failureConsequence === 'string' && q.failureConsequence.trim() !== ''
+						? q.failureConsequence
+						: undefined,
+					deadline: q.deadline && typeof q.deadline === 'object' &&
+						typeof (q.deadline as Record<string, unknown>).day === 'number' &&
+						typeof (q.deadline as Record<string, unknown>).description === 'string'
+						? { day: (q.deadline as Record<string, unknown>).day as number, description: (q.deadline as Record<string, unknown>).description as string }
+						: undefined,
+					followUpQuestIds: Array.isArray(q.followUpQuestIds)
+						? q.followUpQuestIds.filter((id: unknown) => typeof id === 'string')
+						: undefined,
+					prerequisiteQuestIds: Array.isArray(q.prerequisiteQuestIds)
+						? q.prerequisiteQuestIds.filter((id: unknown) => typeof id === 'string')
+						: undefined
 				}));
 		}
 
@@ -219,6 +239,7 @@ SETTLEMENT: ${describeLocation(location)}
 FEATURES: ${(location.features ?? []).join('; ') || 'None yet'}
 EXISTING NPCS: ${existingNpcs.length > 0 ? existingNpcs.map(describeNpc).join('; ') : 'None yet'}
 
+Use "show, don't tell" — describe what the player can see, hear, or smell; never state population numbers or use the settlement tier words (hamlet, village, town, city) in any description or scene fact text.
 Generate 2-3 new NPCs and 1-2 scene facts that make this place feel alive.
 Each NPC should have a distinct role and personality that creates gameplay opportunity.
 
@@ -301,7 +322,10 @@ Return JSON:
       "name": "...", "description": "...", "giverNpcId": "${giver?.id ?? ''}",
       "objectives": [{ "text": "...", "type": "talk-to", "linkedEntityId": "npc-xxx", "linkedEntityName": "Name" }],
       "recommendedLevel": ${(state.characters[0]?.level ?? 1) + 1},
-      "rewards": { "xp": ${100 + (state.characters[0]?.level ?? 1) * 50}, "gold": ${20 + (state.characters[0]?.level ?? 1) * 10} }
+      "rewards": { "xp": ${100 + (state.characters[0]?.level ?? 1) * 50}, "gold": ${20 + (state.characters[0]?.level ?? 1) * 10} },
+      "failureConsequence": "One sentence: what happens in the world if this quest fails (optional)",
+      "deadline": { "day": <gameDay>, "description": "..." } (optional — include for time-sensitive quests only),
+      "followUpQuestIds": ["quest-id"] (optional — IDs of quests that unlock when this one completes)
     }
   ],
   "npcsAdded": [

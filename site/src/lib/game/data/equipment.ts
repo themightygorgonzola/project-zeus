@@ -167,22 +167,34 @@ export const GEAR: GearDefinition[] = [
 	{ name: 'diplomats-pack', displayName: 'Diplomat’s Pack', category: 'pack', cost: '39 gp', weight: 36, description: 'Travel gear suitable for social envoys.', contents: ['Chest', '2 Cases for Maps and Scrolls', 'Fine Clothes', 'Bottle of Ink', 'Ink Pen', 'Lamp', '2 Flasks of Oil', '5 Sheets of Paper', 'Vial of Perfume', 'Sealing Wax', 'Soap'] },
 	{ name: 'entertainers-pack', displayName: 'Entertainer’s Pack', category: 'pack', cost: '40 gp', weight: 38, description: 'A performer’s road kit.', contents: ['Backpack', 'Bedroll', '2 Costumes', '5 Candles', '5 Days of Rations', 'Waterskin', 'Disguise Kit'] }
 ];
+// ---------------------------------------------------------------------------
+// Musical Instruments (SRD)
+// ---------------------------------------------------------------------------
 
+/** Display names of the standard SRD musical instruments a character may choose from. */
+export const INSTRUMENTS: string[] = [
+	'Bagpipes', 'Drum', 'Dulcimer', 'Flute', 'Lute', 'Lyre', 'Horn', 'Pan Flute', 'Shawm', 'Viol'
+];
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** Normalize curly/smart apostrophes to straight ASCII ' for comparison. */
+function normApost(s: string): string {
+	return s.trim().toLowerCase().replace(/[\u2018\u2019\u02BC]/g, "'");
+}
+
 export function getWeapon(name: string): WeaponDefinition | undefined {
 	const normalized = name.trim().toLowerCase().replace(/\s+/g, '-');
-	return WEAPONS.find((weapon) => weapon.name === normalized || weapon.displayName.toLowerCase() === name.trim().toLowerCase());
+	return WEAPONS.find((weapon) => weapon.name === normalized || normApost(weapon.displayName) === normApost(name));
 }
 
 export function getArmor(name: string): ArmorDefinition | undefined {
 	const normalized = name.trim().toLowerCase().replace(/\s+/g, '-');
-	return ARMOR.find((armor) => armor.name === normalized || armor.displayName.toLowerCase() === name.trim().toLowerCase());
+	return ARMOR.find((armor) => armor.name === normalized || normApost(armor.displayName) === normApost(name));
 }
 
 export function getGear(name: string): GearDefinition | undefined {
 	const normalized = name.trim().toLowerCase().replace(/\s+/g, '-');
-	return GEAR.find((gear) => gear.name === normalized || gear.displayName.toLowerCase() === name.trim().toLowerCase());
+	return GEAR.find((gear) => gear.name === normalized || normApost(gear.displayName) === normApost(name));
 }

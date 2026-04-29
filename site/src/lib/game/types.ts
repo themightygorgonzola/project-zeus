@@ -172,7 +172,8 @@ export type Condition =
 	| 'restrained'
 	| 'stunned'
 	| 'unconscious'
-	| 'exhaustion';
+	| 'exhaustion'
+	| 'raging';
 
 export interface ConditionEffect {
 	advantageOn: string[];
@@ -305,6 +306,14 @@ export const DEFAULT_CONDITION_EFFECTS: ConditionEffectMap = {
 		autoFailSaves: [],
 		speedMultiplier: 0.5,
 		notes: ['Higher exhaustion levels stack additional penalties.']
+	},
+	raging: {
+		advantageOn: ['strength-checks', 'strength-saving-throws'],
+		disadvantageOn: [],
+		cantDo: [],
+		autoFailSaves: [],
+		speedMultiplier: 1,
+		notes: ['Resistance to bludgeoning, piercing, and slashing damage.', 'Bonus damage on melee weapon attacks.']
 	}
 };
 
@@ -312,7 +321,7 @@ export const DEFAULT_CONDITION_EFFECTS: ConditionEffectMap = {
 // Items
 // ---------------------------------------------------------------------------
 
-export type ItemCategory = 'weapon' | 'armor' | 'consumable' | 'quest' | 'misc' | 'ammunition';
+export type ItemCategory = 'weapon' | 'armor' | 'consumable' | 'quest' | 'misc' | 'ammunition' | 'container';
 export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'very-rare' | 'legendary';
 
 export interface BaseItem {
@@ -325,8 +334,24 @@ export interface BaseItem {
 	/** How many the holder has. */
 	quantity: number;
 	weight: number;
+	/**
+	 * Space Units — geometric volume proxy for this item.
+	 * 1 SU ≈ the space of a typical handheld object.
+	 * Coins are 0.01 SU each; a greatsword is 5 SU.
+	 * Derived from ITEM_SU_TABLE or fallback formula (weight * 0.7, min 0.5).
+	 * Optional at creation time — normalizeItem fills it in at load.
+	 */
+	spaceTaken?: number;
 	rarity: ItemRarity;
 	attunement: boolean;
+	/** True when this item was crafted or assembled in-world rather than found/purchased. */
+	crafted?: boolean;
+	/** Brief description of source materials (e.g. 'carved from dragon bone', 'brewed from goblin herbs'). */
+	craftedFrom?: string;
+	/** Free-form notes on the item's origin or special crafted properties. */
+	craftingNotes?: string;
+	/** True when this item was part of the character's starting equipment at creation. */
+	isStartingEquipment?: boolean;
 }
 
 export interface WeaponItem extends BaseItem {
@@ -380,7 +405,83 @@ export interface AmmunitionItem extends BaseItem {
 	improvisedDamageType?: string;
 }
 
-export type Item = WeaponItem | ArmorItem | ConsumableItem | QuestItem | MiscItem | AmmunitionItem;
+export type ContainerType =
+	| 'backpack'
+	| 'chest'
+	| 'bag'
+	| 'pouch'
+	| 'sack'
+	| 'case'
+	| 'saddlebag'
+	| 'belt-pouch'
+	| 'coin-purse'
+	| 'quiver'
+	| 'belt'
+	| 'component-pouch'
+	| 'scroll-case'
+	| 'other';
+
+/**
+ * Per-container discount rule. Applied when computing effective WU or SU
+ * for items stored inside this container.
+ */
+export interface ContainerDiscount {
+	/** Apply only to items of this category. Omit to apply to all. */
+	category?: ItemCategory;
+	/** Apply only when item name contains this substring (case-insensitive). */
+	nameMatch?: string;
+	/** Effective WU multiplier. 0.5 = half weight credit. 1.0 = no discount. */
+	wuMultiplier: number;
+	/** Effective SU multiplier. 0.1 = very compact storage. 1.0 = no discount. */
+	suMultiplier: number;
+}
+
+export interface ContainerCapacity {
+	/** Maximum Weight Units the container can hold. 1 WU = 1 lb. */
+	maxWU: number;
+	/** Maximum Space Units the container can hold. */
+	maxSU: number;
+	/** Optional per-item-type discounts for this container's storage. */
+	discounts?: ContainerDiscount[];
+	/** @deprecated Use maxWU instead. Kept for migration from old saves. */
+	maxWeight?: number;
+	/** @deprecated Use maxSU math instead. */
+	maxSlots?: number;
+}
+
+/** Extended encumbrance info including variant thresholds and SU totals. */
+export interface EnhancedEncumbranceInfo {
+	/** Current carried WU (= total lbs from all inventory). Worn/equipped items count at 25%. */
+	wuTotal: number;
+	/** Total SU across entire inventory. */
+	suTotal: number;
+	/** STR × 30 — maximum carry capacity (Overloaded threshold). */
+	capacity: number;
+	/** STR × 15 — threshold for Loaded (no speed penalty). */
+	loadedThreshold: number;
+	/** STR × 25 — threshold for Burdened (speed −10 ft, disadvantage on STR/DEX/CON). */
+	burdenedThreshold: number;
+	/** Percentage used (wuTotal / capacity), can exceed 100. */
+	pct: number;
+	/** Current load status badge. */
+	badge: 'unloaded' | 'loaded' | 'burdened' | 'overloaded';
+	/** True when wuTotal > loadedThreshold. */
+	isEncumbered: boolean;
+	/** True when wuTotal > burdenedThreshold. */
+	isHeavilyEncumbered: boolean;
+	/** True when wuTotal > capacity. */
+	isOverCapacity: boolean;
+}
+
+export interface ContainerItem extends BaseItem {
+	category: 'container';
+	containerType: ContainerType;
+	capacity: ContainerCapacity;
+	/** Items stored inside this container. */
+	contents: Item[];
+}
+
+export type Item = WeaponItem | ArmorItem | ConsumableItem | QuestItem | MiscItem | AmmunitionItem | ContainerItem;
 
 // ---------------------------------------------------------------------------
 // Character progression helpers
@@ -388,6 +489,8 @@ export type Item = WeaponItem | ArmorItem | ConsumableItem | QuestItem | MiscIte
 
 export interface CharacterFeatureRef {
 	name: string;
+	/** Machine-readable identifier for the feature (e.g. 'relentless-endurance'). */
+	tag?: string;
 	level: number;
 	source?: 'class' | 'subclass' | 'race' | 'background' | 'feat' | 'other';
 	/** Which class granted this feature (for multiclass tracking). */
@@ -492,6 +595,8 @@ export interface PlayerCharacter {
 
 	inventory: Item[];
 	gold: number;
+	silver?: number;
+	copper?: number;
 	xp: number;
 
 	conditions: Condition[];
@@ -651,6 +756,8 @@ export interface NPC {
 	description: string;
 	/** GM-only notes — backstory, secrets, agenda. */
 	notes: string;
+	/** Nicknames/informal names the player may use. Shown in AI context to prevent duplicate NPC creation. */
+	aliases?: string[];
 	alive: boolean;
 	statBlock?: CreatureStatBlock;
 	/** Turn number of the most recent interaction (state change, narrative mention, or creation). */
@@ -659,6 +766,8 @@ export interface NPC {
 	interactionNotes?: NpcInteractionNote[];
 	/** When true, NPC is excluded from prompt context but preserved in state for history. */
 	archived?: boolean;
+	/** Active 5e conditions on this NPC. Defaults to [] on construction. Persisted for multi-turn tracking. */
+	conditions?: Condition[];
 }
 
 // ---------------------------------------------------------------------------
@@ -683,6 +792,10 @@ export interface Location {
 	visited: boolean;
 	/** Items lying on the ground at this location (dropped, looted, placed). */
 	groundItems?: Item[];
+	/** Pre-computed travel time in periods; set at world-seed time for distance-measured routes. */
+	travelPeriods?: number;
+	/** Gate access policy — governs entry restrictions by time of day. */
+	gatePolicy?: 'none' | 'daytime-only' | 'guarded-at-night';
 }
 
 // ---------------------------------------------------------------------------
@@ -719,6 +832,8 @@ export interface QuestRewards {
 
 export type EncounterTemplateTier = 'minion' | 'soldier' | 'elite' | 'boss' | 'legendary';
 
+export type QuestCompletionMethod = 'combat' | 'diplomacy' | 'stealth' | 'bribery' | 'deception' | 'custom' | 'expired';
+
 export interface Quest {
 	id: GameId;
 	name: string;
@@ -729,6 +844,19 @@ export interface Quest {
 	rewards: QuestRewards;
 	recommendedLevel: number;
 	encounterTemplates: EncounterTemplateTier[];
+	/** How the quest was resolved. Populated when status transitions to 'completed' or 'failed'. */
+	completionMethod?: QuestCompletionMethod;
+	/** Optional in-world deadline. Quest auto-fails when state.clock.day > deadline.day. */
+	deadline?: { day: number; description: string };
+	/**
+	 * Stakes reminder shown to the AI every turn for active quests.
+	 * Describes real-world consequences if the quest is not completed.
+	 */
+	failureConsequence?: string;
+	/** IDs of quests that become 'available' when this quest transitions to 'completed'. */
+	followUpQuestIds?: GameId[];
+	/** IDs of quests that must be 'completed' before this quest can become 'active'. */
+	prerequisiteQuestIds?: GameId[];
 }
 
 // ---------------------------------------------------------------------------
@@ -773,7 +901,8 @@ export interface DiceResult {
 export interface MechanicResult {
 	type: 'skill-check' | 'attack-roll' | 'saving-throw' | 'damage' | 'healing' | 'other';
 	label: string;
-	dice: DiceResult;
+	/** Dice result. Optional for informational (type: 'other') results with no associated roll. */
+	dice?: DiceResult;
 	dc?: number;
 	success?: boolean;
 }
@@ -850,9 +979,17 @@ export interface StateChange {
 	locationItemsAdded?: Array<{ locationId: GameId; item: Item }>;
 	locationChange?: { from: GameId | null; to: GameId };
 	npcChanges?: Array<{ npcId: GameId; field: string; oldValue: unknown; newValue: unknown }>;
-	questUpdates?: Array<{ questId: GameId; field: string; oldValue: unknown; newValue: unknown; objectiveId?: GameId }>;
+	questUpdates?: Array<{
+		questId: GameId;
+		field: string;
+		oldValue: unknown;
+		newValue: unknown;
+		objectiveId?: GameId;
+		/** How the quest was resolved — included when field==='status' and newValue is 'completed' or 'failed'. */
+		completionMethod?: QuestCompletionMethod;
+	}>;
 	conditionsApplied?: Array<{ characterId: GameId; condition: Condition; applied: boolean }>;
-	xpAwarded?: Array<{ characterId: GameId; amount: number }>;
+	xpAwarded?: Array<{ characterId: GameId; amount: number; reason?: string }>;
 	/** Direct gold transfer to one or more characters (payments, found coins, sales proceeds). */
 	goldChange?: Array<{ characterId: GameId; delta: number; reason: string }>;
 	clockAdvance?: { from: GameClock; to: GameClock };
@@ -884,6 +1021,8 @@ export interface StateChange {
 		disposition: number;
 		description: string;
 		notes?: string;
+		/** Optional stat block — filled by engine if absent/flat for hostile/boss NPCs. */
+		statBlock?: CreatureStatBlock;
 	}>;
 	/** Locations the GM created or revealed this turn. */
 	locationsAdded?: Array<{
@@ -904,6 +1043,16 @@ export interface StateChange {
 		giverNpcId?: GameId | null;
 		objectives: Array<{ id: GameId; text: string }>;
 		recommendedLevel?: number;
+		/** What goes wrong in the world if this quest is not completed. */
+		failureConsequence?: string;
+		/** Optional in-world deadline for this quest. */
+		deadline?: { day: number; description: string };
+		/** Quest IDs unlocked when this quest completes (requires those quests to already exist). */
+		followUpQuestIds?: GameId[];
+		/** Quest IDs that must be 'completed' before this quest becomes 'active'. */
+		prerequisiteQuestIds?: GameId[];
+		/** Optional initial status. Only 'available' and 'active' are permitted on new quests. */
+		status?: 'available' | 'active';
 	}>;
 	/** Free-form scene facts the GM established (non-mechanical). */
 	sceneFactsAdded?: string[];
@@ -1066,6 +1215,8 @@ export interface GameState {
 	worldSeed: string;
 	/** Monotonically increasing counter for turn numbering. */
 	nextTurnNumber: number;
+	/** Consecutive non-travel/non-combat turns elapsed; auto-advances clock every IDLE_TURNS_PER_PERIOD. */
+	idleTurnCount?: number;
 	/** Accumulated scene facts the GM established — surfaced in future prompts. */
 	sceneFacts: string[];
 	/** When the game state was first created. */
@@ -1124,8 +1275,16 @@ export interface CharacterCreateInput {
 	spellChoices?: CharacterSpellChoices;
 	/** Selected option index for each class equipment choice row. */
 	equipmentSelections?: number[];
+	/** Sub-selections for weapon-category / instrument placeholders.
+	 *  Key = "sub-{choiceIndex}", value = ordered array of chosen item display names.
+	 *  e.g. { "sub-1": ["Longsword", "Greatsword"] } for "Two Martial Weapons". */
+	equipmentSubSelections?: Record<string, string[]>;
+	/** Per-background interactive choices: key = BackgroundEquipmentChoice.id, value = selected label or text. */
+	backgroundEquipmentChoices?: Record<string, string>;
 	/** Variant human feat selection. */
 	variantHumanFeat?: string;
+	/** Expertise skill choices for classes with the Expertise feature (e.g. Rogue level 1). */
+	expertiseChoices?: SkillName[];
 	backstory?: string;
 	/** Optional: import a multiclass character with predefined class levels. */
 	importClasses?: ClassLevel[];

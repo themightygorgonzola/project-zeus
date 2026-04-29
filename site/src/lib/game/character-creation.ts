@@ -14,8 +14,11 @@ import type {
 	ClassLevel,
 	ClassName,
 	ClassSpellList,
+	ContainerItem,
+	ContainerType,
 	PlayerCharacter,
-	SkillName
+	SkillName,
+	WeaponItem
 } from './types';
 import { CLASS_SKILL_OPTIONS } from './types';
 import {
@@ -45,6 +48,8 @@ import {
 	getSubrace,
 	getWeapon
 } from './data';
+import type { BackgroundDefinition } from './data';
+import { computeSpaceTaken, CONTAINER_DEFAULTS, canAddToContainer, getItemSU } from './item-dimensions';
 
 // ---------------------------------------------------------------------------
 // Saving throw proficiencies per class (5e PHB)
@@ -66,6 +71,17 @@ const CLASS_SAVE_PROFICIENCIES: Record<ClassName, [AbilityName, AbilityName]> = 
 };
 
 const ALL_ABILITIES: AbilityName[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+
+// Equipment-choice placeholder recognition (must stay in sync with CharacterCreation.svelte helpers)
+const WEAPON_PLACEHOLDER_NAMES = new Set([
+	'martial weapon', 'two martial weapons', 'martial melee weapon',
+	'simple weapon', 'simple melee', 'two simple melee', 'simple melee weapon',
+	'simple ranged weapon'
+]);
+const KNOWN_INSTRUMENT_NAMES = new Set([
+	'bagpipes', 'drum', 'dulcimer', 'flute', 'lute', 'lyre', 'horn', 'pan flute', 'shawm', 'viol'
+]);
+
 const ALL_SKILLS: SkillName[] = [
 	'acrobatics',
 	'animal-handling',
@@ -154,6 +170,7 @@ export function validateCharacterInput(input: CharacterCreateInput): ValidationE
 	validateLanguages(input, errors, backgroundDef?.languageChoices ?? 0);
 	validateSpells(input, errors, abilities);
 	validateEquipment(input, errors);
+	validateExpertise(input, errors);
 
 	if (input.backstory && input.backstory.length > 2000) {
 		errors.push({ field: 'backstory', message: 'Backstory must be 2000 characters or fewer.' });
@@ -437,6 +454,37 @@ function validateEquipment(input: CharacterCreateInput, errors: ValidationError[
 	});
 }
 
+function validateExpertise(input: CharacterCreateInput, errors: ValidationError[]): void {
+	const classDef = getClass(input.class);
+	const hasExpertise = (classDef?.features ?? []).some(
+		(f) => f.level === 1 && (f.tags ?? []).includes('expertise')
+	);
+	if (!hasExpertise) return;
+
+	const backgroundDef = input.background ? getBackground(input.background) : undefined;
+	const skillProficiencies = Array.from(
+		new Set([
+			...(backgroundDef?.skillProficiencies ?? []),
+			...getFixedRacialSkills(input.race, input.subrace),
+			...(input.bonusSkillChoices ?? []),
+			...input.chosenSkills
+		])
+	);
+
+	const choices = input.expertiseChoices ?? [];
+	if (choices.length !== 2) {
+		errors.push({ field: 'expertiseChoices', message: 'Choose 2 skills for expertise.' });
+		return;
+	}
+	if (new Set(choices).size !== choices.length) {
+		errors.push({ field: 'expertiseChoices', message: 'Expertise choices must be unique.' });
+		return;
+	}
+	if (choices.some((c) => !skillProficiencies.includes(c))) {
+		errors.push({ field: 'expertiseChoices', message: 'Expertise choices must come from your skill proficiencies.' });
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Feature-use map (limited-use features → max uses, recovery)
 // ---------------------------------------------------------------------------
@@ -501,7 +549,40 @@ export function createCharacter(
 
 	const baseAbilities = resolveBaseAbilities(input);
 	const abilities = applyRacialBonuses(baseAbilities, input);
-	const inventory = resolveStartingEquipment(input, backgroundDef?.equipment ?? []);
+	const inventory = resolveStartingEquipment(
+		input,
+		backgroundDef
+			? resolveBackgroundEquipment(backgroundDef, input.backgroundEquipmentChoices ?? {})
+			: []
+	);
+
+	// Inject starting coins as physical items into the coin purse.
+	// 1 WU = 1 lb; 50 coins = 1 lb → each coin weighs 0.02 WU.
+	// Coins stack flat: 0.01 SU per coin.
+	{
+		const purse = inventory.find(
+			i => i.category === 'container' && (i as ContainerItem).containerType === 'coin-purse'
+		) as ContainerItem | undefined;
+		if (purse) {
+			const addCoins = (name: string, qty: number, gpValue: number) => {
+				if (qty <= 0) return;
+				purse.contents.push({
+					id: ulid(),
+					name,
+					category: 'misc',
+					weight: 0.02,
+					quantity: qty,
+					spaceTaken: 0.01,
+					value: gpValue,
+					rarity: 'common',
+					attunement: false
+					// no isStartingEquipment flag — coins don't need the SE badge
+				} as PlayerCharacter['inventory'][number]);
+			};
+			addCoins('Gold Pieces', 15, 1);
+		}
+	}
+
 	const profBonus = proficiencyBonus(level);
 	const maxHp = level1Hp(input.class, abilities.con) + getPerLevelHpBonus(input.race, input.subrace, level);
 	const saveProficiencies = [...(CLASS_SAVE_PROFICIENCIES[input.class] ?? ['str', 'con'])];
@@ -558,6 +639,16 @@ export function createCharacter(
 		? []  // Warlock doesn't use standard slots at level 1
 		: spellSlots;
 
+	// Resolve expertise skills from player choices, filter to confirmed skill proficiencies
+	const hasExpertiseFeature = (classDef?.features ?? []).some(
+		(f) => f.level === 1 && (f.tags ?? []).includes('expertise')
+	);
+	const expertiseSkills: SkillName[] = hasExpertiseFeature
+		? Array.from(new Set(input.expertiseChoices ?? []))
+			.filter((c) => skillProficiencies.includes(c))
+			.slice(0, 2)
+		: [];
+
 	return {
 		id: ulid(),
 		userId,
@@ -578,7 +669,7 @@ export function createCharacter(
 		size: raceDef?.size ?? 'Medium',
 		proficiencyBonus: profBonus,
 		skillProficiencies,
-		expertiseSkills: [],
+		expertiseSkills,
 		saveProficiencies,
 		languages,
 		armorProficiencies: Array.from(
@@ -590,6 +681,7 @@ export function createCharacter(
 		),
 		weaponProficiencies: Array.from(
 			new Set([
+				'unarmed',
 				...(classDef?.weaponProficiencies.map(String) ?? []),
 				...(raceDef?.weaponProficiencies ?? []),
 				...(subraceDef?.weaponProficiencies ?? [])
@@ -614,7 +706,9 @@ export function createCharacter(
 		inspiration: false,
 		passivePerception,
 		inventory,
-		gold: 15,
+		gold: 0,
+		silver: 0,
+		copper: 0,
 		xp: 0,
 		conditions: [],
 		resistances: getRacialResistances(input.race, input.subrace),
@@ -929,19 +1023,342 @@ function normalizeFeatName(name: string): string {
 	return name.trim().toLowerCase().replace(/\s+/g, '-');
 }
 
-function resolveStartingEquipment(input: CharacterCreateInput, backgroundEquipment: string[]): PlayerCharacter['inventory'] {
-	const classDef = getClass(input.class);
-	const selectedRows = (classDef?.equipmentChoices ?? []).map((choice, index) => {
-		const selectedIndex = input.equipmentSelections?.[index] ?? 0;
-		return choice.options[selectedIndex] ?? choice.options[0] ?? [];
-	});
-	const labels = [...selectedRows.flat(), ...backgroundEquipment];
-	const items = labels.map((label, index) => itemFromLabel(label, index === 0));
+/**
+ * Resolves the background equipment list, factoring in any interactive
+ * equipment choices the player made during character creation.
+ */
+function resolveBackgroundEquipment(
+	backgroundDef: BackgroundDefinition,
+	choices: Record<string, string>
+): string[] {
+	const items = [...backgroundDef.equipment];
+
+	for (const choice of (backgroundDef.equipmentChoices ?? [])) {
+		const val = choices[choice.id] ?? '';
+
+		if (choice.type === 'radio') {
+			if (choice.itemNameTemplate && val) {
+				items.push(choice.itemNameTemplate.replace(`{${choice.id}}`, val));
+			} else {
+				const opt = choice.options?.find((o) => o.label === val);
+				if (opt) items.push(...opt.items);
+			}
+		}
+
+		if (choice.type === 'dual-radio') {
+			if (choice.itemNameTemplate) {
+				const rank = choices[choice.id] ?? '';
+				const separation = choice.secondId ? (choices[choice.secondId] ?? '') : '';
+				if (rank && separation) {
+					const name = choice.itemNameTemplate
+						.replace(`{${choice.id}}`, rank)
+						.replace(`{${choice.secondId ?? ''}}`, separation);
+					items.push(name);
+				} else if (rank) {
+					// Separation not yet chosen — emit rank only, strip template suffix
+					const name = choice.itemNameTemplate
+						.replace(`{${choice.id}}`, rank)
+						.replace(/\s*\([^)]*\)\s*$/, '');
+					items.push(name);
+				}
+			} else {
+				const opt = choice.options?.find((o) => o.label === val);
+				if (opt?.items.length) items.push(...opt.items);
+				if (choice.secondId) {
+					const val2 = choices[choice.secondId] ?? '';
+					const opt2 = choice.secondOptions?.find((o) => o.label === val2);
+					if (opt2?.items.length) items.push(...opt2.items);
+				}
+			}
+		}
+
+		if (choice.type === 'text') {
+			if (choice.orDefaultOption && val === choice.orDefaultOption.label) {
+				// "Or:" fallback selected — add its items (may be empty for "No Token")
+				items.push(...choice.orDefaultOption.items);
+			} else if (choice.skipLabel && val === choice.skipLabel) {
+				// skipLabel selected — add nothing
+			} else if (choice.itemNameTemplate && val) {
+				items.push(choice.itemNameTemplate.replace(`{${choice.id}}`, val));
+			} else if (choice.fixedItems?.length) {
+				// Fixed items are always added for this choice block
+				items.push(...choice.fixedItems);
+			}
+		}
+	}
+
 	return items;
 }
 
+function resolveStartingEquipment(input: CharacterCreateInput, backgroundEquipment: string[]): PlayerCharacter['inventory'] {
+	const classDef = getClass(input.class);
+	const labels: string[] = [];
+
+	for (const [index, choice] of (classDef?.equipmentChoices ?? []).entries()) {
+		const selectedIndex = input.equipmentSelections?.[index] ?? 0;
+		const option = choice.options[selectedIndex] ?? choice.options[0] ?? [];
+		const subPicks = input.equipmentSubSelections?.[`sub-${index}`] ?? [];
+
+		for (const label of option) {
+			const lowLabel = label.toLowerCase();
+			const isPlaceholder = WEAPON_PLACEHOLDER_NAMES.has(lowLabel) || lowLabel === 'musical instrument';
+			if (isPlaceholder && subPicks.length > 0) {
+				// Replace each placeholder slot with the user's chosen item names
+				for (const pick of subPicks) {
+					labels.push(pick);
+				}
+			} else {
+				labels.push(label);
+			}
+		}
+	}
+
+	labels.push(...(classDef?.startingEquipment ?? []), ...backgroundEquipment);
+
+	// Expand adventuring packs (e.g. "Explorer's Pack") into their individual contents.
+	// Track which label indices originated from pack expansion so they route to the backpack.
+	const packOriginIndices = new Set<number>();
+	{
+		const rawLabels = [...labels];
+		labels.length = 0;
+		for (const lbl of rawLabels) {
+			const g = getGear(lbl.trim());
+			if (g?.category === 'pack' && g.contents?.length) {
+				const startIdx = labels.length;
+				labels.push(...g.contents);
+				for (let i = startIdx; i < labels.length; i++) packOriginIndices.add(i);
+			} else {
+				labels.push(lbl);
+			}
+		}
+	}
+
+	// Pass 1: build all items
+	const allBuilt: PlayerCharacter['inventory'] = labels.map((label, index) => ({
+		...itemFromLabel(label, index === 0),
+		isStartingEquipment: true as const
+	}));
+
+	// Ensure every character has a belt and a coin purse (universal starting containers)
+	{
+		const hasBelt = allBuilt.some(i => i.category === 'container' && (i as ContainerItem).containerType === 'belt');
+		const hasCoinPurse = allBuilt.some(i => i.category === 'container' && (i as ContainerItem).containerType === 'coin-purse');
+		if (!hasBelt) {
+			const d = CONTAINER_DEFAULTS['belt'];
+			const belt: ContainerItem & { isStartingEquipment: true } = {
+				id: ulid(),
+				name: 'Belt',
+				category: 'container',
+				containerType: 'belt',
+				capacity: { maxWU: d.maxWU, maxSU: d.maxSU, discounts: [] },
+				contents: [],
+				description: 'A sturdy leather belt with loops, holders, and small pouches.',
+				value: 2,
+				quantity: 1,
+				weight: 0.5,
+				spaceTaken: computeSpaceTaken('Belt', 0.5),
+				rarity: 'common',
+				attunement: false,
+				isStartingEquipment: true
+			};
+			allBuilt.push(belt);
+		}
+		if (!hasCoinPurse) {
+			const d = CONTAINER_DEFAULTS['coin-purse'];
+			const coinPurse: ContainerItem & { isStartingEquipment: true } = {
+				id: ulid(),
+				name: 'Coin Purse',
+				category: 'container',
+				containerType: 'coin-purse',
+				capacity: { maxWU: d.maxWU, maxSU: d.maxSU, discounts: [...d.discounts] },
+				contents: [],
+				description: 'A simple leather pouch for carrying coins.',
+				value: 0.5,
+				quantity: 1,
+				weight: 0.25,
+				spaceTaken: computeSpaceTaken('Coin Purse', 0.25),
+				rarity: 'common',
+				attunement: false,
+				isStartingEquipment: true
+			};
+			allBuilt.push(coinPurse);
+		}
+		// Ensure characters with bows or crossbows get a quiver for their ammunition
+		const hasQuiver = allBuilt.some(i => i.category === 'container' && (i as ContainerItem).containerType === 'quiver');
+		if (!hasQuiver) {
+			const needsQuiver = allBuilt.some(i => {
+				if (i.category !== 'weapon') return false;
+				const def = getWeapon((i as WeaponItem).weaponName);
+				if (!def) return false;
+				return (def.category === 'simple-ranged' || def.category === 'martial-ranged')
+					&& def.properties.includes('ammunition')
+					&& def.name !== 'sling'
+					&& def.name !== 'blowgun';
+			});
+			if (needsQuiver) {
+				const d = CONTAINER_DEFAULTS['quiver'];
+				const quiver: ContainerItem & { isStartingEquipment: true } = {
+					id: ulid(),
+					name: 'Quiver',
+					category: 'container',
+					containerType: 'quiver',
+					capacity: { maxWU: d.maxWU, maxSU: d.maxSU, discounts: [...d.discounts] },
+					contents: [],
+					description: 'A leather quiver worn on the back, designed to hold arrows, bolts, and other ammunition.',
+					value: 1,
+					quantity: 1,
+					weight: 1,
+					spaceTaken: computeSpaceTaken('Quiver', 1),
+					rarity: 'common',
+					attunement: false,
+					isStartingEquipment: true
+				};
+				allBuilt.push(quiver);
+			}
+		}
+	}
+
+	// ── Auto-equip: pick the best weapon, equip it, unequip the rest ────────
+	{
+		// Parse damage string to a score: higher = better (uses max damage as proxy)
+		const dmgScore = (dmg: string): number => {
+			const m = /^(\d+)d(\d+)/.exec(dmg ?? '');
+			return m ? parseInt(m[1]) * parseInt(m[2]) : 0;
+		};
+
+		const weaponItems = allBuilt.filter(i => i.category === 'weapon') as WeaponItem[];
+		// Reset all equipped flags that itemFromLabel may have set
+		for (const w of weaponItems) (w as { equipped: boolean }).equipped = false;
+
+		if (weaponItems.length > 0) {
+			const scored = weaponItems.map(w => {
+				const def = getWeapon(w.weaponName);
+				const isMartial = def?.category?.startsWith('martial') ?? false;
+				return { w, isMartial, score: dmgScore(w.damage ?? '') };
+			}).sort((a, b) => {
+				if (a.isMartial !== b.isMartial) return a.isMartial ? -1 : 1;
+				return b.score - a.score;
+			});
+			// Equip the top-ranked weapon
+			(scored[0].w as { equipped: boolean }).equipped = true;
+		}
+	}
+
+	// Build set of pack-origin item IDs BEFORE starting Pass 2
+	const packOriginItemIds = new Set<string>(
+		[...packOriginIndices].map(idx => allBuilt[idx]?.id).filter((id): id is string => Boolean(id))
+	);
+
+	// Pass 2: route non-equipped, non-container items into containers
+	const containers = allBuilt.filter(i => i.category === 'container') as ContainerItem[];
+	if (containers.length === 0) return allBuilt; // no containers — flat list as-is
+
+	const nonContainers = allBuilt.filter(i => i.category !== 'container');
+
+	const findCont = (type: ContainerType): ContainerItem | undefined =>
+		containers.find(c => c.containerType === type);
+
+	const backpack   = findCont('backpack');
+	const quiver     = findCont('quiver');
+	const coinPurse  = findCont('coin-purse');
+	const scrollCase = findCont('scroll-case');
+	const beltPouch  = findCont('belt-pouch') ?? findCont('pouch');
+
+	const routed = new Set<string>();
+
+	function tryPutIn(item: PlayerCharacter['inventory'][number], cont: ContainerItem | undefined): boolean {
+		if (!cont) return false;
+		if (!canAddToContainer(cont, item).ok) return false;
+		cont.contents.push(item);
+		routed.add(item.id);
+		return true;
+	}
+
+	for (const item of nonContainers) {
+		// Equipped weapons/armor stay top-level
+		if ('equipped' in item && (item as { equipped?: boolean }).equipped) continue;
+
+		const name = item.name.toLowerCase();
+		const su = getItemSU(item);
+
+		// Pack-origin items go directly to the backpack (they "came from" the pack)
+		if (packOriginItemIds.has(item.id)) {
+			tryPutIn(item, backpack);
+			continue;
+		}
+
+		if (item.category === 'ammunition') {
+			// Ammo → quiver first, then backpack
+			if (tryPutIn(item, quiver) || tryPutIn(item, backpack)) continue;
+		} else if (/\b(coin|piece|gp|sp|cp|pp|ep)\b/.test(name)) {
+			// Currency → coin-purse first, then backpack
+			if (tryPutIn(item, coinPurse) || tryPutIn(item, backpack)) continue;
+		} else if (/scroll/.test(name)) {
+			// Scrolls → scroll-case first, then backpack
+			if (tryPutIn(item, scrollCase) || tryPutIn(item, backpack)) continue;
+		} else if (su <= 0.5) {
+			// Very small items only → belt-pouch first, then backpack
+			if (tryPutIn(item, beltPouch) || tryPutIn(item, backpack)) continue;
+		} else {
+			// Default → backpack
+			if (tryPutIn(item, backpack)) continue;
+		}
+		// Overflow: stays loose
+	}
+
+	// Sort containers large→small by max weight capacity, then loose/equipped items
+	containers.sort((a, b) => b.capacity.maxWU - a.capacity.maxWU);
+	return [
+		...containers,
+		...nonContainers.filter(i => !routed.has(i.id))
+	];
+}
+
+/** Maps lowercase container names to their ContainerType. More specific entries must come first. */
+const CONTAINER_NAME_MAP: Array<[string, ContainerType, number]> = [
+	// [normalised label, ContainerType, weight in lbs]
+	['backpack',         'backpack',         5  ],
+	['sack',             'sack',             0.5],
+	['bag',              'bag',              1  ],
+	['coin purse',       'coin-purse',       0.5],
+	['coin-purse',       'coin-purse',       0.5],
+	['scroll case',      'scroll-case',      1  ],
+	['scroll-case',      'scroll-case',      1  ],
+	['component pouch',  'component-pouch',  2  ],
+	['component-pouch',  'component-pouch',  2  ],
+	['belt pouch',       'belt-pouch',       1  ],
+	['belt-pouch',       'belt-pouch',       1  ],
+	['quiver',           'quiver',           1  ],
+	['belt',             'belt',             0.5],
+	['pouch',            'belt-pouch',       1  ],
+];
+
 function itemFromLabel(label: string, equipPrimary = false): PlayerCharacter['inventory'][number] {
 	let { baseName, quantity } = parseItemLabel(label);
+
+	// Detect containers before weapon/gear lookup
+	const normBase = baseName.toLowerCase().replace(/^an?\s+/, '').trim();
+	for (const [key, containerType, weightLbs] of CONTAINER_NAME_MAP) {
+		if (normBase === key) {
+			const defaults = CONTAINER_DEFAULTS[containerType];
+			const containerItem: ContainerItem = {
+				id: ulid(),
+				name: baseName,
+				category: 'container',
+				containerType,
+				capacity: { maxWU: defaults.maxWU, maxSU: defaults.maxSU, discounts: [...(defaults.discounts ?? [])] },
+				contents: [],
+				description: `A ${normBase}.`,
+				value: 0,
+				quantity: 1,
+				weight: weightLbs,
+				spaceTaken: computeSpaceTaken(baseName, weightLbs),
+				rarity: 'common',
+				attunement: false
+			};
+			return containerItem;
+		}
+	}
 
 	// Handle word-quantity prefixes like "Two Handaxes" → weapon "Handaxe", quantity 2.
 	// This covers barbarian starting equipment and similar patterns.
@@ -989,6 +1406,7 @@ function itemFromLabel(label: string, equipPrimary = false): PlayerCharacter['in
 			value: parseCurrencyValue(weapon.cost),
 			quantity,
 			weight: weapon.weight,
+			spaceTaken: computeSpaceTaken(weapon.displayName, weapon.weight),
 			rarity: 'common',
 			attunement: false
 		};
@@ -1001,7 +1419,7 @@ function itemFromLabel(label: string, equipPrimary = false): PlayerCharacter['in
 			name: armor.displayName,
 			category: 'armor',
 			armorName: armor.name,
-			description: `A set of ${armor.displayName.toLowerCase()}.`,
+			description: armor.name === 'shield' ? 'A singular shield, of wood and steel.' : `A suit of ${armor.displayName.toLowerCase()}.`,
 			baseAC: armor.baseAC,
 			magicBonus: 0,
 			equipped: true,
@@ -1010,6 +1428,7 @@ function itemFromLabel(label: string, equipPrimary = false): PlayerCharacter['in
 			value: parseCurrencyValue(armor.cost),
 			quantity,
 			weight: armor.weight,
+			spaceTaken: computeSpaceTaken(armor.displayName, armor.weight),
 			rarity: 'common',
 			attunement: false
 		};
@@ -1031,6 +1450,7 @@ function itemFromLabel(label: string, equipPrimary = false): PlayerCharacter['in
 				value: parseCurrencyValue(gear.cost),
 				quantity,
 				weight: gear.weight,
+				spaceTaken: computeSpaceTaken(gear.displayName, gear.weight),
 				rarity: 'common',
 				attunement: false
 			};
@@ -1045,6 +1465,26 @@ function itemFromLabel(label: string, equipPrimary = false): PlayerCharacter['in
 			value: parseCurrencyValue(gear.cost),
 			quantity,
 			weight: gear.weight,
+			spaceTaken: computeSpaceTaken(gear.displayName, gear.weight),
+			rarity: 'common',
+			attunement: false
+		};
+	}
+
+	// Specific musical instrument names chosen by the player (Lute, Flute, etc.)
+	if (KNOWN_INSTRUMENT_NAMES.has(baseName.toLowerCase())) {
+		const instrumentGear = getGear('musical-instrument');
+		return {
+			id: ulid(),
+			name: baseName,
+			category: 'misc',
+			description: `A ${baseName.toLowerCase()}, used as a musical instrument.`,
+			notes: instrumentGear?.description,
+			tags: ['tool', 'musical-instrument'],
+			value: parseCurrencyValue(instrumentGear?.cost),
+			quantity,
+			weight: instrumentGear?.weight ?? 3,
+			spaceTaken: computeSpaceTaken(baseName, instrumentGear?.weight ?? 3),
 			rarity: 'common',
 			attunement: false
 		};
@@ -1060,6 +1500,7 @@ function itemFromLabel(label: string, equipPrimary = false): PlayerCharacter['in
 		value: 0,
 		quantity,
 		weight: 0,
+		spaceTaken: 0.5,
 		rarity: 'common',
 		attunement: false
 	};

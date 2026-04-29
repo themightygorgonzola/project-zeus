@@ -5,7 +5,7 @@ import { shortRest, longRest } from '$lib/game/rest';
 import { advanceClock, advanceClockOnState, travelBetween, findLocation, getAvailableExits } from '$lib/game/travel';
 import { castSpell, canCastSpell } from '$lib/game/spellcasting';
 import { getSpell } from '$lib/game/data/spells';
-import { resolveAttack, resolveNpcAttack, allDefeated, advanceTurn, type CombatAttackResult } from '$lib/game/combat';
+import { resolveAttack, resolveNpcAttack, allDefeated, advanceTurn, getCombatantState, updateCombatantHp, type CombatAttackResult } from '$lib/game/combat';
 import { attackToMechanicResult, rollDeathSave } from '$lib/game/mechanics';
 import { ulid } from 'ulid';
 
@@ -878,7 +878,14 @@ export function autoAdvancePastNpcs(
 				const friendlyTargets = getHostileNpcTargets(state, encounter);
 				if (friendlyTargets.length > 0) {
 					const targetCombatant = friendlyTargets[iters % friendlyTargets.length];
+					// Rage resistance: if target PC is raging, temporarily give physical resistances
+					const ragingPcAdv = state.characters.find(c => c.id === targetCombatant.referenceId);
+					const origResistancesAdv = ragingPcAdv ? [...ragingPcAdv.resistances] : [];
+					if (ragingPcAdv?.conditions.includes('raging')) {
+						ragingPcAdv.resistances = [...new Set([...ragingPcAdv.resistances, 'bludgeoning', 'piercing', 'slashing'])];
+					}
 					const attackResult = resolveNpcAttack(state, npc, 0, targetCombatant, encounter);
+					if (ragingPcAdv) ragingPcAdv.resistances = origResistancesAdv;
 					const attackName = npc.statBlock.attacks[0].name;
 
 					// Track where this NPC's results start so we grab exactly theirs
@@ -903,7 +910,7 @@ export function autoAdvancePastNpcs(
 					// Announce if a pre-death trait saved the target
 					if (attackResult.traitSaved) {
 						mechanicResults.push({
-							type: 'info',
+							type: 'other',
 							label: `${targetCombatant.name} activates ${attackResult.traitSaved}! Drops to 1 HP instead of 0.`,
 							success: true
 						});
@@ -1286,6 +1293,31 @@ function resolveCombatAttack(
 		return base;
 	}
 
+	// 1b. Grapple / shove — contested Athletics check instead of a normal attack roll.
+	// This fires inside active combat when the player's declared action matches grapple
+	// vocabulary. Returns a PendingCheck so the UI can collect the contested roll result
+	// before the narrator resolves the outcome.
+	const GRAPPLE_RE = /\b(grapple|pin\s+(them|him|her|it|down)|wrestle|grab\s+and\s+hold|tackle|shove\s+(them|him|her|it|down|back|away))\b/i;
+	if (GRAPPLE_RE.test(intent.rawAction)) {
+		const grappleCheck: PendingCheck = {
+			id: ulid(),
+			kind: 'contested',
+			characterId: actor.id,
+			ability: 'str',
+			skill: 'athletics',
+			advantageState: 'normal',
+			reason: 'Grapple attempt — make a contested Athletics check (target may use Athletics or Acrobatics to resist).',
+			combatBound: true,
+			opposingActorId: target.referenceId
+		};
+		return {
+			...base,
+			status: 'awaiting-roll',
+			pendingCheck: grappleCheck,
+			resolvedActionSummary: grappleCheck.reason
+		};
+	}
+
 	// 2. Find weapon — use pre-resolved weaponItemId from combat classifier if available
 	let weapon: WeaponItem;
 	if (preResolvedWeaponItemId) {
@@ -1300,6 +1332,14 @@ function resolveCombatAttack(
 		}
 	} else {
 		weapon = chooseAttackWeapon(actor, intent);
+	}
+
+	// 2b. Rage activation — detect explicit intent to enter rage this turn
+	const RAGE_ACTIVATION_RE = /\b(i\s+rage|enter\s+(?:a\s+)?rage|activate\s+rage|use\s+rage|start\s+(?:to\s+)?rage)\b/i;
+	const RAGE_MELEE_TYPES = ['bludgeoning', 'piercing', 'slashing'];
+	const isRageActivation = RAGE_ACTIVATION_RE.test(intent.rawAction) && !actor.conditions.includes('raging') && (actor.featureUses?.Rage?.current ?? 0) > 0;
+	if (isRageActivation) {
+		actor.conditions.push('raging'); // apply immediately so attack roll reflects rage this turn
 	}
 
 	// 3. Resolve attack
@@ -1323,13 +1363,54 @@ function resolveCombatAttack(
 		}];
 	}
 
+	// 5b. Rage damage bonus (+2/+3/+4 by level) — runs after hpChanges is built
+	if (result.attackResult.hits && result.damageResult && actor.conditions.includes('raging') && RAGE_MELEE_TYPES.includes(result.damageType)) {
+		const rageBonus = actor.level >= 16 ? 4 : actor.level >= 9 ? 3 : 2;
+		const adjustedHp = Math.max(0, result.damageResult.currentHp - rageBonus);
+		const rageTargetState = getCombatantState(state, target);
+		updateCombatantHp(state, target, adjustedHp, Math.max(0, rageTargetState.tempHp), adjustedHp <= 0);
+		result.attackResult.totalDamage += rageBonus;
+		result.damageResult.currentHp = adjustedHp;
+		if (adjustedHp <= 0 && !result.targetDefeated) result.targetDefeated = true;
+		if (stateChanges.hpChanges) stateChanges.hpChanges[0].newHp = adjustedHp;
+	}
+
+	// 5c. Rage activation state changes (emit featureUsed + conditionsApplied)
+	if (isRageActivation) {
+		stateChanges.featureUsed = { characterId: actor.id, feature: 'Rage' };
+		stateChanges.conditionsApplied = [
+			...(stateChanges.conditionsApplied ?? []),
+			{ characterId: actor.id, condition: 'raging', applied: true }
+		];
+	}
+
+	// Detect non-lethal intent (5e: melee only, player must declare before the attack)
+	const nonLethalKeywords = /\b(non.?lethal|knock out|knock them out|subdue|incapacitate|ko\b|knocking out|take down without killing|leave alive|don.?t kill|dont kill)\b/i;
+	const isNonLethal = nonLethalKeywords.test(intent.rawAction) && !weapon.properties?.includes('range') && !weapon.range;
+
 	// Build summary
 	let summary: string;
 	if (result.attackResult.hits) {
 		summary = `Attacked ${target.name} with ${weapon.name} — ${result.attackResult.critical ? 'CRITICAL HIT' : 'hit'} for ${result.attackResult.totalDamage} ${result.damageType} damage`;
-		if (result.targetDefeated) summary += ' (defeated!)';
+		if (result.targetDefeated) {
+			summary += isNonLethal ? ' (knocked out — non-lethal!)' : ' (defeated!)';
+		}
 	} else {
 		summary = `Attacked ${target.name} with ${weapon.name} — ${result.attackResult.fumble ? 'fumble!' : 'missed'}`;
+	}
+
+	// Non-lethal KO: emit unconscious condition so narrator knows not to kill the target
+	if (isNonLethal && result.targetDefeated) {
+		mechanicResults.push({
+			type: 'other',
+			label: `Non-lethal KO — ${target.name} is unconscious but alive (0 HP, stable)`,
+			dice: { notation: '', rolls: [], total: 0 },
+			success: true
+		});
+		stateChanges.conditionsApplied = [
+			...(stateChanges.conditionsApplied ?? []),
+			{ characterId: target.referenceId, condition: 'unconscious', applied: true }
+		];
 	}
 
 	// Check if all enemies defeated → auto-end encounter
@@ -1425,8 +1506,15 @@ export function resolveEnemyTurns(
 		const targetIndex = i % friendlyTargets.length;
 		const selectedTarget = friendlyTargets[targetIndex];
 
+		// Rage resistance: if target PC is raging, temporarily give physical resistances
+		const ragingPcET = state.characters.find(c => c.id === selectedTarget.referenceId);
+		const origResistancesET = ragingPcET ? [...ragingPcET.resistances] : [];
+		if (ragingPcET?.conditions.includes('raging')) {
+			ragingPcET.resistances = [...new Set([...ragingPcET.resistances, 'bludgeoning', 'piercing', 'slashing'])];
+		}
 		// Use first attack from stat block
 		const attackResult = resolveNpcAttack(state, npc, 0, selectedTarget, encounter);
+		if (ragingPcET) ragingPcET.resistances = origResistancesET;
 
 		// Build mechanic results
 		const attackName = npc.statBlock.attacks[0].name;
@@ -1448,7 +1536,7 @@ export function resolveEnemyTurns(
 			// Announce if a pre-death trait saved the target
 			if (attackResult.traitSaved) {
 				mechanicResults.push({
-					type: 'info',
+					type: 'other',
 					label: `${selectedTarget.name} activates ${attackResult.traitSaved}! Drops to 1 HP instead of 0.`,
 					success: true
 				});
@@ -1801,12 +1889,42 @@ function resolveTravel(
 
 	// Try to match destination name from action text
 	const lower = intent.rawAction.toLowerCase();
-	const matchedExits = exits.filter((exit) => {
-		const exitLower = exit.name.toLowerCase();
-		// Check if any significant word from the exit name appears in the action
-		const words = exitLower.split(/\s+/).filter((w) => w.length > 2);
-		return words.some((word) => lower.includes(word)) || lower.includes(exitLower);
-	});
+
+	// Settlement-intent keywords: if the player is clearly trying to enter a populated place,
+	// prefer settlement-type exits over wilderness exits to prevent wrong-exit matching.
+	const settlementKeywords = ['enter', 'town', 'city', 'village', 'gate', 'market', 'inn', 'tavern', 'hamlet'];
+	const hasSettlementIntent = settlementKeywords.some((kw) => lower.includes(kw));
+
+	const matchedExits = exits
+		.filter((exit) => {
+			const exitLower = exit.name.toLowerCase();
+			// Full exit name present verbatim in the action — always qualifies.
+			if (lower.includes(exitLower)) return true;
+			// Word-based matching: skip articles/conjunctions/prepositions (≤ 3 chars)
+			// and require at least one 'strong' word (≥ 5 chars) to have matched.
+			// This prevents short words like "the"(3), "near"(4), "ford"(4) from
+			// producing false-positive travel matches on unrelated in-settlement actions.
+			const words = exitLower.split(/\s+/).filter((w) => w.length > 3);
+			const matchingWords = words.filter((word) => lower.includes(word));
+			return matchingWords.length > 0 && matchingWords.some((w) => w.length >= 5);
+		})
+		.sort((a, b) => {
+			// When the player expresses settlement intent, sort settlement exits first
+			if (hasSettlementIntent) {
+				if (a.type === 'settlement' && b.type !== 'settlement') return -1;
+				if (b.type === 'settlement' && a.type !== 'settlement') return 1;
+			}
+			return 0;
+		});
+
+	// Wilderness opt-in guard: if every matched exit is a wilderness-type location,
+	// require explicit wilderness-departure language in the player's action.
+	// Prevents in-settlement actions (e.g. "walk up to the front desk") from being
+	// routed to a wilderness exit that shares only short/common words with the text.
+	const WILDERNESS_OPT_IN = /\b(wilderness|wilds?|wood(s|land)?|forest|outside|outskirts|country(side)?|fields?|plains?|leave\s+town|leave\s+cit|leave\s+settlement|head\s+out|walk\s+out|ride\s+out|venture\s+out|out\s+of\s+town|depart)\b/;
+	if (matchedExits.length > 0 && matchedExits.every((e) => e.type === 'wilderness') && !WILDERNESS_OPT_IN.test(lower)) {
+		return base;
+	}
 
 	if (matchedExits.length === 0) {
 		// Check for directional keywords that might not match any exit name
@@ -1831,7 +1949,19 @@ function resolveTravel(
 	const travelResult = travelBetween(state, state.partyLocationId, destination.locationId);
 
 	if (!travelResult.success) {
-		// Travel engine rejected — let AI narrate
+		if (travelResult.gateSealed) {
+			// Gate is physically sealed — travel did not occur, AI narrates the refusal
+			return {
+				...base,
+				resolvedActionSummary: `Gate sealed: cannot enter ${destination.name} — ${travelResult.reason}`,
+				mechanicResults: [{
+					type: 'other',
+					label: `Gate sealed: ${destination.name} is inaccessible at ${state.clock.timeOfDay}`,
+					dice: { notation: '', rolls: [], total: 0 }
+				}]
+			};
+		}
+		// Other travel failure — let AI narrate
 		return base;
 	}
 
@@ -1840,6 +1970,15 @@ function resolveTravel(
 		label: `Traveled to ${destination.name} (${travelResult.periodsElapsed} period(s))`,
 		dice: { notation: 'travel', rolls: [travelResult.periodsElapsed], total: travelResult.periodsElapsed }
 	}];
+
+	// Gate challenge: guards require the party to explain themselves
+	if (travelResult.gateChallenge) {
+		mechanicResults.push({
+			type: 'other',
+			label: `Gate challenge: guards stop the party at the entrance to ${destination.name} — requires explanation or persuasion`,
+			dice: { notation: '', rolls: [], total: 0 }
+		});
+	}
 
 	const stateChanges: StateChange = { ...travelResult.stateChanges };
 

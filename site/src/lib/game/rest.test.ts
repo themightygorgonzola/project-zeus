@@ -653,24 +653,24 @@ describe('longRest', () => {
 		});
 
 		it('does not remove non-clearable conditions', () => {
-			const poisoned = makeCharacter({ conditions: ['poisoned', 'blinded'] as Condition[] });
-			const result = longRest(poisoned);
+			const blinded = makeCharacter({ conditions: ['grappled', 'blinded'] as Condition[] });
+			const result = longRest(blinded);
 
 			expect(result.conditionsRemoved).toHaveLength(0);
-			expect(result.character.conditions).toContain('poisoned');
+			expect(result.character.conditions).toContain('grappled');
 			expect(result.character.conditions).toContain('blinded');
 		});
 
 		it('handles multiple clearable and non-clearable conditions', () => {
 			const mixed = makeCharacter({
-				conditions: ['frightened', 'poisoned', 'charmed', 'blinded'] as Condition[]
+				conditions: ['frightened', 'grappled', 'charmed', 'blinded'] as Condition[]
 			});
 			const result = longRest(mixed);
 
 			expect(result.conditionsRemoved).toHaveLength(2);
 			expect(result.conditionsRemoved).toContain('frightened');
 			expect(result.conditionsRemoved).toContain('charmed');
-			expect(result.character.conditions).toEqual(['poisoned', 'blinded']);
+			expect(result.character.conditions).toEqual(['grappled', 'blinded']);
 		});
 	});
 

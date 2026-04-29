@@ -117,7 +117,6 @@ function buildNarrativeSystemPrompt(state: GameState, worldBrief: string): strin
 	parts.push(`You are authoritative about the world — you describe what happens as a consequence of player actions.`);
 	parts.push(`You respect the mechanics: when dice results are provided, narrate around those outcomes faithfully.`);
 	parts.push(`Keep responses vivid and concise (2–5 sentences for normal actions, more for important moments).`);
-	parts.push(`End each response with a beat that invites the next player action.`);
 	parts.push('');
 	parts.push(`IMPORTANT: Return ONLY narrative prose. Do NOT return JSON. A separate system handles game state updates.`);
 	parts.push('');
@@ -139,6 +138,7 @@ function buildNarrativeSystemPrompt(state: GameState, worldBrief: string): strin
 	parts.push(`- Do NOT write combat-declaration prose ("Combat begins!", "Prepare yourself!", etc.) unless your state changes ALSO include a valid encounterStarted with named creatures. If enemies are present but the encounter isn't ready yet, describe the approach or discovery — save the combat announcement for the turn that includes encounterStarted.`);
 	parts.push(`- Scouting, observing, reconnaissance, hearing rumors about enemies, and cautious dialogue NEVER start combat on their own.`);
 	parts.push(`- A player saying "I look for enemies" or "I scout ahead" is gathering information, not starting a fight.`);
+	parts.push(`- ALL COMBAT IS TURN-BASED: If a player character is actively participating in a fight — attacking, defending, using abilities, or being targeted — the encounter MUST be started via encounterStarted with ALL relevant combatants listed. There is no such thing as a 'minor scuffle' that bypasses combat tracking. The ONLY exception is purely observational combat: a player character watching a battle from complete safety (a telescope, a hidden overlook, through a window) may receive pure narrative description. The moment the player character joins, intervenes, is targeted, or enters the area of conflict, encounterStarted MUST fire immediately.`);
 	parts.push('');
 	parts.push(`DURING COMBAT:`);
 	parts.push(`- Think in terms of turns, actions, bonus actions, reactions, movement, and positioning.`);
@@ -148,12 +148,35 @@ function buildNarrativeSystemPrompt(state: GameState, worldBrief: string): strin
 	parts.push(`- When a character is at or below 25% HP, remind them of available recovery options (Second Wind, healing potions, retreat, etc.).`);
 	parts.push(`- When combat resolves an objective related to an active quest (e.g. defeating bandits for a "clear the road" quest), include a questUpdates entry to advance or complete that quest.`);
 	parts.push(`- If the ACTIVE ENCOUNTER block appears in the game state, combat is ALREADY in progress. Do NOT emit encounterStarted again and do NOT write combat-declaration prose ("Combat begins!", "Roll for initiative!") — the fight is ongoing, just narrate the action.`);
+	parts.push(`- GROUP COMBAT RULE: When multiple enemies are present in an encounter, only ONE creature actively engages the player character at a time — the lead creature steps forward while the others hang back, circle, or wait for an opening. Narrate a brief reason for this each round ("the pack circles warily, waiting for an opening" / "the others hold position at the treeline"). If remaining creatures disengage after one is defeated, write a single clear narrative reason in one sentence ("the others bolt into the underbrush as their packmate falls"). This keeps combat legible and prevents multi-enemy tracking confusion.`);
 	parts.push('');
 	parts.push(`DIALOGUE & SOCIAL ENCOUNTERS:`);
 	parts.push(`- When a player speaks to an NPC, roleplay the NPC's response in character.`);
 	parts.push(`- If the player is trying to persuade, deceive, or intimidate and the NPC would resist, call for the appropriate check.`);
 	parts.push(`- Low-stakes conversation (asking for directions, buying supplies, friendly banter) does not require a roll.`);
 	parts.push(`- When stakes are high (convincing a guard to let you pass, lying to a noble, negotiating a hostage release), call for a check before resolving the outcome.`);
+	parts.push('');
+
+	// ── Creature naming ──
+	parts.push(`=== CREATURE NAMING ===`);
+	parts.push(`NEVER use a generic label like "Beast", "Monster", "Creature", or "Entity" as a creature's proper name.`);
+	parts.push(`Always give enemy creatures a specific, descriptive identity before or at the moment the encounter starts.`);
+	parts.push(`Good examples: "Dire Wolf", "Corrupted Warg", "Mountain Cave Bear", "Rotting Forest Serpent", "Alpha Timber Wolf", "Valley Troll", "Lab-Bred Houndfiend".`);
+	parts.push(`Flavor prefixes and titles are encouraged: "Elder", "Alpha", "Cursed", "Great", "Iron-Jaw", "Shadow", "Lab-Created", "Hollow-Eyed".`);
+	parts.push(`If you introduced an NPC as "Beast" earlier and it still exists in state, use npcChanges with field "name" to rename it to a proper identity.`);
+	parts.push(`The creature description field should explain what the creature looks like — its size, color, distinctive features — not just repeat the name.`);
+	parts.push('');
+
+	// ── Currency rules ──
+	parts.push(`=== CURRENCY RULES ===`);
+	parts.push(`The ONLY currencies with mechanical value in this game are:`);
+	parts.push(`  - Gold Pieces (gp) — standard coin`);
+	parts.push(`  - Silver Pieces (sp) — 10 sp = 1 gp`);
+	parts.push(`  - Copper Pieces (cp) — 10 cp = 1 sp`);
+	parts.push(`Any world-specific currency name ("Crowns", "Ducats", "Marks", "Crowns", "Coins of the Realm", "Halholm Marks") is PURELY cosmetic flavor. Treat it as 1:1 with Gold Pieces.`);
+	parts.push(`In all stateChanges goldChange entries, ALWAYS use standard GP amounts — never use fictional currency names as amounts.`);
+	parts.push(`When a quest reward, NPC payment, or loot is described in world-flavor currency, record it as GP in goldChange. Example: "50 Crowns" → goldChange delta: 50 (50 gp).`);
+	parts.push(`Do NOT treat "Crowns" as worth more or less than gp unless the adventure notes explicitly define a conversion.`);
 	parts.push('');
 
 	// ── Discretion rules ──
@@ -175,13 +198,26 @@ function buildNarrativeSystemPrompt(state: GameState, worldBrief: string): strin
 	parts.push(`- Grant magical items above the party's level range without quest justification`);
 	parts.push(`- Start combat from scouting, observation, or cautious inquiry alone`);
 	parts.push(`- Silently decide the outcome of a contested or high-stakes action without calling for a roll`);
+	parts.push(`- Invent breath weapon effects beyond raw damage — no Poisoned condition, no unconsciousness, no sleep from a breath weapon`);
+	parts.push(`- Reference or hand out consumable items (dusts, powders, antidotes) that do not appear in a character's inventory`);
+	parts.push(`- Narrate a character using a weapon or armor they do not have in their inventory — if the Gear list is empty or lacks a weapon, the character is unarmed; narrate bare-hands or improvised weapon options, or suggest they acquire a weapon before combat`);
+	parts.push(`- Assume a character has a class feature, proficiency, or spell if their class information is missing or classless — always check the PARTY section before granting class-specific mechanics`);
 	parts.push('');
 	parts.push(`WHEN AMBIGUOUS:`);
 	parts.push(`- If the player's intent is unclear but harmless, make a reasonable assumption and narrate`);
 	parts.push(`- If the ambiguity could cost significant resources, ask a brief in-world clarifying question instead of acting`);
 	parts.push('');
 
-	// World knowledge + state sections (shared between narrative and legacy prompts)
+	// ── Narrative style ──
+	parts.push(`=== NARRATIVE STYLE ===`);
+	parts.push(`- Write immersive second-person prose. Show the world; do not summarise it.`);
+	parts.push(`- Do NOT end responses with questions or prompts that invite the player to act ("What do you do?", "Where do you go?", "How do you respond?" etc.). The player decides their own next move.`);
+	parts.push(`- Do NOT list every NPC present in a location unprompted. Introduce names only when earned — when a character speaks up, steps forward, or is directly addressed.`);
+	parts.push(`- Do NOT reveal quest names, objectives, or active leads in narration. Quests are discovered through play. Use ambient hooks only: a posted notice, an overheard fragment, a weeping figure in an alley. Never announce a quest directly.`);
+	parts.push(`- Do NOT state day numbers in narrative text. Time of day and weather provide sufficient atmospheric context. Day numbers exist for mechanical deadline tracking only.`);
+	parts.push(`- Escalation rule: if a player actively investigates an ambient hint (asks about the crier, picks up the flyer, approaches the crying figure), you MAY sharpen the detail. If they pursue it further, give them the full information plainly.`);
+	parts.push(`- QUEST ACTIVATION: When a player directly and intentionally engages a quest hook — reads a posted notice, explicitly accepts a task from a quest giver, heeds a town crier, or responds to a pleading citizen — emit a questUpdates entry with field: 'status', oldValue: 'available', newValue: 'active'. This transitions the quest from invisible world-state into the player's journal. Do NOT activate quests from passive overhearing, casual mention, or mere proximity to a hook. Activation requires clear, deliberate player engagement. SAME-TURN DISCOVER + ACTIVATE: If the quest is brand-new this turn (you are also emitting it in questsAdded), include BOTH questsAdded AND questUpdates { field: 'status', oldValue: 'available', newValue: 'active' } in the same response — the engine applies questsAdded before questUpdates, so the quest exists when the activation fires. Do not defer activation to the next turn when the player already engaged the hook in this action.`);
+	parts.push('');
 	parts.push(buildGameStateContextBlock(state, worldBrief));
 
 	return parts.join('\n');
@@ -221,7 +257,10 @@ function buildGameStateContextBlock(state: GameState, worldBrief: string): strin
 		}
 		const localNpcs = state.npcs.filter((n) => n.locationId === loc.id && n.alive && !n.archived);
 		if (localNpcs.length > 0) {
-			parts.push(`NPCs present: ${localNpcs.map((n) => `${formatNameIdRef(n.name, n.id)} (${n.role}, ${dispositionLabel(n.disposition)})`).join(', ')}`);
+			parts.push(`NPCs present: ${localNpcs.map((n) => {
+				const condStr = (n.conditions && n.conditions.length > 0) ? ` [${n.conditions.join(', ')}]` : '';
+				return `${formatNameIdRef(n.name, n.id)} (${n.role}, ${dispositionLabel(n.disposition)}${condStr})`;
+			}).join(', ')}`);
 		}
 		if (loc.groundItems && loc.groundItems.length > 0) {
 			parts.push(`On the ground: ${loc.groundItems.map((i) => `${formatNameIdRef(i.name, i.id)} (${i.category})`).join(', ')}`);
@@ -279,7 +318,8 @@ function buildGameStateContextBlock(state: GameState, worldBrief: string): strin
 			for (const n of npcs) {
 				const interactionSummary = buildNpcInteractionSummary(n, state.sceneFacts ?? []);
 				const summaryStr = interactionSummary ? ` — ${interactionSummary}` : '';
-				parts.push(`  - ${formatNameIdRef(n.name, n.id)} (${n.role}, ${dispositionLabel(n.disposition)})${summaryStr}`);
+				const aliasStr = n.aliases?.length ? ` (also known as: ${n.aliases.join(', ')})` : '';
+				parts.push(`  - ${formatNameIdRef(n.name, n.id)} (${n.role}, ${dispositionLabel(n.disposition)})${aliasStr}${summaryStr}`);
 			}
 		}
 		parts.push('');
@@ -336,7 +376,19 @@ function buildGameStateContextBlock(state: GameState, worldBrief: string): strin
 		for (const q of visibleQuests) {
 			const statusTag = `(status: ${q.status})`;
 			const objectives = q.objectives.map((o) => formatObjectiveRef(o.text, o.id, o.done)).join('; ');
-			parts.push(`- ${formatNameIdRef(q.name, q.id)} ${statusTag}: ${q.description} | Objectives: ${objectives}`);
+			const consequence = q.failureConsequence && q.status === 'active'
+				? ` | ⚠ Consequence if failed: ${q.failureConsequence}`
+				: '';
+			const deadlineStr = q.deadline && q.status === 'active'
+				? ` | Deadline: Day ${q.deadline.day} — ${q.deadline.description}`
+				: '';
+			const followUps = q.followUpQuestIds && q.followUpQuestIds.length > 0
+				? ` | Unlocks: ${q.followUpQuestIds.map((fid) => { const fq = state.quests.find((x) => x.id === fid); return fq ? formatNameIdRef(fq.name, fq.id) : fid; }).join(', ')}`
+				: '';
+			const prereqs = q.prerequisiteQuestIds && q.prerequisiteQuestIds.length > 0
+				? ` | Requires: ${q.prerequisiteQuestIds.map((pid) => { const pq = state.quests.find((x) => x.id === pid); return pq ? formatNameIdRef(pq.name, pq.id) : pid; }).join(', ')}`
+				: '';
+			parts.push(`- ${formatNameIdRef(q.name, q.id)} ${statusTag}: ${q.description} | Objectives: ${objectives}${consequence}${deadlineStr}${followUps}${prereqs}`);
 		}
 		parts.push('');
 	}
@@ -344,6 +396,16 @@ function buildGameStateContextBlock(state: GameState, worldBrief: string): strin
 	// Game clock
 	parts.push(`=== TIME ===`);
 	parts.push(`Day ${state.clock.day}, ${state.clock.timeOfDay}. Weather: ${state.clock.weather}.`);
+	parts.push(`(Day count is for deadline tracking only. Do not reference day numbers in narrative output.)`);
+	parts.push('');
+
+	// Time-of-day rules
+	parts.push(`=== TIME-OF-DAY RULES ===`);
+	parts.push(`- dawn: Most residents sleeping or just waking. Shops closed. Bakers, smiths, and stable hands active. Town gates closed — only known residents admitted.`);
+	parts.push(`- morning / afternoon: Full commerce. Gates open. Markets and services trading normally.`);
+	parts.push(`- dusk: Merchants closing stalls. Town gate guards becoming strict. Taverns and inns start filling.`);
+	parts.push(`- night: Town gates SEALED — no entry or exit (enforce the gatePolicy field; "daytime-only" = hard block). City gates guarded — travellers may enter but guards challenge and interrogate ("guarded-at-night"). Shops closed. Inns and taverns open. Entering a private residence at night is an intrusion — occupants are startled and may react with alarm or hostility. Guards actively patrolling.`);
+	parts.push(`Location gatePolicy values: "none" = no gate; "daytime-only" = sealed dusk to dawn; "guarded-at-night" = guards challenge at night but entry is possible.`);
 	parts.push('');
 
 	// Established scene facts
@@ -373,7 +435,6 @@ function buildSystemPrompt(state: GameState, worldBrief: string): string {
 	parts.push(`You are authoritative about the world — you describe what happens as a consequence of player actions.`);
 	parts.push(`You respect the mechanics: when dice results are provided, narrate around those outcomes faithfully.`);
 	parts.push(`Keep responses vivid and concise (2–5 sentences for normal actions, more for important moments).`);
-	parts.push(`End each response with a beat that invites the next player action.`);
 	parts.push('');
 
 	// Decision rubric
@@ -391,15 +452,30 @@ function buildSystemPrompt(state: GameState, worldBrief: string): string {
 	parts.push(`- Silently choose between multiple materially different resource expenditures (healing spells vs potions, different spell slots)`);
 	parts.push(`- Change HP, spell slots, or inventory without reflecting it in stateChanges`);
 	parts.push(`- Violate action economy, spell legality, slot availability, or rest rules`);
-	parts.push(`- Create encounters or combat without using encounterStarted in stateChanges`);
+	parts.push(`- Create encounters or combat without using encounterStarted in stateChanges (encounterStarted is REQUIRED whenever your narrative describes enemies attacking or combat beginning — never omit it and never submit an empty creatures array)`);
 	parts.push(`- Override or contradict engine-provided mechanic results (if [Mechanics: ...] is present, those are FACTS)`);
 	parts.push(`- Kill or permanently incapacitate a player character without mechanical justification`);
 	parts.push(`- Move the party to a new location without a locationChange in stateChanges`);
 	parts.push(`- Grant magical items above the party's level range without quest justification`);
+	parts.push(`- Use "Beast", "Monster", "Creature", or any other generic label as a creature's name — always give a specific, descriptive identity (e.g. "Dire Wolf", "Corrupted Warg", "Mountain Cave Bear")`);
+	parts.push(`- Start combat without firing encounterStarted regardless of how minor the fight seems — ALL player-involved combat uses the turn-based encounter system`);
+	parts.push(`- Narrate a character using a weapon or armor they do not have in their inventory — if their Gear list is empty or lacks a suitable weapon, they are unarmed; present improvised weapon or bare-hand options, or suggest acquiring a weapon first`);
+	parts.push(`- Assume class features or spells for a character whose class is shown as classless or not assigned`);
 	parts.push('');
 	parts.push(`WHEN AMBIGUOUS:`);
 	parts.push(`- If the player's intent is unclear but harmless, make a reasonable assumption and narrate`);
 	parts.push(`- If the ambiguity could cost significant resources, ask a brief in-world clarifying question instead of acting`);
+	parts.push('');
+
+	// ── Narrative style ──
+	parts.push(`=== NARRATIVE STYLE ===`);
+	parts.push(`- Write immersive second-person prose. Show the world; do not summarise it.`);
+	parts.push(`- Do NOT end responses with questions or prompts that invite the player to act ("What do you do?", "Where do you go?", "How do you respond?" etc.). The player decides their own next move.`);
+	parts.push(`- Do NOT list every NPC present in a location unprompted. Introduce names only when earned — when a character speaks up, steps forward, or is directly addressed.`);
+	parts.push(`- Do NOT reveal quest names, objectives, or active leads in narration. Quests are discovered through play. Use ambient hooks only: a posted notice, an overheard fragment, a weeping figure in an alley. Never announce a quest directly.`);
+	parts.push(`- Do NOT state day numbers in narrative text. Time of day and weather provide sufficient atmospheric context. Day numbers exist for mechanical deadline tracking only.`);
+	parts.push(`- Escalation rule: if a player actively investigates an ambient hint (asks about the crier, picks up the flyer, approaches the crying figure), you MAY sharpen the detail. If they pursue it further, give them the full information plainly.`);
+	parts.push(`- QUEST ACTIVATION: When a player directly and intentionally engages a quest hook — reads a posted notice, explicitly accepts a task from a quest giver, heeds a town crier, or responds to a pleading citizen — emit a questUpdates entry with field: 'status', oldValue: 'available', newValue: 'active'. This transitions the quest from invisible world-state into the player's journal. Do NOT activate quests from passive overhearing, casual mention, or mere proximity to a hook. Activation requires clear, deliberate player engagement. SAME-TURN DISCOVER + ACTIVATE: If the quest is brand-new this turn (you are also emitting it in questsAdded), include BOTH questsAdded AND questUpdates { field: 'status', oldValue: 'available', newValue: 'active' } in the same response — the engine applies questsAdded before questUpdates, so the quest exists when the activation fires. Do not defer activation to the next turn when the player already engaged the hook in this action.`);
 	parts.push('');
 
 	// Shared game state block
@@ -419,15 +495,15 @@ function buildSystemPrompt(state: GameState, worldBrief: string): string {
 	parts.push(`    "locationItemsAdded": [{"locationId": "exact-location-id-from-visible-[id:-field]", "item": {"id": "item-<unique>", "name": "...", "category": "...", "description": "...", "value": N, "quantity": N}}] or omit,`);
 	parts.push(`    "locationChange": {"from": "exact-current-location-id-from-visible-[id:-field]-or-null", "to": "exact-location-id-from-visible-[id:-field]"} or omit,`);
 	parts.push(`    "npcChanges": [{"npcId": "exact-id-from-visible-[id:-field]", "field": "disposition|alive|hp", "oldValue": X, "newValue": Y} or {"npcId": "exact-id-from-visible-[id:-field]", "field": "notes", "newValue": Y}] or omit,`);
-	parts.push(`    "questUpdates": [{"questId": "exact-id-from-visible-[id:-field]", "field": "status", "oldValue": "active", "newValue": "available|active|completed|failed"} or {"questId": "exact-id-from-visible-[id:-field]", "field": "objective", "objectiveId": "exact-objective-id-from-objective(..., id: ...)", "oldValue": false, "newValue": true}] or omit,`);
-	parts.push(`    "conditionsApplied": [{"characterId": "exact-id-from-PARTY-id-field", "condition": "...", "applied": true|false}] or omit,`);
+	parts.push(`    "questUpdates": [{"questId": "exact-id-from-visible-[id:-field]", "field": "status", "oldValue": "active", "newValue": "available|active|completed|failed", "completionMethod": "combat|diplomacy|stealth|bribery|deception|custom (include when completing or failing)"} or {"questId": "exact-id-from-visible-[id:-field]", "field": "objective", "objectiveId": "exact-objective-id-from-objective(..., id: ...)", "oldValue": false, "newValue": true}] or omit,`);
+	parts.push(`    "conditionsApplied": [{"characterId": "exact-id-from-PARTY-or-NPC-id-field", "condition": "blinded|charmed|deafened|frightened|grappled|incapacitated|invisible|paralyzed|petrified|poisoned|prone|restrained|stunned|unconscious|exhaustion", "applied": true|false}] or omit — use for PCs AND NPCs,`);
 	parts.push(`    "xpAwarded": [{"characterId": "exact-id-from-PARTY-id-field", "amount": N}] or omit,`);
 	parts.push(`    "goldChange": [{"characterId": "exact-id-from-PARTY-id-field", "delta": N, "reason": "..."}] or omit — use for direct gold payments/earnings/exchanges (positive delta = receive gold, negative = spend gold),`);
 	parts.push(`    "npcsAdded": [{"id": "npc-<unique>", "name": "...", "role": "merchant|quest-giver|hostile|neutral|ally|companion|boss", "locationId": "exact-location-id-from-visible-[id:-field]", "disposition": 0, "description": "..."}] or omit,`);
 	parts.push(`    "locationsAdded": [{"id": "loc-<unique>", "name": "...", "type": "settlement|wilderness|dungeon|interior|road", "description": "...", "connections": ["exact-location-id-from-visible-[id:-field]"], "features": ["..."], "groundItems": [{"id": "item-<unique>", "name": "...", "category": "...", "description": "...", "value": N, "quantity": N}]}] or omit,`);
-	parts.push(`    "questsAdded": [{"id": "quest-<unique>", "name": "...", "description": "...", "giverNpcId": "exact-npc-id-from-visible-[id:-field]-or-null", "objectives": [{"id": "obj-<unique>", "text": "..."}], "recommendedLevel": N}] or omit,`);
+	parts.push(`    "questsAdded": [{"id": "quest-<unique>", "name": "...", "description": "...", "giverNpcId": "exact-npc-id-from-visible-[id:-field]-or-null", "objectives": [{"id": "obj-<unique>", "text": "..."}], "recommendedLevel": N, "rewards": {"xp": N, "gold": N}, "status": "available|active (optional — use 'active' only if the player engaged this hook in the current action)", "failureConsequence": "one-sentence consequence if not completed (optional)", "deadline": {"day": N, "description": "..."} (optional), "followUpQuestIds": ["quest-id"] (optional)}] or omit,`);
 	parts.push(`    "sceneFactsAdded": ["fact about the scene or world"] or omit,`);
-	parts.push(`    "encounterStarted": {"creatures": [{"id": "npc-<unique>", "name": "...", "role": "hostile", "locationId": "exact-location-id-from-visible-[id:-field]-or-omit-for-party-location", "disposition": -100, "description": "...", "tier": "weak|normal|tough|elite|boss"}]} or omit,`);
+	parts.push(`    "encounterStarted": {"creatures": [{"id": "npc-<unique>", "name": "...", "role": "hostile", "locationId": "exact-location-id-from-visible-[id:-field]-or-omit-for-party-location", "disposition": -100, "description": "...", "tier": "weak|normal|tough|elite|boss"}]} — REQUIRED when narrative describes combat starting; NEVER omit and NEVER submit an empty creatures array — list each enemy with id, name, role:'hostile', and tier,`);
 	parts.push(`    "encounterEnded": {"outcome": "victory|defeat|flee|negotiated"} or omit,`);
 	parts.push(`    "companionPromoted": [{"npcId": "exact-npc-id-from-visible-[id:-field]"}] or omit (array — include one entry per NPC to recruit; statBlock is optional, the engine auto-generates if omitted),`);
 	parts.push(`    "clockAdvance": {"from": {"day": N, "timeOfDay": "...", "weather": "..."}, "to": {"day": N, "timeOfDay": "...", "weather": "..."}} or omit`);
@@ -438,8 +514,11 @@ function buildSystemPrompt(state: GameState, worldBrief: string): string {
 	parts.push(`=== CRITICAL RULES ===`);
 	parts.push(`IMPORTANT: For every "characterId" field, output ONLY the bare ID string from the [id: ...] field in the PARTY section — e.g. if the party entry reads "[name: Alice][id: 01ABC123]" then characterId must be "01ABC123", NOT "Alice" and NOT the full token string. Never use a character's name or any invented string as a characterId.`);
 	parts.push(`- Every NPC you mention by name for the FIRST TIME must be tracked via npcsAdded. Do not introduce named NPCs only in narrative.`);
+	parts.push(`- Before adding a new NPC via npcsAdded, check KNOWN NPCs for any existing entry showing "(also known as: ...)" — if the name matches an alias, use that NPC's existing id rather than creating a duplicate.`);
 	parts.push(`- Every item gained or lost MUST appear in the correct stateChanges field(s). Do not mention acquiring or losing items only in narrative.`);
 	parts.push(`- ITEM DROP/PICKUP RULES: Use itemsDropped (with itemId from inventory) when a character sets an item down — it lands at the current location shown as "On the ground" next turn. Use itemsPickedUp (with the exact itemId shown in "On the ground") when recovering a dropped item — this restores the ORIGINAL item id intact. Use itemsLost only for consumed/sold/stolen/destroyed items. Use itemsGained only for truly new items (purchases, loot, rewards). Use locationItemsAdded to place new items at any location (chest unlocked, enemy killed, GM loot).`);
+	parts.push(`- PURCHASE PAYMENTS: When the narrative shows the player paying gold for goods, services, or passage, you MUST emit goldChange with a negative delta equal to the amount paid. Recording it in sceneFactsAdded alone is NOT sufficient.`);
+	parts.push(`- ITEM ACQUISITION NARRATION: Every item the narrative describes as looted, found, gifted, picked up, or purchased MUST have a corresponding stateChanges entry (itemsGained or itemsPickedUp). If you narrate it, track it mechanically — failure means the item does not exist in the game.`);
 	parts.push(`- ITEM NAMING RULES: Every item in itemsGained or locationItemsAdded must be a single, atomic item. Never combine two or more distinct items into one name using "and" — e.g. "Sword and Shield" is FORBIDDEN; instead list them as two separate entries. Do not add an item whose name or weaponName already exists in the character's inventory.`);
 	parts.push(`- When a companion NPC (shown in COMPANIONS) is in combat, include their combat actions in narrativeText and any HP/alive changes via npcChanges (use field: "hp" for companion HP changes).`);
 	parts.push(`- Use npcChanges with field: "notes" to record important NPC interaction details (e.g. deals struck, secrets revealed, favors owed). The note text goes in newValue as a string.`);
@@ -456,6 +535,45 @@ function buildSystemPrompt(state: GameState, worldBrief: string): string {
 	parts.push(`- IMPORTANT: Always return valid JSON. The narrativeText field is required.`);
 	parts.push(`- Record important world details (NPC agreements, prices, promises, discoveries) as sceneFactsAdded so they persist across turns.`);
 	parts.push(`- GOLD PAYMENTS: When an NPC pays or rewards the party, ALWAYS use goldChange (not just sceneFactsAdded). The delta amount MUST match the active quest reward if a quest covers this payment — never invent a different amount. If no quest exists, base the amount on negotiated/agreed terms visible in the narrative.`);
+	parts.push(`- QUEST REWARD GOLD: When a quest is completed, the engine automatically distributes quest.rewards.gold to every party member. NEVER also emit a goldChange entry for that same amount in the same response — it will be applied twice, giving the party double gold. Do not narrate an NPC paying out the quest reward amount AND also emit goldChange in the same turn.`);
+	parts.push(`- QUEST COMPLETION METHOD: When completing or failing a quest via questUpdates status change, always include "completionMethod". Choose: "combat" (defeated in battle), "diplomacy" (talked down or negotiated), "stealth" (bypassed undetected), "bribery" (paid off), "deception" (tricked), "custom" (other). A "defeat-encounter" objective CAN be resolved by diplomacy — if the party talked down enemies without fighting, mark objectives done with completionMethod "diplomacy".`);
+	parts.push(`- QUEST STAKES: When creating new quests via questsAdded, add a "failureConsequence" (one sentence) describing what happens in the world if the party fails. For time-sensitive quests, add a "deadline" with a specific day number and plain-language description. These fields make the world feel reactive and create narrative stakes.`);
+	parts.push('');
+	parts.push(`=== BREATH WEAPON & CONDITION RULES ===`);
+	parts.push(`- A breath weapon deals DAMAGE ONLY based on its damage type. It NEVER automatically applies the Poisoned condition, NEVER causes unconsciousness, and NEVER induces sleep on a failed save. No conditions are applied unless a separate racial ability or magic item explicitly states it.`);
+	parts.push(`- The POISONED condition means: disadvantage on attack rolls and ability checks ONLY. It does NOT cause sleep, paralysis, or unconsciousness. Never conflate the Poisoned condition with being knocked out.`);
+	parts.push(`- GRAPPLE sets the target's speed to 0. It does NOT impose disadvantage on saving throws and does NOT affect breath weapon saves or spell saves in any way.`);
+	parts.push(`- NPC conditions: use conditionsApplied with the NPC's exact id (from KNOWN NPCS) to track active conditions. Conditions are shown in brackets next to NPCs in the CURRENT LOCATION section when present.`);
+	parts.push('');
+	parts.push(`=== NON-LETHAL DAMAGE ===`);
+	parts.push(`- When the engine emits a mechanic result labelled "Non-lethal KO — [target]", the target is unconscious at 0 HP but NOT dead. Do NOT emit npcChanges with field alive: false. Narrate them being knocked out, not killed.`);
+	parts.push(`- Non-lethal applies to melee weapon attacks only. Spells, breath weapons, and ranged attacks CANNOT be declared non-lethal — they always deal lethal damage.`);
+	parts.push(`- A non-lethally knocked-out target is alive, unconscious, stable at 0 HP. They may be tied up, questioned, or left behind.`);
+	parts.push('');
+	parts.push(`=== ENCOUNTER DECLARATION DISCIPLINE ===`);
+	parts.push(`- NEVER write combat-declaration prose ("Combat begins!", "Hostilities break out!", "Prepare yourself!") unless your stateChanges for THIS SAME response include a valid encounterStarted with named creatures. Violating this creates broken encounter state — the UI enters combat mode with no combatants.`);
+	parts.push(`- If the ACTIVE ENCOUNTER block is already present in the game state, combat is ongoing. Do NOT write "Combat begins!" or any variant again, and do NOT emit encounterStarted — the fight is already in progress, just narrate the current action.`);
+	parts.push(`- Scouting, observing enemies from a distance, hearing about enemies, and cautious dialogue NEVER warrant combat-declaration prose.`);
+	parts.push(`- ALL COMBAT IS TURN-BASED: When a player character is actively participating in any fight, encounterStarted MUST be emitted with all combatants. There is no minor skirmish that bypasses this. Pure narration-only combat is only valid when the player is a completely passive spectator (e.g. watching through a telescope).`);
+	parts.push(`- GROUP COMBAT: When multiple enemies are present, only ONE engages at a time. The rest hang back with a brief narrative reason. When remaining enemies leave after a defeat, give one clear sentence: "the others bolt into the dark as their leader falls."`);
+	parts.push(`- CREATURE NAMING: Never name an NPC just "Beast", "Monster", or "Creature". Always use a specific descriptive identity: "Dire Wolf", "Corrupted Warg", "Elder Cave Bear", etc.`);
+	parts.push(`- CURRENCY: Only Gold Pieces (gp), Silver Pieces (sp), and Copper Pieces (cp) are mechanical currencies. World-flavor currency names (Crowns, Marks, Ducats) are 1:1 with gp. Always record goldChange in GP amounts.`);
+	parts.push('');
+	parts.push(`=== CRAFTING & HOMEBREW ITEMS ===`);
+	parts.push(`- No crafting system exists in this campaign unless a quest or explicit DM note introduces one. Do NOT invent harvesting mechanics, ingredient lists, or crafting recipes from creature bodies.`);
+	parts.push(`- If a player asks to craft something, describe the 5e downtime crafting baseline (days of work = item value ÷ 25 GP, tool proficiency required) and note it needs GM approval before beginning.`);
+	parts.push(`- When adding a crafted or player-assembled item via itemsGained, include crafted: true and craftedFrom describing the source materials in the item object.`);
+	parts.push(`- PHANTOM ITEMS: Never reference or hand out consumable items (dusts, powders, antidotes, tinctures) that do not already appear in a character's inventory or in locationItems. If a player says "I use my dragon-scale dust", check the inventory first — if it isn't there, tell them they don't have it.`);
+	parts.push('');
+	parts.push(`=== DRAGONBORN SUBRACES ===`);
+	parts.push(`- "Lead dragonborn" has no official 5e SRD entry. Treat it as the Green dragon ancestry: 15-foot cone, Constitution saving throw, poison damage type.`);
+	parts.push(`- Breath weapon DC = 8 + CON modifier + proficiency bonus. Damage: 2d6 at levels 1–5, 3d6 at 6–10, 4d6 at 11–15, 5d6 at 16+.`);
+	parts.push(`- Poison damage type from this breath weapon is damage only — it does NOT apply the Poisoned condition unless a separate ability explicitly grants it.`);
+	parts.push('');
+	parts.push(`=== RAGE / BARBARIAN RULES ===`);
+	parts.push(`- When a barbarian activates Rage (says "I rage", "I enter rage", etc.), emit featureUsed: {"characterId": "...", "feature": "Rage"}. The engine automatically applies physical damage resistance and the rage damage bonus — do NOT manually adjust HP changes for these effects.`);
+	parts.push(`- Do NOT emit conditionsApplied for "raging" — the engine manages the raging condition internally.`);
+	parts.push(`- Rage ends automatically when combat ends. Remaining Rage uses are shown in the party stat block under featureUses.Rage.current.`);
 
 	return parts.join('\n');
 }
@@ -488,6 +606,7 @@ export function buildStateExtractionPrompt(state: GameState): string {
 	parts.push(`- New locations described for the first time`);
 	parts.push(`- New quests or quest objectives mentioned`);
 	parts.push(`- Quest progress (objectives completed, quest status changes)`);
+	parts.push(`- QUEST ACTIVATION: When the narrative clearly shows a player directly and intentionally engaging a quest hook (reading a posted notice, accepting from a quest giver, heeding a town crier, responding to a pleading citizen), emit questUpdates with field: 'status', oldValue: 'available', newValue: 'active'. This is the mechanic that makes a quest appear in the player's journal. Do NOT activate quests for passive observation, accidental overhearing, or casual proximity to a hook. SAME-TURN DISCOVER + ACTIVATE: If the narrative shows a brand-new quest being created AND the player engaging it in the same action, emit BOTH questsAdded AND questUpdates { field: 'status', oldValue: 'available', newValue: 'active' } — the engine processes questsAdded before questUpdates, so this is safe.`);
 	parts.push(`- NPC disposition changes (became friendlier/hostile)`);
 	parts.push(`- NPC deaths (alive → false, hp → 0)`);
 	parts.push(`- Conditions applied or removed (poisoned, charmed, etc.)`);
@@ -499,7 +618,9 @@ export function buildStateExtractionPrompt(state: GameState): string {
 	parts.push('');
 	parts.push(`=== IMPORTANT GUIDELINES ===`);
 	parts.push(`- If the narrative describes movement to a NEW place not in KNOWN LOCATIONS, you MUST emit locationsAdded AND locationChange.`);
-	parts.push(`- If the narrative mentions a new NPC by name, you MUST emit npcsAdded.`);
+	parts.push(`- LOCATION ENFORCEMENT: When a quest or mission sends the player to a distinctly-named new place not in KNOWN LOCATIONS (a supply camp, new outpost, dungeon, etc.), emit locationsAdded with a new unique id AND locationChange to move the party there. Never narrate arrival at a mission area without creating its location. Never reuse an existing location id for a different, new place.`);
+	parts.push(`- DESTROYED LOCATIONS: If ESTABLISHED FACTS mention a location was burned, ruined, destroyed, or abandoned, treat it as inactive. Do not generate active enemy encounters at that location id, and do not send the player on new missions there — create a fresh location entry for new missions.`);
+	parts.push(`- If the narrative mentions a new NPC by name, you MUST emit npcsAdded — unless the name matches an alias shown in parentheses after any existing KNOWN NPC entry (e.g. "(also known as: Aunt Tess)"), in which case use that NPC's existing id instead.`);
 	parts.push(`- If the narrative describes gaining or losing an item, emit the correct field: itemsDropped (placed on ground), itemsPickedUp (recovered from ground using exact id), itemsLost (consumed/sold/destroyed), itemsGained (brand new item), or locationItemsAdded (new item at a location).`);
 	parts.push(`- ITEM DROP/PICKUP: itemsDropped moves an item from inventory to the location's ground (preserving its original id). itemsPickedUp moves it back — use the EXACT item id from "On the ground" in the location state. Never use itemsGained to recover a ground item; that creates a hallucinated duplicate.`);
 	parts.push(`- If an NPC is killed in the narrative, emit npcChanges with field "alive", newValue false, AND field "hp", newValue 0.`);
@@ -508,13 +629,28 @@ export function buildStateExtractionPrompt(state: GameState): string {
 	parts.push(`- Connect new locations to existing ones via the connections array.`);
 	parts.push(`- Record important world details as sceneFactsAdded — agreements, prices, discoveries, lore, NPC promises.`);
 	parts.push(`- GOLD PAYMENTS: When the narrative shows an NPC paying the party or the party spending gold, emit goldChange with the exact amount. Use positive delta for received gold, negative for spent gold.`);
+	parts.push(`- CURRENCY NORMALIZATION: All in-world currency names ("Crowns", "Marks", "Ducats", "Coins of the Realm") are 1:1 with Gold Pieces. Always record goldChange in GP amounts even if the narrative uses a world-flavor currency name.`);
+	parts.push(`- CREATURE NAMING: If an NPC in state is named generically ("Beast", "Monster", "Creature"), and the narrative gives it a more specific identity, emit npcChanges with field "name" and the new descriptive name.`);
+	parts.push(`- COMBAT TRACKING: If the narrative describes a fight in which the player character participated but no encounterStarted was emitted this turn, you MUST emit encounterStarted with all enemies present. All player-involved combat requires encounter tracking.`);
+	parts.push(`- GROUP COMBAT: When enemies flee or disengage after a partial defeat, emit npcChanges alive: false (or escaped: true via notes) for those NPCs so they are not left in limbo.`);
 	parts.push(`- Use npcChanges with field "notes" to record significant NPC interaction details.`);
 	parts.push(`- If the narrative has NO mechanical effects, return {"stateChanges": {}}.`);
 	parts.push(`- Do NOT award XP or complete quest objectives for merely asking questions, hearing rumors, scouting from safety, or discussing possible plans.`);
 	parts.push(`- Do NOT start combat for simple observation or reconnaissance unless hostilities actually begin, the party is discovered, or the narrative clearly commits to battle.`);
 	parts.push(`- Only use encounterStarted when the narrative contains an EXPLICIT attack, ambush, or charge — words like "attacks", "lunges", "combat begins", "roll for initiative". Scouting, observing, and cautious dialogue are NOT combat.`);
+	parts.push(`- ENCOUNTER NPC IDENTITY: In encounterStarted.creatures, each creature MUST use either (a) a brand-new unique id (e.g., npc-guard-1) or (b) an existing NPC id ONLY if that NPC is currently at the party's location with hostile disposition. NEVER use the id of a quest-giver, merchant, ally, or companion as a hostile creature — give enemy commanders new ids.`);
 	parts.push(`- Award small XP (10-50) for clever roleplay, exploration, or puzzle-solving.`);
 	parts.push(`- Do NOT emit xpAwarded for enemy kills or combat victories — the game engine awards combat XP automatically via resolveEncounter. Only emit xpAwarded for roleplay, exploration, puzzle-solving, or social accomplishments.`);
+	parts.push(`- QUEST COMPLETION METHOD: When a quest is completed or failed, include "completionMethod" in the questUpdates status entry. Choose: "combat" (enemies defeated in battle), "diplomacy" (negotiated/talked-down), "stealth" (bypassed unseen), "bribery" (paid off), "deception" (tricked), "custom" (other). A "defeat-encounter" objective CAN be resolved by diplomacy — if the narrative shows the party talked enemies down without combat, mark objectives done with completionMethod "diplomacy".`);
+	parts.push(`- QUEST REWARDS: Every quest created via questsAdded MUST include a "rewards" object with non-zero xp appropriate to the difficulty (minimum 50 per recommendedLevel). Include gold when the quest-giver is a noble, officer, or merchant. Never omit rewards or emit {xp: 0, gold: 0}.`);
+	parts.push(`- BREATH WEAPON EXTRACTION: A breath weapon hit causes DAMAGE ONLY. Never emit conditionsApplied for "poisoned" or "unconscious" as a direct result of a breath weapon. If the narrative says the target was "knocked out by the breath", do NOT emit conditionsApplied — the engine handles melee KO only.`);
+	parts.push(`- NON-LETHAL KO EXTRACTION: If the narrative describes a melee attack knocking a target unconscious (non-lethal), emit conditionsApplied for "unconscious" on the target's NPC id. Do NOT also emit npcChanges with alive: false — the target survived.`);
+	parts.push(`- PHANTOM ITEMS: Do not emit itemsGained for items the narrative invents on-the-fly (dusts, powders, antidotes) unless those items already exist as locationItems or the narrative shows them being purchased/rewarded in this same turn.`);
+	parts.push(`- PURCHASE SPENDING: When the narrative shows the player spending or paying gold, emit goldChange with a negative delta equal to the amount paid.`);
+	parts.push(`- ITEM ACQUISITION: Every item the narrative describes as acquired (looted, picked up, purchased, gifted) must be emitted in itemsGained or itemsPickedUp. Do not let inventory acquisitions exist only in narrative.`);
+	parts.push(`- COMBAT PROSE WITHOUT encounterStarted: If the narrative shows actual combat taking place (enemies attacking, damage being dealt, characters fighting) but no encounterStarted was included in the stateChanges, you MUST emit encounterStarted with all enemies present — omitting it leaves the encounter untracked. The ONLY exception is a narrative that contains ONLY a declaration phrase ("Combat begins!") with no actual combat actions described — in that case do not emit encounterStarted.`);
+	parts.push(`- QUEST GOLD EXTRACTION: If the narrative describes an NPC paying the party an amount that matches a quest completion reward AND that quest has a non-zero gold reward in this same turn, do NOT emit goldChange — the engine's distributeQuestRewards function already handles distributing that gold. However, if the completed quest had no gold reward (rewards.gold === 0) or if the gold payment is clearly separate from quest reward distribution, you MUST emit goldChange for that payment.`);
+	parts.push(`- RAGE: When the narrative shows a barbarian activating rage, emit featureUsed: {"characterId": "...", "feature": "Rage"}. Do NOT emit conditionsApplied for "raging" — the engine manages this condition.`);
 	parts.push('');
 
 	// Response format
@@ -530,15 +666,15 @@ export function buildStateExtractionPrompt(state: GameState): string {
 	parts.push(`    "locationItemsAdded": [{"locationId": "exact-location-id-from-visible-[id:-field]", "item": {"id": "item-<unique>", "name": "...", "category": "...", "description": "...", "value": N, "quantity": N}}] or omit,`);
 	parts.push(`    "locationChange": {"from": "exact-current-location-id-or-null", "to": "exact-destination-location-id"} or omit,`);
 	parts.push(`    "npcChanges": [{"npcId": "exact-id-from-visible-[id:-field]", "field": "disposition|alive|hp", "oldValue": X, "newValue": Y} or {"npcId": "exact-id-from-visible-[id:-field]", "field": "notes", "newValue": Y}] or omit,`);
-	parts.push(`    "questUpdates": [{"questId": "exact-id-from-visible-[id:-field]", "field": "status|objective", ...}] or omit,`);
-	parts.push(`    "conditionsApplied": [{"characterId": "exact-id-from-CHARACTERS-id-field", "condition": "blinded|charmed|deafened|frightened|grappled|incapacitated|invisible|paralyzed|petrified|poisoned|prone|restrained|stunned|unconscious|exhaustion", "applied": true|false}] or omit,`);
+	parts.push(`    "questUpdates": [{"questId": "exact-id-from-visible-[id:-field]", "field": "status", "oldValue": "active", "newValue": "available|active|completed|failed", "completionMethod": "combat|diplomacy|stealth|bribery|deception|custom (include when completing/failing)"} or {"questId": "...", "field": "objective", "objectiveId": "...", "oldValue": false, "newValue": true}] or omit,`);
+	parts.push(`    "conditionsApplied": [{"characterId": "exact-id-from-CHARACTERS-or-NPCs-id-field", "condition": "blinded|charmed|deafened|frightened|grappled|incapacitated|invisible|paralyzed|petrified|poisoned|prone|restrained|stunned|unconscious|exhaustion", "applied": true|false}] or omit — applies to PCs and NPCs,`);
 	parts.push(`    "xpAwarded": [{"characterId": "exact-id-from-CHARACTERS-id-field", "amount": N}] or omit,`);
 	parts.push(`    "goldChange": [{"characterId": "exact-id-from-CHARACTERS-id-field", "delta": N, "reason": "..."}] or omit — use for direct gold payments, sales, or wages (positive = received, negative = spent),`);
 	parts.push(`    "npcsAdded": [{"id": "npc-<unique>", "name": "...", "role": "merchant|quest-giver|hostile|neutral|ally|companion|boss", "locationId": "exact-location-id-from-visible-[id:-field]", "disposition": 0, "description": "..."}] or omit,`);
 	parts.push(`    "locationsAdded": [{"id": "loc-<unique>", "name": "...", "type": "settlement|wilderness|dungeon|interior|road", "description": "...", "connections": ["exact-location-id-from-visible-[id:-field]"], "features": ["..."], "groundItems": [{"id": "item-<unique>", "name": "...", "category": "...", "description": "...", "value": N, "quantity": N}]}] or omit,`);
-	parts.push(`    "questsAdded": [{"id": "quest-<unique>", "name": "...", "description": "...", "giverNpcId": "exact-npc-id-from-visible-[id:-field]-or-null", "objectives": [{"id": "obj-<unique>", "text": "..."}], "recommendedLevel": N}] or omit,`);
+	parts.push(`    "questsAdded": [{"id": "quest-<unique>", "name": "...", "description": "...", "giverNpcId": "exact-npc-id-from-visible-[id:-field]-or-null", "objectives": [{"id": "obj-<unique>", "text": "..."}], "recommendedLevel": N, "rewards": {"xp": N, "gold": N}, "status": "available|active (optional — use 'active' only if the player engaged this hook in the current action)", "failureConsequence": "one-sentence consequence if not completed (optional)", "deadline": {"day": N, "description": "..."} (optional), "followUpQuestIds": ["quest-id"] (optional)}] or omit,`);
 	parts.push(`    "sceneFactsAdded": ["important fact to remember"] or omit,`);
-	parts.push(`    "encounterStarted": {"creatures": [{"id": "npc-<unique>", "name": "...", "role": "hostile", "locationId": "exact-location-id-from-visible-[id:-field]-or-omit-for-party-location", "disposition": -100, "description": "...", "tier": "weak|normal|tough|elite|boss"}]} or omit,`);
+	parts.push(`    "encounterStarted": {"creatures": [{"id": "npc-<unique>", "name": "...", "role": "hostile", "locationId": "exact-location-id-from-visible-[id:-field]-or-omit-for-party-location", "disposition": -100, "description": "...", "tier": "weak|normal|tough|elite|boss"}]} — REQUIRED when narrative describes combat starting; NEVER omit and NEVER submit an empty creatures array — list each enemy with id, name, role:'hostile', and tier,`);
 	parts.push(`    "encounterEnded": {"outcome": "victory|defeat|flee|negotiated"} or omit,`);
 	parts.push(`    "companionPromoted": [{"npcId": "exact-npc-id-from-visible-[id:-field]"}] or omit (array — one entry per NPC; statBlock optional),`);
 	parts.push(`    "clockAdvance": {"from": {"day": N, "timeOfDay": "...", "weather": "..."}, "to": {"day": N, "timeOfDay": "...", "weather": "..."}} or omit`);
@@ -549,6 +685,7 @@ export function buildStateExtractionPrompt(state: GameState): string {
 	parts.push(`During active combat the engine resolves all attacks, damage, and dice rolls authoritatively.`);
 	parts.push(`- Do NOT invent hit/miss results, damage numbers, or specify attack targets in stateChanges.`);
 	parts.push(`- You may still extract encounterStarted/encounterEnded, HP changes from non-engine sources, and condition changes.`);
+	parts.push(`- IMPORTANT: Even during a combat turn, you MUST still extract ALL non-attack state changes: goldChange (gold paid/received), questUpdates (quest completed/objectives done), itemsGained/Lost (loot picked up, items consumed), conditionsApplied, npcChanges (NPC dying, fleeing, disposition change), locationsAdded, sceneFactsAdded, and companionPromoted. Combat does NOT exempt you from extracting these. Returning {} during combat is almost always wrong.`);
 	parts.push(`- Treat locationChange.from, questUpdates.oldValue, and npcChanges.oldValue as concurrency guards. When included, they MUST match the current state shown below or the write may be rejected.`);
 
 	// Current game state snapshot for ID reference
@@ -600,7 +737,13 @@ export function buildStateExtractionPrompt(state: GameState): string {
 		parts.push(`QUESTS:`);
 		for (const q of state.quests) {
 			const objs = q.objectives.map((o) => formatObjectiveRef(o.text, o.id, o.done)).join('; ');
-			parts.push(`- ${formatNameIdRef(q.name, q.id)} (status: ${q.status}): ${objs}`);
+			const consequence = q.failureConsequence && q.status === 'active'
+				? ` | ⚠ Consequence if failed: ${q.failureConsequence}`
+				: '';
+			const deadlineStr = q.deadline && q.status === 'active'
+				? ` | Deadline: Day ${q.deadline.day} — ${q.deadline.description}`
+				: '';
+			parts.push(`- ${formatNameIdRef(q.name, q.id)} (status: ${q.status}): ${objs}${consequence}${deadlineStr}`);
 		}
 		parts.push('');
 	}
@@ -683,9 +826,11 @@ function formatCharacterBrief(c: PlayerCharacter): string {
 		.map((i) => formatNameIdRef(i.name, i.id));
 	const itemStr = notableItems.length > 0 ? ` | Gear: ${notableItems.join(', ')}` : '';
 
-	const classDesc = c.classes.length > 1
-		? c.classes.map((cl) => `${cl.name} ${cl.level}`).join('/')
-		: getPrimaryClass(c);
+	const classDesc = c.classes.length === 0
+		? '(classless — no class selected)'
+		: c.classes.length > 1
+			? c.classes.map((cl) => `${cl.name} ${cl.level}`).join('/')
+			: getPrimaryClass(c);
 
 	// Per-class spellcasting summary
 	const spellParts: string[] = [];
@@ -753,10 +898,14 @@ export function buildWorldBrief(
 		if (settlement) {
 			const ownerState = world.politics.states.find((s) => s.i === settlement.state);
 			const culture = world.societies.cultures.find((c) => c.i === settlement.culture);
+			const sizeLabel =
+				settlement.group === 'city'   ? 'a walled city'   :
+				settlement.group === 'town'   ? 'a fortified town' :
+				settlement.group === 'village' ? 'a village'        : 'a small hamlet';
 			parts.push(
-				`The party is in ${settlement.name}, a ${settlement.group} of ${Math.round(settlement.population * 1000).toLocaleString('en')} people` +
-					(ownerState ? ` in ${ownerState.fullName}` : '') +
-					(culture ? `, whose people follow ${culture.name} customs` : '') +
+				`The party is currently in ${settlement.name}, ${sizeLabel}` +
+					(ownerState ? ` in the territory of ${ownerState.fullName}` : '') +
+					(culture ? `; local customs follow ${culture.name} tradition` : '') +
 					`.`
 			);
 		}
@@ -832,10 +981,10 @@ function turnsToMessages(turns: TurnRecord[], useJsonFormat = false): ChatMessag
 }
 
 function formatMechanicResult(m: MechanicResult): string {
-	const diceStr = `${m.dice.notation} → ${m.dice.total}`;
+	const diceStr = m.dice ? `${m.dice.notation} → ${m.dice.total}` : '';
 	const dcStr = m.dc !== undefined ? ` vs DC ${m.dc}` : '';
 	const successStr = m.success !== undefined ? (m.success ? ' ✓' : ' ✗') : '';
-	return `${m.label}: ${diceStr}${dcStr}${successStr}`;
+	return `${m.label}${diceStr ? ': ' + diceStr : ''}${dcStr}${successStr}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -991,8 +1140,19 @@ function buildNarratorSystemPrompt(state: GameState, worldBrief: string): string
 	parts.push(`- Do NOT invent additional mechanical effects (no extra damage, no bonus healing, no status changes beyond what's given).`);
 	parts.push(`- You MAY add sensory detail, NPC reactions, environmental flavor, and dramatic tension.`);
 	parts.push(`- Keep responses vivid and concise (2–5 sentences for normal actions, more for important moments).`);
-	parts.push(`- End each response with a beat that invites the next player action.`);
+	parts.push(`- NON-LETHAL KO: If a mechanic result says "Non-lethal KO \u2014 [target]", narrate them being knocked unconscious, NOT killed. They are alive on the ground. Do NOT describe their death.`);
+	parts.push(`- BREATH WEAPONS: Never narrate a breath weapon applying the Poisoned condition or causing unconsciousness \u2014 a breath weapon deals damage only. Describe the target singed, scorched, poisoned by the gas (sickened description), etc., but NOT dropping unconscious or falling asleep from the breath itself.`);
 	parts.push(`- Return ONLY narrative prose. Do NOT return JSON.`);
+	parts.push('');
+
+	// ── Narrative style (universal) ──
+	parts.push(`=== NARRATIVE STYLE ===`);
+	parts.push(`- Write immersive second-person prose. Show the world; do not summarise it.`);
+	parts.push(`- Do NOT end responses with questions or prompts that invite the player to act ("What do you do?", "Where do you go?", "How do you respond?" etc.). The player decides their own next move.`);
+	parts.push(`- Do NOT list every NPC present in a location unprompted. Introduce names only when earned — when a character speaks up, steps forward, or is directly addressed.`);
+	parts.push(`- Do NOT reveal quest names, objectives, or active leads in narration. Quests are discovered through play. Use ambient hooks only: a posted notice, an overheard fragment, a weeping figure in an alley. Never announce a quest directly.`);
+	parts.push(`- Do NOT state day numbers in narrative text. Time of day and weather provide sufficient atmospheric context. Day numbers exist for mechanical deadline tracking only.`);
+	parts.push(`- Escalation rule: if a player actively investigates an ambient hint (asks about the crier, picks up the flyer, approaches the crying figure), you MAY sharpen the detail. If they pursue it further, give them the full information plainly.`);
 	parts.push('');
 
 	// World knowledge
@@ -1011,7 +1171,10 @@ function buildNarratorSystemPrompt(state: GameState, worldBrief: string): string
 		parts.push(`Description: ${loc.description}`);
 		const localNpcs = state.npcs.filter((n) => n.locationId === loc.id && n.alive);
 		if (localNpcs.length > 0) {
-			parts.push(`NPCs present: ${localNpcs.map((n) => `${n.name} (${n.role})`).join(', ')}`);
+			parts.push(`NPCs present: ${localNpcs.map((n) => {
+				const condStr = (n.conditions && n.conditions.length > 0) ? ` [${n.conditions.join(', ')}]` : '';
+				return `${n.name} (${n.role}${condStr})`;
+			}).join(', ')}`);
 		}
 		parts.push('');
 	}
@@ -1028,6 +1191,14 @@ function buildNarratorSystemPrompt(state: GameState, worldBrief: string): string
 	// Time
 	parts.push(`=== TIME ===`);
 	parts.push(`Day ${state.clock.day}, ${state.clock.timeOfDay}. Weather: ${state.clock.weather}.`);
+	parts.push(`(Day count is for deadline tracking only. Do not reference day numbers in narrative output.)`);
+	parts.push('');
+
+	parts.push(`=== TIME-OF-DAY RULES ===`);
+	parts.push(`- dawn: Most residents sleeping or just waking. Shops closed. Town gates closed.`);
+	parts.push(`- morning / afternoon: Full commerce. Gates open. Normal social interactions.`);
+	parts.push(`- dusk: Merchants closing. Town gate guards alert. Taverns filling.`);
+	parts.push(`- night: Town gates SEALED (daytime-only policy = hard block). City gates: guards challenge travellers (guarded-at-night). Shops closed. Inns and taverns open. Entering homes at night is an intrusion. Guards patrolling.`);
 	parts.push('');
 
 	return parts.join('\n');
@@ -1046,7 +1217,7 @@ export function formatMechanicSummaryForNarrator(resolvedTurn: ResolvedTurn): st
 		parts.push('');
 		parts.push(`MECHANIC RESULTS (these are FACTS — narrate around them):`);
 		for (const result of resolvedTurn.mechanicResults) {
-			const diceStr = result.dice.notation !== '' ? ` [${result.dice.notation} → ${result.dice.total}]` : '';
+			const diceStr = result.dice && result.dice.notation !== '' ? ` [${result.dice.notation} → ${result.dice.total}]` : '';
 			const dcStr = result.dc !== undefined ? ` (DC ${result.dc})` : '';
 			const successStr = result.success !== undefined ? ` ${result.success ? '(succeeded)' : '(failed)'}` : '';
 			parts.push(`- ${result.type.toUpperCase()}: ${result.label}${diceStr}${dcStr}${successStr}`);
@@ -1156,7 +1327,7 @@ function formatRoundActionsSummary(
 		lines.push(`\n${actorName}: "${action.rawAction}"`);
 
 		for (const result of action.mechanicResults) {
-			const diceStr = result.dice.notation
+			const diceStr = result.dice?.notation
 				? ` [${result.dice.notation} → ${result.dice.total}]`
 				: '';
 			const successStr =
@@ -1260,7 +1431,7 @@ export function assembleRoundNarratorContext(
 				const layOnHands = pc.featureUses?.['Lay on Hands'];
 				if (layOnHands && layOnHands.current > 0) resources.push('Lay on Hands');
 				// Check healing potions
-				const potions = pc.inventory?.filter(i => i.type === 'potion' && /heal/i.test(i.name));
+				const potions = pc.inventory?.filter(i => i.category === 'consumable' && /heal/i.test(i.name));
 				if (potions && potions.length > 0) resources.push(`${potions.length} healing potion(s)`);
 				const hint = resources.length > 0
 					? ` (available: ${resources.join(', ')})`

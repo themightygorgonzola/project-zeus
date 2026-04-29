@@ -130,7 +130,12 @@ export interface LongRestPreview {
 /** Conditions automatically removed by a long rest. */
 const LONG_REST_CLEARABLE_CONDITIONS: ReadonlySet<Condition> = new Set<Condition>([
 	'frightened',
-	'charmed'
+	'charmed',
+	'unconscious',
+	'prone',
+	'stunned',
+	'paralyzed',
+	'poisoned'
 ]);
 
 // ---------------------------------------------------------------------------

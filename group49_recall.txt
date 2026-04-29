@@ -1,0 +1,146 @@
+
+================================================================================
+  GROUP 49 — Inventory Rebalance + Drag-Drop Overhaul
+================================================================================
+
+  CONTEXT
+  -------
+  Player-reported: characters became encumbered instantly on creation, and
+  container drag-drop misfired due to false DragLeave events. No containers
+  were created at character creation (backpack was stored as MiscItem).
+
+  DESIGN DECISIONS (from 5-question user interview)
+  --------------------------------------------------
+  • Encumbrance thresholds: STR×15 = Loaded, STR×25 = Burdened, STR×30 = Overloaded
+  • Worn/equipped items count at 25% WU toward encumbrance (body-supported)
+  • SU displayed only inside container panels; NOT on main encumbrance bar
+  • Containers auto-populated at character creation (two-pass routing)
+  • Right-click context menu added as drag-drop fallback for touch/accessibility
+
+  ── PHASE 1: Encumbrance Math ─────────────────────────────────────────────────
+  FILE: src/lib/game/item-dimensions.ts
+
+  getCharacterTotalWU() — worn item discount
+    Items with equipped:true now contribute item.weight × 0.25 WU (not full weight).
+    Container contents always contribute full weight (they hang from the body).
+
+  getEnhancedEncumbranceInfo() — new thresholds
+    OLD: capacity=STR×15, encumberedThreshold=STR×5, heavilyEncumberedThreshold=STR×10
+    NEW: capacity=STR×30, loadedThreshold=STR×15, burdenedThreshold=STR×25
+    Added: badge:'unloaded'|'loaded'|'burdened'|'overloaded' field
+
+  CONTAINER_DEFAULTS — doubled standard container sizes
+    backpack: 30WU/60SU  →  60WU/120SU
+    sack:     15WU/30SU  →  30WU/60SU
+    bag:      20WU/40SU  →  40WU/80SU
+
+  ── PHASE 2: Type Update ──────────────────────────────────────────────────────
+  FILE: src/lib/game/types.ts
+
+  EnhancedEncumbranceInfo interface — renamed threshold fields + badge
+    Removed: encumberedThreshold, heavilyEncumberedThreshold
+    Added:   loadedThreshold, burdenedThreshold, badge
+    Kept:    isEncumbered, isHeavilyEncumbered, isOverCapacity (semantics updated)
+    Note:    isEncumbered now means wuTotal > loadedThreshold
+             isHeavilyEncumbered now means wuTotal > burdenedThreshold
+
+  ── PHASE 3: Container Capacities (covered in Phase 1 above) ────────────────
+
+  ── PHASE 4: Auto-Populate Starting Containers ───────────────────────────────
+  FILE: src/lib/game/character-creation.ts
+
+  Added imports: ContainerItem, ContainerType (from types), canAddToContainer,
+                 getItemSU (from item-dimensions)
+
+  Added CONTAINER_NAME_MAP — maps normalised item labels to ContainerType + weight:
+    backpack → 'backpack' (5 lbs), sack → 'sack', bag → 'bag',
+    coin purse → 'coin-purse', scroll case → 'scroll-case',
+    component pouch → 'component-pouch', belt pouch → 'belt-pouch',
+    quiver → 'quiver', pouch → 'belt-pouch'
+
+  itemFromLabel() — detects container names before weapon/armor/gear lookup.
+    Returns ContainerItem with capacity from CONTAINER_DEFAULTS when matched.
+    Container items start with empty contents:[].
+
+  resolveStartingEquipment() — two-pass algorithm:
+    Pass 1: Build all items (containers get ContainerItem shape)
+    Pass 2: Route non-equipped, non-container items into containers:
+      ammunition  → quiver first, then backpack
+      coins       → coin-purse first, then backpack
+      scrolls     → scroll-case first, then backpack
+      SU ≤ 1      → belt-pouch first, then backpack
+      default     → backpack
+      overflow    → stays loose (no hard fail)
+    Equipped weapons + armor always stay as top-level loose items.
+    Final order: containers first (filled), then remaining loose/equipped.
+
+  ── PHASE 5: Drag-Drop Bug Fix ────────────────────────────────────────────────
+  FILE: src/lib/components/JournalPanel.svelte
+
+  handleDragLeave(e) — bounding-box guard added
+    Old: cleared drop state immediately on any DragLeave event
+    New: checks if the mouse is still within the drop zone's bounding rect;
+         if cursor is still inside, the event is ignored (it was fired by a child).
+         Signature changed from () to (e: DragEvent).
+
+  ── PHASE 6: Right-Click Context Menu ────────────────────────────────────────
+  FILE: src/lib/components/JournalPanel.svelte
+
+  New state:
+    contextMenu: { x, y, itemId, fromSource } | null
+
+  New functions:
+    handleItemContextMenu(e, itemId, fromSource) — fires on each item's
+      oncontextmenu event; stores cursor position + item identity.
+    closeContextMenu() — clears the state.
+    moveViaContextMenu(toSource) — calls moveItemToContainer then
+      onInventoryMove + persistInventoryMove (same path as drag-drop).
+    $effect — installs a window mousedown listener to dismiss the menu when
+      clicking outside; guards using .closest('.ctx-menu') to avoid self-close.
+
+  oncontextmenu added to:
+    • Equipped zone items (fromSource = 'equipped')
+    • Container contents items (fromSource = container.id)
+    • Loose zone items (fromSource = 'loose')
+
+  Context menu HTML — fixed position at cursor, renders:
+    • "⚔️ Equipped" (only for weapon/armor items not already equipped)
+    • "🎽 Loose" (only when not already loose)
+    • One button per container, disabled + "(full)" label when canAddToContainer fails
+    • "✕ Cancel" at bottom
+
+  ── PHASE 7: UI Cleanup ───────────────────────────────────────────────────────
+  FILE: src/lib/components/JournalPanel.svelte
+
+  Encumbrance bar zones — proportions now reflect actual thresholds:
+    Green:  STR×0 → STR×15 = 50% of bar width
+    Yellow: STR×15 → STR×25 = 33% of bar width
+    Orange: STR×25 → STR×30 = 17% of bar width
+    (Previously all three hardcoded at 33.33%)
+
+  Encumbrance status labels renamed:
+    OLD: Encumbered, Heavily Encumbered, Over Capacity
+    NEW: Loaded, Burdened, Overloaded
+    (Now driven by enc.badge field)
+
+  Encumbrance popover text — updated thresholds + descriptions:
+    Unloaded (0–STR×15): No penalty.
+    Loaded (STR×15–STR×25): No speed penalty — but you feel the weight.
+    Burdened (STR×25–STR×30): Speed −10 ft; disadvantage on STR/DEX/CON.
+    Overloaded (>STR×30): Speed −20 ft; GM may impose further penalties.
+    Note: "Capacity = STR × 30 WU. Worn/equipped items count at 25% WU."
+
+  WU/SU popover text — SU role clarified:
+    "SU does not affect the main encumbrance bar — only WU does."
+
+  Item chips — SU removed from main inventory zones (equipped, container contents,
+    loose). All chips now show only "{weight × qty} WU".
+    Container load bars still show both WU and SU (per user requirement).
+
+  --- RESULTS ---
+  svelte-check: 0 new errors (18 pre-existing errors in AdventureCard.svelte,
+    CharacterCreation.svelte, +page.svelte were unchanged)
+  Files changed: src/lib/game/types.ts
+                 src/lib/game/item-dimensions.ts
+                 src/lib/game/character-creation.ts
+                 src/lib/components/JournalPanel.svelte

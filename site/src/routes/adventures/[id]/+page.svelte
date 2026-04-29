@@ -25,6 +25,13 @@
 	let worldSnapshot = $derived(
 		toWorldSnapshot((data.state as { world?: PrototypeWorld } | undefined)?.world)
 	);
+	let worldCities = $derived(
+		((data.state as { world?: PrototypeWorld } | undefined)?.world?.politics.settlements ?? [])
+			.filter((s) => s.population > 0)
+			.sort((a, b) => b.population - a.population)
+			.slice(0, 5)
+			.map((s) => s.name)
+	);
 
 	let adventureId = $derived(data.adventure.id);
 	let currentUserId = $derived(data.currentUserId);
@@ -200,6 +207,7 @@
 	let turnPhase = $state<'classifying' | 'narrating' | 'extracting' | 'rewarding' | 'query' | null>(null);
 	let lastGmTurnTs = $state(0); // timestamp of last GM message
 	let rollingCheck = $state(false); // true while a roll is being resolved
+	let questNotification = $state(false); // true when a new active quest was received
 
 	// Hydrate transcript from server-loaded data
 	function hydrateTranscript() {
@@ -563,6 +571,18 @@
 			if (msg.type === 'world:time-advance') {
 				const summary = String((msg as any).summary ?? 'Time passes');
 				toastTimeAdvance(summary);
+			}
+
+			if (msg.type === 'game:quest-discovered') {
+				toastQuestUpdate(String(msg.name ?? 'Unknown Quest'), 'discovered');
+			}
+
+			if (msg.type === 'game:quest-update') {
+				const questObj = (msg as any).quest as { name?: string } | undefined;
+				const reason = String((msg as any).reason ?? 'accepted');
+				toastQuestUpdate(questObj?.name ?? 'Unknown Quest', reason);
+				if (reason === 'accepted') questNotification = true;
+				invalidateAll();
 			}
 
 			if (msg.type === 'game:clarification-request') {
@@ -1115,7 +1135,10 @@
 					clock={gameState?.clock}
 					adventureId={adventureId}
 					onCreated={handleCharacterCreated}
-			/>
+					onInventoryMove={(updated) => { partyCharacters = { ...partyCharacters, [updated.userId]: updated }; }}
+					worldCities={worldCities}
+					bind:questNotification
+				/>
 		</div>
 	</div>
 </div>

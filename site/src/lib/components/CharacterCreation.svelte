@@ -21,11 +21,15 @@
 		getSubrace,
 		RACES
 	} from '$lib/game';
+	import type { WeaponDefinition, ArmorDefinition, GearDefinition } from '$lib/game';
+	import { WEAPONS, INSTRUMENTS, getArmor, getGear, getWeapon } from '$lib/game';
+	import type { BackgroundChoiceOption } from '$lib/game/data/backgrounds';
 	import { validateCharacterInput } from '$lib/game/character-creation';
 
 	interface Props {
 		adventureId: string;
 		onCreated?: (character: PlayerCharacter) => void;
+		worldCities?: string[];
 	}
 
 	const abilityOrder: AbilityName[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
@@ -96,7 +100,7 @@
 		{ id: 'identity', label: 'Identity' }
 	] as const;
 
-	let { adventureId, onCreated = () => {} }: Props = $props();
+	let { adventureId, onCreated = () => {}, worldCities = [] }: Props = $props();
 	let isOpen = $state(true);
 	let currentStep = $state(0);
 	let submitting = $state(false);
@@ -128,7 +132,10 @@
 		chosenSkills: [],
 		spellChoices: { cantrips: [], knownSpells: [], preparedSpells: [] },
 		equipmentSelections: [],
+		equipmentSubSelections: {},
 		variantHumanFeat: undefined,
+		backgroundEquipmentChoices: {},
+		expertiseChoices: [],
 		backstory: ''
 	});
 
@@ -167,6 +174,12 @@
 			: 0
 	);
 	let pointBuySummary = $derived(form.abilityAssignment ? pointBuy(form.abilityAssignment) : { spent: 0, remaining: 27, valid: false, invalidAbilities: [] });
+	let expertiseCount = $derived(
+		classDef?.features.some((f) => f.level === 1 && f.tags.includes('expertise')) ? 2 : 0
+	);
+	let expertisePool = $derived(
+		Array.from(new Set([...backgroundSkills, ...fixedRacialSkills, ...(form.bonusSkillChoices ?? []), ...form.chosenSkills])) as SkillName[]
+	);
 	let standardPool = $derived.by(() => {
 		const used = new Set(Object.values(standardSlots).filter((v): v is number => v !== undefined));
 		return STANDARD_ARRAY.filter(v => !used.has(v));
@@ -185,6 +198,20 @@
 		allSkills.filter((skill) => !backgroundSkills.includes(skill) && !fixedRacialSkills.includes(skill) && !form.chosenSkills.includes(skill))
 	);
 	let currentStepErrors = $derived(getStepErrors(currentStep));
+
+	// ── Background equipment choice helpers ──────────────────────────────
+	/** Overrides for choice option lists populated at runtime (e.g. Urchin city from world). */
+	let bgChoiceOptions = $derived.by(() => {
+		const map: Record<string, BackgroundChoiceOption[]> = {};
+		if (backgroundDef?.equipmentChoices && worldCities.length > 0) {
+			for (const c of backgroundDef.equipmentChoices) {
+				if (c.id === 'cityOfOrigin') {
+					map[c.id] = worldCities.map((name) => ({ label: name, items: [] }));
+				}
+			}
+		}
+		return map;
+	});
 
 	onMount(() => {
 		initializeDefaults();
@@ -286,6 +313,37 @@
 			.split('-')
 			.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
 			.join(' ');
+	}
+
+	const BOON_LABELS: Record<string, string> = {
+		'vehicles-land':      'Land Vehicles',
+		'vehicles-water':     'Water Vessels',
+		'navigator-tools':    "Navigator's Tools",
+		'thieves-tools':      "Thieves' Tools",
+		'herbalism-kit':      'Herbalism Kit',
+		'artisan-tools':      "Artisan's Tools",
+		'forgery-kit':        'Forgery Kit',
+		'disguise-kit':       'Disguise Kit',
+		'gaming-set':         'Gaming Set (of choice)',
+		'musical-instrument': 'Musical Instrument (of choice)',
+	};
+	function formatBoon(value: string): string {
+		return BOON_LABELS[value] ?? formatLabel(value);
+	}
+
+	function sortEquipment(items: string[]): string[] {
+		const clothing = items.find(e => /\bclothes\b|\bvestments\b|\bcostume\b|\brobes?\b|\bapparel\b/i.test(e));
+		const pouch    = items.find(e => /\bpouch\b|\bpurse\b/i.test(e));
+		const rest     = items.filter(e => e !== clothing && e !== pouch);
+		return [...(clothing ? [clothing] : []), ...(pouch ? [pouch] : []), ...rest];
+	}
+
+	function setBgChoice(id: string, value: string) {
+		form.backgroundEquipmentChoices = { ...(form.backgroundEquipmentChoices ?? {}), [id]: value };
+	}
+
+	function bgChoice(id: string): string {
+		return form.backgroundEquipmentChoices?.[id] ?? '';
 	}
 
 	function setRace(race: CharacterCreateInput['race']) {
@@ -440,8 +498,12 @@
 
 	function syncEquipmentState() {
 		const count = getClass(form.class)?.equipmentChoices.length ?? 0;
-		const next = Array.from({ length: count }, (_, index) => Number(form.equipmentSelections?.[index] ?? 0));
+		// Always start unselected so the player consciously picks each choice
+		const next = Array.from({ length: count }, () => -1);
 		form.equipmentSelections = next;
+		form.equipmentSubSelections = {};
+		subPickDirections = {};
+		openChoiceIdx = null;
 	}
 
 	function setStatMethod(method: CharacterCreateInput['statMethod']) {
@@ -504,6 +566,80 @@
 		syncStandardAssignment();
 		dragSource = null;
 		dragOverTarget = null;
+	}
+
+	function applyOptimalSpec() {
+		if (!classDef) return;
+		const sorted = [...STANDARD_ARRAY].sort((a, b) => b - a);
+		const priorities: AbilityName[] = [];
+		for (const ab of classDef.primaryAbility) {
+			if (!priorities.includes(ab)) priorities.push(ab);
+		}
+		for (const ab of classDef.saveProficiencies) {
+			if (!priorities.includes(ab)) priorities.push(ab);
+		}
+		for (const ab of abilityOrder) {
+			if (!priorities.includes(ab)) priorities.push(ab);
+		}
+		const next: Partial<Record<AbilityName, number>> = {};
+		for (let i = 0; i < priorities.length; i++) {
+			next[priorities[i]] = sorted[i];
+		}
+		standardSlots = next;
+		savedStandard = { ...next };
+		syncStandardAssignment();
+	}
+
+	function applyRandomSpec() {
+		const values = [...STANDARD_ARRAY];
+		for (let i = values.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[values[i], values[j]] = [values[j], values[i]];
+		}
+		const next: Partial<Record<AbilityName, number>> = {};
+		for (let i = 0; i < abilityOrder.length; i++) {
+			next[abilityOrder[i]] = values[i];
+		}
+		standardSlots = next;
+		savedStandard = { ...next };
+		syncStandardAssignment();
+	}
+
+	function applyOptimalPointBuy() {
+		if (!classDef) return;
+		const sorted = [...STANDARD_ARRAY].sort((a, b) => b - a);
+		const priorities: AbilityName[] = [];
+		for (const ab of classDef.primaryAbility) {
+			if (!priorities.includes(ab)) priorities.push(ab);
+		}
+		for (const ab of classDef.saveProficiencies) {
+			if (!priorities.includes(ab)) priorities.push(ab);
+		}
+		for (const ab of abilityOrder) {
+			if (!priorities.includes(ab)) priorities.push(ab);
+		}
+		const result: AbilityScores = { str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 };
+		for (let i = 0; i < priorities.length; i++) {
+			result[priorities[i]] = sorted[i];
+		}
+		form.abilityAssignment = result;
+		savedPointBuy = { ...result };
+		syncSpellState();
+	}
+
+	function applyRandomPointBuy() {
+		const values = [...STANDARD_ARRAY];
+		for (let i = values.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[values[i], values[j]] = [values[j], values[i]];
+		}
+		const result: AbilityScores = { str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 };
+		for (let i = 0; i < abilityOrder.length; i++) {
+			result[abilityOrder[i]] = values[i];
+		}
+		form.abilityAssignment = result;
+		savedPointBuy = { ...result };
+		syncSpellState();
 	}
 
 	function updateAbility(ability: AbilityName, value: string) {
@@ -574,6 +710,16 @@
 		form.spellChoices = { ...form.spellChoices, [field]: [...list, spell] };
 	}
 
+	function toggleExpertise(skill: SkillName) {
+		const list = [...(form.expertiseChoices ?? [])];
+		if (list.includes(skill)) {
+			form.expertiseChoices = list.filter((e) => e !== skill);
+			return;
+		}
+		if (list.length >= expertiseCount) return;
+		form.expertiseChoices = [...list, skill];
+	}
+
 	function toggleFlexibleAbility(ability: AbilityName) {
 		const next = { ...(form.abilityChoiceBonuses ?? {}) };
 		if (next[ability]) {
@@ -591,6 +737,307 @@
 		const next = [...(form.equipmentSelections ?? [])];
 		next[index] = Number(value);
 		form.equipmentSelections = next;
+	}
+
+	// ── Equipment panel state ─────────────────────────────────────────────
+	/** Which choice row's detail panel is currently open (only one at a time). */
+	let openChoiceIdx = $state<number | null>(null);
+	/** Per-weapon direction state for the 0→1→2→1→0 cycle. Key: `"{ci}-{itemName}"`. */
+	let subPickDirections = $state<Record<string, 'up' | 'down'>>({});
+
+	const WEAPON_PLACEHOLDER_SET = new Set([
+		'martial weapon', 'two martial weapons', 'martial melee weapon',
+		'simple weapon', 'simple melee', 'two simple melee', 'simple melee weapon',
+		'simple ranged weapon'
+	]);
+
+	function isPanelOpen(ci: number): boolean {
+		return openChoiceIdx === ci;
+	}
+
+	function selectEquipmentOption(ci: number, optIdx: number) {
+		const prevOptIdx = form.equipmentSelections?.[ci] ?? -1;
+		// Always open the panel for this choice row when a tab is clicked
+		openChoiceIdx = ci;
+		// Clear sub-picks (and direction state) when switching to a different option on the same row
+		if (optIdx !== prevOptIdx) {
+			setSubPick(ci, []);
+			// Clear direction state for this choice so the next pick starts fresh
+			const prefix = `${ci}-`;
+			subPickDirections = Object.fromEntries(
+				Object.entries(subPickDirections).filter(([k]) => !k.startsWith(prefix))
+			);
+		}
+		setEquipmentSelection(ci, String(optIdx));
+	}
+
+	function closePanelManually(ci: number) {
+		// Toggle: if this panel is already open, close it; clicking a tab re-opens it
+		if (openChoiceIdx === ci) openChoiceIdx = null;
+	}
+
+	function getWeaponPlaceholderInOption(option: string[]): string | null {
+		return option.find(s => WEAPON_PLACEHOLDER_SET.has(s.toLowerCase())) ?? null;
+	}
+
+	function isInstrumentPlaceholder(label: string): boolean {
+		return label.toLowerCase() === 'musical instrument';
+	}
+
+	function getInstrumentPlaceholderInOption(option: string[]): string | null {
+		return option.find(s => isInstrumentPlaceholder(s)) ?? null;
+	}
+
+	function parsePlaceholderCount(placeholder: string): number {
+		const low = placeholder.toLowerCase();
+		if (low.startsWith('two ')) return 2;
+		if (low.startsWith('three ')) return 3;
+		if (low.startsWith('four ')) return 4;
+		if (low.startsWith('five ')) return 5;
+		return 1;
+	}
+
+	function damageMaxValue(damage: string): number {
+		const m = damage.match(/(\d+)d(\d+)/);
+		return m ? parseInt(m[1]) * parseInt(m[2]) : 0;
+	}
+
+	const DAMAGE_TYPE_ORDER: Record<string, number> = { bludgeoning: 0, piercing: 1, slashing: 2 };
+
+	function sortWeapons(weapons: WeaponDefinition[]): WeaponDefinition[] {
+		return [...weapons].sort((a, b) => {
+			// 1. STR weapons first, then DEX
+			const aStat = weaponPrimaryStat(a) === 'STR' ? 0 : 1;
+			const bStat = weaponPrimaryStat(b) === 'STR' ? 0 : 1;
+			if (aStat !== bStat) return aStat - bStat;
+			// 2. Highest max damage first
+			const aDmg = damageMaxValue(a.damage);
+			const bDmg = damageMaxValue(b.damage);
+			if (aDmg !== bDmg) return bDmg - aDmg;
+			// 3. Damage type alphabetically (bludgeoning → piercing → slashing)
+			const aType = DAMAGE_TYPE_ORDER[a.damageType] ?? 99;
+			const bType = DAMAGE_TYPE_ORDER[b.damageType] ?? 99;
+			return aType - bType;
+		});
+	}
+
+	function getWeaponsForPlaceholder(placeholder: string): WeaponDefinition[] {
+		const low = placeholder.toLowerCase();
+		let list: WeaponDefinition[];
+		if (low.includes('martial')) list = WEAPONS.filter(w => w.category.startsWith('martial'));
+		else if (low.includes('ranged')) list = WEAPONS.filter(w => w.category.endsWith('-ranged'));
+		else list = WEAPONS.filter(w => w.category.startsWith('simple'));
+		return sortWeapons(list);
+	}
+
+	function weaponPrimaryStat(w: WeaponDefinition): 'STR' | 'DEX' {
+		if (w.properties.includes('finesse') || w.category.endsWith('-ranged')) return 'DEX';
+		return 'STR';
+	}
+
+	function getArmorInOption(option: string[]): ArmorDefinition | null {
+		for (const item of option) {
+			const armor = getArmor(item);
+			if (armor && armor.type !== 'shield') return armor;
+		}
+		return null;
+	}
+
+	function hasShieldInOption(option: string[]): boolean {
+		return option.some(item => getArmor(item)?.type === 'shield');
+	}
+
+	function getPackInOption(option: string[]): GearDefinition | null {
+		for (const item of option) {
+			const gear = getGear(item);
+			if (gear?.contents?.length) return gear;
+		}
+		return null;
+	}
+
+	function computeArmorAC(armor: ArmorDefinition): { formula: string; total: number } {
+		const dexMod = abilityModifier(previewAbilities.dex);
+		if (armor.maxDexBonus === 0) {
+			return { formula: `${armor.baseAC} (no DEX)`, total: armor.baseAC };
+		}
+		if (armor.maxDexBonus === null) {
+			const total = armor.baseAC + dexMod;
+			const sign = dexMod >= 0 ? `+${dexMod}` : `${dexMod}`;
+			return { formula: `${armor.baseAC} ${sign} DEX`, total };
+		}
+		const appliedDex = Math.min(dexMod, armor.maxDexBonus);
+		const total = armor.baseAC + appliedDex;
+		const sign = appliedDex >= 0 ? `+${appliedDex}` : `${appliedDex}`;
+		return { formula: `${armor.baseAC} ${sign} DEX (max +${armor.maxDexBonus})`, total };
+	}
+
+	function getSubPicks(ci: number): string[] {
+		return form.equipmentSubSelections?.[`sub-${ci}`] ?? [];
+	}
+
+	function setSubPick(ci: number, picks: string[]) {
+		form.equipmentSubSelections = {
+			...(form.equipmentSubSelections ?? {}),
+			[`sub-${ci}`]: picks
+		};
+	}
+
+	/**
+	 * Weapon selection with FIFO eviction.
+	 *
+	 * Clicking an already-picked weapon cycles it: 0→1→max→(max-1)→…→0→repeat.
+	 * Clicking a NEW weapon when the budget is full evicts the oldest pick (front
+	 * of the array) and appends the new weapon. This means:
+	 *   - 1×Longsword, click Flail  (budget=2, has room)  → 1×Longsword, 1×Flail
+	 *   - 2×Longsword, click Flail  (budget full)          → 1×Longsword, 1×Flail
+	 *   - 1×Longsword, 1×Flail, click Blowgun (budget full)→ 1×Flail, 1×Blowgun
+	 */
+	function toggleSubPick(ci: number, itemName: string, maxCount: number) {
+		const picks = [...getSubPicks(ci)];
+		const count = picks.filter(n => n === itemName).length;
+		const key = `${ci}-${itemName}`;
+		let dir = subPickDirections[key] ?? 'up';
+
+		if (count > 0) {
+			// Weapon already picked — run the up/down cycle
+			if (dir === 'up') {
+				// Going up: add another if room
+				if (picks.length < maxCount) {
+					picks.push(itemName);
+					const newCount = count + 1;
+					if (newCount >= maxCount) dir = 'down';
+				} else {
+					// Budget full with other weapons — evict oldest, add again (net no-change for this weapon)
+					// Instead just start going down (remove one)
+					picks.splice(picks.indexOf(itemName), 1);
+					const newCount = count - 1;
+					dir = newCount <= 0 ? 'up' : 'down';
+				}
+			} else {
+				// Going down: remove one
+				picks.splice(picks.indexOf(itemName), 1);
+				const newCount = count - 1;
+				if (newCount <= 0) dir = 'up';
+			}
+		} else {
+			// Weapon not currently picked
+			if (picks.length < maxCount) {
+				// Room available — just add
+				picks.push(itemName);
+				const newCount = 1;
+				dir = newCount >= maxCount ? 'down' : 'up';
+			} else {
+				// Budget full — FIFO evict: remove the oldest pick (index 0), add new weapon
+				picks.shift();
+				picks.push(itemName);
+				// After eviction we now hold 1 of this weapon; set dir based on whether budget is now full
+				dir = picks.filter(n => n === itemName).length >= maxCount ? 'down' : 'up';
+			}
+		}
+
+		subPickDirections = { ...subPickDirections, [key]: dir };
+		setSubPick(ci, picks);
+	}
+
+	function isWeaponTwoHanded(w: WeaponDefinition): boolean {
+		return w.properties.includes('two-handed');
+	}
+
+	function getWeaponDisplayTags(w: WeaponDefinition): string[] {
+		const tags: string[] = [];
+		if (w.properties.includes('two-handed')) tags.push('Two-Handed');
+		else if (w.properties.includes('versatile')) tags.push('Versatile');
+		else tags.push('One-Handed');
+		if (w.category.endsWith('-ranged')) tags.push('Ranged');
+		if (w.properties.includes('heavy')) tags.push('Heavy');
+		if (w.properties.includes('light')) tags.push('Light');
+		if (w.properties.includes('reach')) tags.push('Reach');
+		if (w.properties.includes('finesse')) tags.push('Finesse');
+		if (w.properties.includes('thrown') && !w.category.endsWith('-ranged')) tags.push('Thrown');
+		if (w.properties.includes('loading')) tags.push('Loading');
+		if (w.properties.includes('ammunition')) tags.push('Ammo');
+		return tags;
+	}
+
+	const WEAPON_TAG_TOOLTIPS: Record<string, string> = {
+		'One-Handed':  'Requires one hand to wield. Can be paired with a second one-handed weapon, a shield, or another item.',
+		'Two-Handed':  'Requires both hands to wield. Cannot be used alongside a shield.',
+		'Versatile':   'Can be used one-handed or two-handed. Gains higher damage when gripped with both hands.',
+		'Ranged':      'Makes attacks at range using Dexterity for attack and damage rolls.',
+		'Heavy':       'Large and unwieldy. Small creatures have disadvantage on attack rolls with heavy weapons.',
+		'Light':       'Small and easy to handle. Ideal for two-weapon fighting alongside another light weapon.',
+		'Reach':       'Extends your melee reach to 10 feet instead of the usual 5 feet.',
+		'Finesse':     'You may use either Strength or Dexterity (whichever is higher) for attack and damage rolls.',
+		'Thrown':      'Can be thrown as a ranged attack. Uses the same ability modifier as melee attacks.',
+		'Loading':     'Requires an action to reload between shots. Limits you to one attack per action.',
+		'Ammo':        'Requires ammunition (arrows, bolts, etc.) to make ranged attacks.',
+	};
+
+	function getTagClass(tag: string): string {
+		switch (tag) {
+			case 'One-Handed': return 'tag-one-handed';
+			case 'Two-Handed': return 'tag-two-handed';
+			case 'Ranged':     return 'tag-ranged';
+			case 'Reach':      return 'tag-reach';
+			case 'Finesse':    return 'tag-finesse';
+			case 'Versatile':  return 'tag-versatile';
+			case 'Heavy':      return 'tag-heavy';
+			default:           return '';
+		}
+	}
+
+	/** Returns "Special:" descriptor text for a weapon if it has notable notes or versatile damage. */
+	function getWeaponSpecialText(w: WeaponDefinition): string | null {
+		const parts: string[] = [];
+		if (w.versatileDamage) parts.push(`Deals ${w.versatileDamage} damage when wielded with two hands.`);
+		if (w.notes) parts.push(w.notes);
+		return parts.length ? parts.join(' ') : null;
+	}
+
+	/** Finds actual WeaponDefinition entries referenced in an option (handles "Two Shortswords" etc.). */
+	function getConcreteWeaponsInOption(option: string[]): WeaponDefinition[] {
+		const result: WeaponDefinition[] = [];
+		for (const item of option) {
+			if (WEAPON_PLACEHOLDER_SET.has(item.toLowerCase())) continue;
+			if (isInstrumentPlaceholder(item)) continue;
+			let w = getWeapon(item);
+			if (!w) {
+				const low = item.toLowerCase();
+				for (const prefix of ['two ', 'three ', 'four ', 'five ']) {
+					if (low.startsWith(prefix)) {
+						const rest = item.slice(prefix.length);
+						const sing = rest.endsWith('s') ? rest.slice(0, -1) : rest;
+						w = getWeapon(rest) ?? getWeapon(sing);
+						if (w) break;
+					}
+				}
+			}
+			if (w && !result.find(r => r.name === w!.name)) result.push(w);
+		}
+		return result;
+	}
+
+	/** How many of a given weapon are in this option (e.g. "Two Shortswords" → 2). */
+	function concreteWeaponCount(weapon: WeaponDefinition, option: string[]): number {
+		let total = 0;
+		for (const item of option) {
+			if (getWeapon(item)?.name === weapon.name) { total += 1; continue; }
+			for (const [prefix, qty] of [['two ', 2], ['three ', 3], ['four ', 4], ['five ', 5]] as [string, number][]) {
+				if (item.toLowerCase().startsWith(prefix)) {
+					const rest = item.slice(prefix.length);
+					const sing = rest.endsWith('s') ? rest.slice(0, -1) : rest;
+					if ((getWeapon(rest) ?? getWeapon(sing))?.name === weapon.name) { total += qty; break; }
+				}
+			}
+		}
+		return Math.max(total, 1);
+	}
+
+	function subPicksContainTwoHanded(ci: number): boolean {
+		return getSubPicks(ci).some(name => {
+			const w = getWeapon(name);
+			return w ? w.properties.includes('two-handed') : false;
+		});
 	}
 
 	function portal(node: HTMLElement) {
@@ -634,13 +1081,13 @@
 			case 1:
 				return ['class', 'subclass'];
 			case 2:
-				return ['background'];
+				return ['background', 'bgChoices'];
 			case 3:
 				return ['abilityAssignment'];
 			case 4:
 				return ['chosenSkills', 'bonusSkillChoices', 'chosenLanguages'];
 			case 5:
-				return ['spellChoices', 'spellChoices.cantrips', 'spellChoices.knownSpells', 'spellChoices.preparedSpells', 'equipmentSelections'];
+				return ['expertiseChoices', 'spellChoices', 'spellChoices.cantrips', 'spellChoices.knownSpells', 'spellChoices.preparedSpells', 'equipmentSelections'];
 			case 6:
 				return ['name', 'alignment', 'backstory'];
 			default:
@@ -707,6 +1154,26 @@
 			issues.push({ field: 'background', message: 'Choose a background.' });
 		}
 
+		if (step === 2 && backgroundDef) {
+			for (const choice of (backgroundDef.equipmentChoices ?? [])) {
+				if (!choice.required) continue;
+				const ids: string[] = choice.type === 'dual-radio' && choice.secondId
+					? [choice.id, choice.secondId]
+					: [choice.id];
+				for (const id of ids) {
+					if (!form.backgroundEquipmentChoices?.[id]) {
+						issues.push({ field: 'bgChoices', message: `${choice.prompt}` });
+					}
+				}
+				if (choice.type === 'text' && choice.textMaxWords) {
+					const wc = (form.backgroundEquipmentChoices?.[choice.id] ?? '').trim().split(/\s+/).filter(Boolean).length;
+					if (wc > choice.textMaxWords) {
+						issues.push({ field: 'bgChoices', message: `Keep the description to ${choice.textMaxWords} words or fewer.` });
+					}
+				}
+			}
+		}
+
 		if (step === 3) {
 			if (!form.abilityAssignment) {
 				issues.push({ field: 'abilityAssignment', message: 'Assign your ability scores.' });
@@ -734,6 +1201,9 @@
 		}
 
 		if (step === 5) {
+			if (expertiseCount > 0 && (form.expertiseChoices ?? []).length !== expertiseCount) {
+				issues.push({ field: 'expertiseChoices', message: `Choose ${expertiseCount} skills for expertise.` });
+			}
 			if (expectedCantripCount > 0 && (form.spellChoices?.cantrips?.length ?? 0) !== expectedCantripCount) {
 				issues.push({ field: 'spellChoices.cantrips', message: `Choose ${expectedCantripCount} cantrip${expectedCantripCount === 1 ? '' : 's'}.` });
 			}
@@ -775,8 +1245,9 @@
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
+		// Character creation must be completed — do not allow closing via keyboard
 		if (event.key === 'Escape') {
-			isOpen = false;
+			event.preventDefault();
 		}
 	}
 
@@ -829,7 +1300,7 @@
 			class="cc-backdrop"
 			role="presentation"
 			onkeydown={handleKeydown}
-			onclick={(e) => { if (e.target === e.currentTarget) isOpen = false; }}
+			onclick={(e) => { void e; /* backdrop click blocked — character creation must be completed */ }}
 		>
 			<div class="cc-shell" role="dialog" aria-modal="true" aria-labelledby="cc-title">
 				<!-- â”€â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
@@ -859,7 +1330,8 @@
 						{/each}
 					</nav>
 
-					<button type="button" class="close-btn" onclick={() => (isOpen = false)} aria-label="Close">âœ•</button>
+					<!-- Close disabled: character creation must be completed before returning to play -->
+					<button type="button" class="close-btn" disabled title="Complete character creation to continue" aria-label="Cannot close — character creation required">âœ•</button>
 				</header>
 
 				<!-- â”€â”€â”€ Error strip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
@@ -888,7 +1360,7 @@
 									onclick={() => setRace(race.name as any)}
 								>
 									<strong>{race.displayName}</strong>
-									<span class="option-sub">{race.description}</span>
+									<span class="option-sub">{race.shortDescription}</span>
 								</button>
 							{/each}
 						</aside>
@@ -1040,9 +1512,10 @@
 								>
 									<div class="row-top">
 										<strong>{cls.displayName}</strong>
-										<span class="badge">d{cls.hitDie}</span>
+										<span class="hit-die-label">Hit die: <span class="badge">d{cls.hitDie}</span></span>
 									</div>
-									<span class="option-sub">{cls.primaryAbility.map(a => abilityLabels[a]).join(' / ')}</span>
+									<span class="option-sub">Main: {cls.primaryAbility.map(a => abilityLabels[a]).join(' / ')}</span>
+									<span class="option-sub-stats">Saves: {cls.saveProficiencies.map(a => abilityLabels[a]).join(', ')}</span>
 								</button>
 							{/each}
 						</aside>
@@ -1131,14 +1604,22 @@
 						<aside class="option-list">
 							<div class="list-header">Choose your background</div>
 							{#each BACKGROUNDS as bg}
+								{@const boonParts = [
+									...bg.toolProficiencies.map(formatBoon),
+									...(bg.languages ?? []).map(l => `${l} (language)`),
+									...(bg.languageChoices ? [`+${bg.languageChoices} Language${bg.languageChoices > 1 ? 's' : ''} of Choice`] : [])
+								]}
 								<button
 									type="button"
-									class="option-row"
+									class="option-row bg-option-row"
 									class:selected={form.background === bg.name}
 									onclick={() => setBackground(bg.name)}
 								>
 									<strong>{bg.displayName}</strong>
-									<span class="option-sub">{bg.skillProficiencies.map(formatLabel).join(', ')}</span>
+									<span class="option-sub">Skills: {bg.skillProficiencies.map(formatLabel).join(' & ')}</span>
+									{#if boonParts.length > 0}
+										<span class="option-sub bg-additions">Additions: {boonParts.join(', ')}</span>
+									{/if}
 								</button>
 							{/each}
 						</aside>
@@ -1162,8 +1643,113 @@
 
 								<div class="detail-section">
 									<h4>Equipment</h4>
-									<p class="hint">{backgroundDef.equipment.join(', ')}</p>
+									{#each [sortEquipment(backgroundDef.equipment)] as _ordered}
+										{#if _ordered.length > 5}
+											<div class="equip-columns">
+												<ul class="equip-list">
+													{#each _ordered.slice(0, Math.ceil(_ordered.length / 2)) as item}<li>{item}</li>{/each}
+												</ul>
+												<ul class="equip-list">
+													{#each _ordered.slice(Math.ceil(_ordered.length / 2)) as item}<li>{item}</li>{/each}
+												</ul>
+											</div>
+										{:else}
+											<ul class="equip-list">
+												{#each _ordered as item}<li>{item}</li>{/each}
+											</ul>
+										{/if}
+									{/each}
 								</div>
+
+								<!-- ── Background equipment choices ──────────────────── -->
+								{#if backgroundDef.equipmentChoices?.length}
+									{#each backgroundDef.equipmentChoices as choice}
+										<div class="detail-section bg-choice-section">
+											<h4>{choice.sectionLabel}</h4>
+											<p class="hint">{choice.prompt}</p>
+
+											<!-- RADIO -->
+											{#if choice.type === 'radio'}
+												{@const opts = bgChoiceOptions[choice.id] ?? choice.options ?? []}
+												{#if opts.length === 0}
+													<p class="hint muted">No options available — a world must be loaded.</p>
+												{:else}
+													<div class="bg-choice-options">
+														{#each opts as opt}
+															<label class="bg-choice-pill" class:selected={bgChoice(choice.id) === opt.label}>
+																<input type="radio" name={choice.id} value={opt.label}
+																	checked={bgChoice(choice.id) === opt.label}
+																	onchange={() => setBgChoice(choice.id, opt.label)} />
+																<span class="choice-label">{opt.label}</span>
+																{#if opt.description}<span class="choice-desc">{opt.description}</span>{/if}
+															</label>
+														{/each}
+													</div>
+												{/if}
+											{/if}
+
+											<!-- DUAL-RADIO -->
+											{#if choice.type === 'dual-radio'}
+												<div class="bg-choice-options">
+													{#each choice.options ?? [] as opt}
+														<label class="bg-choice-pill" class:selected={bgChoice(choice.id) === opt.label}>
+															<input type="radio" name={choice.id} value={opt.label}
+																checked={bgChoice(choice.id) === opt.label}
+																onchange={() => setBgChoice(choice.id, opt.label)} />
+															<span class="choice-label">{opt.label}</span>
+														</label>
+													{/each}
+												</div>
+												{#if choice.secondId}
+													<p class="hint" style="margin-top:0.6rem">{choice.secondPrompt}</p>
+													<div class="bg-choice-options">
+														{#each choice.secondOptions ?? [] as opt}
+															{#each [choice.secondId] as sid}
+																<label class="bg-choice-pill" class:selected={bgChoice(sid) === opt.label}>
+																	<input type="radio" name={sid} value={opt.label}
+																		checked={bgChoice(sid) === opt.label}
+																		onchange={() => setBgChoice(sid, opt.label)} />
+																	<span class="choice-label">{opt.label}</span>
+																</label>
+															{/each}
+														{/each}
+													</div>
+												{/if}
+											{/if}
+
+											<!-- TEXT -->
+											{#if choice.type === 'text'}
+												{#each [bgChoice(choice.id)] as textVal}
+													<textarea class="bg-text-input" class:optional-input={choice.optional}
+														maxlength={choice.textMaxChars ?? undefined}
+														placeholder={choice.textPlaceholder ?? (choice.optional ? '(optional)' : '')}
+														value={textVal}
+														oninput={(e) => setBgChoice(choice.id, (e.target as HTMLTextAreaElement).value)}
+													></textarea>
+													{#if choice.textMaxWords}
+														{@const wc = textVal.trim().split(/\s+/).filter(Boolean).length}
+														<span class="char-counter" class:over={wc > choice.textMaxWords}>{wc}/{choice.textMaxWords} words</span>
+													{/if}
+												{/each}
+												{#if choice.orDefaultOption}
+													<div class="bg-choice-or-row">
+														<span class="hint-small">Or:</span>
+														<label class="bg-choice-pill" class:selected={bgChoice(choice.id) === choice.orDefaultOption.label}>
+															<input type="radio" name={choice.id} value={choice.orDefaultOption.label}
+																checked={bgChoice(choice.id) === choice.orDefaultOption.label}
+																onchange={() => setBgChoice(choice.id, choice.orDefaultOption!.label)} />
+															<span class="choice-label">{choice.orDefaultOption.label}</span>
+														</label>
+													</div>
+												{/if}
+											{/if}
+
+											{#if choice.required && !bgChoice(choice.id)}
+												<p class="field-error-inline">Required</p>
+											{/if}
+										</div>
+									{/each}
+								{/if}
 
 								<div class="detail-section">
 									<h4>Feature: {backgroundDef.feature.name}</h4>
@@ -1204,6 +1790,9 @@
 								{#if fieldError('background')}
 									<p class="field-error">{fieldError('background')}</p>
 								{/if}
+								{#if fieldError('bgChoices')}
+									<p class="field-error">{fieldError('bgChoices')}</p>
+								{/if}
 							{/if}
 						</div>
 					</div>
@@ -1243,6 +1832,21 @@
 									<span>Remaining: <strong>{pointBuySummary.remaining}</strong></span>
 								</div>
 								<p class="hint">Each score: 8 (0 pts) to 15 (9 pts) — total budget: 27 pts</p>
+								<div class="spec-btn-row">
+									<button
+										type="button"
+										class="spec-btn"
+										title="Distributes 15–8 across your stats in the optimal order for your chosen class — primary ability gets the highest score, saves next. Spends exactly 27 points. You can still adjust afterwards."
+										onclick={applyOptimalPointBuy}
+										disabled={!classDef}
+									>Optimal Class Spec</button>
+									<button
+										type="button"
+										class="spec-btn"
+										title="Randomly shuffles the values 15, 14, 13, 12, 10, 8 across your stats for an unpredictable build. Spends exactly 27 points."
+										onclick={applyRandomPointBuy}
+									>Randomized Spec</button>
+								</div>
 							{/if}
 
 							<div class="ability-grid-builder" class:rolled={form.statMethod === 'rolled'}>
@@ -1317,6 +1921,21 @@
 									{#if standardPool.length === 0}
 										<span class="pool-empty">All values assigned</span>
 									{/if}
+								</div>
+								<div class="spec-btn-row">
+									<button
+										type="button"
+										class="spec-btn"
+										title="Assigns the standard array values in an order optimized for your chosen class — primary stat gets the highest value, save proficiencies next. You can still drag to adjust afterwards."
+										onclick={applyOptimalSpec}
+										disabled={!classDef}
+									>Optimal Class Spec</button>
+									<button
+										type="button"
+										class="spec-btn"
+										title="Randomly shuffles all six standard array values across your ability scores for a wildcard build."
+										onclick={applyRandomSpec}
+									>Randomized Spec</button>
 								</div>
 								<p class="standard-hint">Assign the values {STANDARD_ARRAY.join(', ')} to your abilities in any order.</p>
 							{/if}
@@ -1431,6 +2050,29 @@
 						<div class="pane-content">
 							<h3 class="section-title">Magic &amp; Starting Equipment</h3>
 
+							<!-- Expertise selection (Rogue and future expertise classes) -->
+							{#if expertiseCount > 0}
+								<div class="gear-section">
+									<h4>Expertise</h4>
+									<div class="spell-group">
+										<div class="spell-group-header">
+											<span>Choose {expertiseCount} skills to double your proficiency bonus</span>
+											<span class="counter">{(form.expertiseChoices ?? []).length}/{expertiseCount}</span>
+										</div>
+										<div class="pill-row">
+											{#each expertisePool as skill}
+												<button type="button" class="pill" class:selected={(form.expertiseChoices ?? []).includes(skill)} onclick={() => toggleExpertise(skill)}>
+													{formatLabel(skill)}
+												</button>
+											{/each}
+										</div>
+										{#if fieldError('expertiseChoices')}
+											<p class="field-error">{fieldError('expertiseChoices')}</p>
+										{/if}
+									</div>
+								</div>
+							{/if}
+
 							<!-- Spell sections -->
 							{#if expectedCantripCount > 0 || knownSpellCount > 0 || preparedSpellCount > 0}
 								<div class="gear-section">
@@ -1502,25 +2144,222 @@
 								<div class="gear-section">
 									<h4>Starting Equipment</h4>
 									{#each classDef.equipmentChoices as choice, choiceIdx}
+										{@const selectedOptIdx = form.equipmentSelections?.[choiceIdx] ?? -1}
+										{@const selectedOption = selectedOptIdx >= 0 ? (choice.options[selectedOptIdx] ?? []) : []}
+										{@const rowOpen = isPanelOpen(choiceIdx)}
+										{@const armorEntry = getArmorInOption(selectedOption)}
+										{@const shieldPresent = hasShieldInOption(selectedOption)}
+										{@const packEntry = getPackInOption(selectedOption)}
+										{@const weaponPH = getWeaponPlaceholderInOption(selectedOption)}
+										{@const instPH = getInstrumentPlaceholderInOption(selectedOption)}
+										{@const pickCount = weaponPH ? parsePlaceholderCount(weaponPH) : 1}
+										{@const subPicks = getSubPicks(choiceIdx)}
+										{@const concreteWeapons = getConcreteWeaponsInOption(selectedOption)}
 										<div class="equip-group">
 											<span class="equip-label">{choice.label}</span>
 											<div class="equip-options">
 												{#each choice.options as option, optIdx}
+													{@const isSelected = selectedOptIdx === optIdx}
+													{@const optPH = getWeaponPlaceholderInOption(option)}
+													{@const optPC = optPH ? parsePlaceholderCount(optPH) : 1}
 													<button
 														type="button"
 														class="equip-card"
-														class:selected={form.equipmentSelections?.[choiceIdx] === optIdx}
-														onclick={() => setEquipmentSelection(choiceIdx, String(optIdx))}
+														class:selected={isSelected}
+														onclick={() => selectEquipmentOption(choiceIdx, optIdx)}
 													>
 														{option.join(' + ')}
+														{#if isSelected && optPC > 1}
+															<span class="pick-count-badge">{subPicks.length}/{optPC}</span>
+														{/if}
 													</button>
 												{/each}
 											</div>
+											{#if rowOpen}
+												{#if armorEntry}
+													{@const acData = computeArmorAC(armorEntry)}
+													<div class="equip-detail-panel">
+														<div class="equip-detail-header">
+															<span class="equip-detail-row">
+																<strong>{armorEntry.displayName}</strong>
+																<span class="armor-type-tag">{armorEntry.type}</span>
+																<span class="ac-formula">AC {acData.total} ({acData.formula})</span>
+															</span>
+															<button type="button" class="equip-detail-caret" onclick={() => closePanelManually(choiceIdx)} aria-label="Close panel">▲</button>
+														</div>
+													</div>
+												{/if}
+												{#if shieldPresent}
+													<div class="equip-detail-panel">
+														<div class="equip-detail-header">
+															<span class="equip-detail-row">
+																<strong>Shield</strong>
+																<span class="armor-type-tag">Shield</span>
+																<span class="ac-formula">+2 AC bonus · Cannot be used with two-handed weapons.</span>
+															</span>
+															<button type="button" class="equip-detail-caret" onclick={() => closePanelManually(choiceIdx)} aria-label="Close panel">▲</button>
+														</div>
+													</div>
+												{/if}
+												{#if packEntry}
+													<div class="equip-detail-panel">
+														<div class="equip-detail-header">
+															<span class="equip-detail-title"><strong>{packEntry.displayName}</strong></span>
+															<button type="button" class="equip-detail-caret" onclick={() => closePanelManually(choiceIdx)} aria-label="Close panel">▲</button>
+														</div>
+														<ul class="equip-pack-contents">
+															{#each packEntry.contents ?? [] as item}
+																<li>{item}</li>
+															{/each}
+														</ul>
+													</div>
+												{/if}
+												{#if concreteWeapons.length > 0 && !weaponPH && !instPH}
+													<div class="equip-detail-panel">
+														<div class="equip-detail-header">
+															<span class="equip-detail-title"><strong>Weapons Included</strong></span>
+															<button type="button" class="equip-detail-caret" onclick={() => closePanelManually(choiceIdx)} aria-label="Close panel">▲</button>
+														</div>
+														<div class="equip-weapon-list">
+															<div class="weapon-header-row">
+																<span class="wcol-name">Weapon</span>
+																<span class="wcol-damage">Damage</span>
+																<span class="wcol-stat">Stat</span>
+																<span class="wcol-tags">Properties</span>
+															</div>
+															{#each concreteWeapons as weapon}
+																{@const primary = weaponPrimaryStat(weapon)}
+																{@const wCount = concreteWeaponCount(weapon, selectedOption)}
+																{@const specialText = getWeaponSpecialText(weapon)}
+																<div class="equip-weapon-row readonly">
+																	<span class="wcol-name">
+																		{weapon.displayName}
+																		{#if wCount > 1}<span class="weapon-sel-badge weapon-sel-double">×{wCount}</span>{/if}
+																	</span>
+																	<span class="wcol-damage">
+																		{#if weapon.damage === '0'}<span class="damage-none">—</span>
+																		{:else}{weapon.damage} <span class="damage-type">{weapon.damageType}</span>{/if}
+																	</span>
+																	<span class="wcol-stat">{primary}</span>
+																	<span class="wcol-tags">
+																		{#each getWeaponDisplayTags(weapon) as tag}
+																			<span class="weapon-tag {getTagClass(tag)}" title={WEAPON_TAG_TOOLTIPS[tag]}>{tag}</span>
+																		{/each}
+																	</span>
+																	{#if specialText}
+																		<span class="weapon-special"><em>Special:</em> {specialText}</span>
+																	{/if}
+																</div>
+															{/each}
+														</div>
+													</div>
+												{/if}
+												{#if weaponPH}
+													<div class="equip-detail-panel">
+														<div class="equip-detail-header">
+															<span class="equip-detail-title">
+																<strong>{weaponPH}</strong>
+																{#if pickCount > 1}
+																	<span class="pick-count-badge">{subPicks.length}/{pickCount}</span>
+																{/if}
+															</span>
+															<button type="button" class="equip-detail-caret" onclick={() => closePanelManually(choiceIdx)} aria-label="Close panel">▲</button>
+														</div>
+														<div class="equip-weapon-list">
+															<div class="weapon-header-row">
+																<span class="wcol-name">Weapon</span>
+																<span class="wcol-damage">Damage</span>
+																<span class="wcol-stat">Stat</span>
+																<span class="wcol-tags">Properties</span>
+															</div>
+															{#each getWeaponsForPlaceholder(weaponPH) as weapon}
+																{@const primary = weaponPrimaryStat(weapon)}
+																{@const selCount = subPicks.filter(n => n === weapon.displayName).length}
+																{@const specialText = getWeaponSpecialText(weapon)}
+																<button
+																	type="button"
+																	class="equip-weapon-row"
+																	class:selected={selCount > 0}
+																	onclick={() => toggleSubPick(choiceIdx, weapon.displayName, pickCount)}
+																>
+																	<span class="wcol-name">
+																		{weapon.displayName}
+																		{#if selCount > 0}
+																			<span class="weapon-sel-badge" class:weapon-sel-double={selCount > 1}>
+																				{#if selCount > 1}×{selCount}{:else}✓{/if}
+																			</span>
+																		{/if}
+																	</span>
+																	<span class="wcol-damage">
+																		{#if weapon.damage === '0'}<span class="damage-none">—</span>
+																		{:else}{weapon.damage} <span class="damage-type">{weapon.damageType}</span>{/if}
+																	</span>
+																	<span class="wcol-stat">{primary}</span>
+																	<span class="wcol-tags">
+																		{#each getWeaponDisplayTags(weapon) as tag}
+																			<span class="weapon-tag {getTagClass(tag)}" title={WEAPON_TAG_TOOLTIPS[tag]}>{tag}</span>
+																		{/each}
+																	</span>
+																	{#if specialText}
+																		<span class="weapon-special"><em>Special:</em> {specialText}</span>
+																	{/if}
+																</button>
+															{/each}
+														</div>
+													</div>
+												{/if}
+												{#if instPH}
+													<div class="equip-detail-panel">
+														<div class="equip-detail-header">
+															<span class="equip-detail-title"><strong>Choose an Instrument</strong></span>
+															<button type="button" class="equip-detail-caret" onclick={() => closePanelManually(choiceIdx)} aria-label="Close panel">▲</button>
+														</div>
+														<div class="equip-weapon-list equip-instrument-list">
+															<div class="weapon-header-row">
+																<span class="wcol-name">Instrument</span>
+																<span class="wcol-damage"></span>
+																<span class="wcol-stat">Stat</span>
+																<span class="wcol-tags">Type</span>
+															</div>
+															{#each INSTRUMENTS as instrument}
+																{@const iChosen = subPicks[0] === instrument}
+																<button
+																	type="button"
+																	class="equip-weapon-row"
+																	class:selected={iChosen}
+																	onclick={() => setSubPick(choiceIdx, [instrument])}
+																>
+																	<span class="wcol-name">
+																		{instrument}
+																		{#if iChosen}<span class="weapon-sel-badge">✓</span>{/if}
+																	</span>
+																	<span class="wcol-damage"><span class="damage-none">—</span></span>
+																	<span class="wcol-stat">CHA</span>
+																	<span class="wcol-tags"><span class="weapon-tag">Instrument</span></span>
+																</button>
+															{/each}
+														</div>
+													</div>
+												{/if}
+											{/if}
 										</div>
 									{/each}
 									{#if fieldError('equipmentSelections')}
 										<p class="field-error">{fieldError('equipmentSelections')}</p>
 									{/if}
+								</div>
+							{/if}
+
+							<!-- Guaranteed items automatically granted to this class -->
+							{#if classDef?.startingEquipment && classDef.startingEquipment.length > 0}
+								<div class="gear-section">
+									<h4>Guaranteed Equipment</h4>
+									<p class="equip-guaranteed-note">Every {classDef.displayName} starts with these automatically.</p>
+									<div class="equip-options">
+										{#each classDef.startingEquipment as item}
+											<span class="pill selected">{item}</span>
+										{/each}
+									</div>
 								</div>
 							{/if}
 						</div>
@@ -1619,15 +2458,15 @@
 		gap: 0.75rem;
 		padding: 1rem;
 		border-radius: 16px;
-		background: rgba(255,255,255,0.03);
-		border: 1px solid rgba(255,255,255,0.08);
+		background: var(--surface);
+		border: 1px solid var(--border);
 	}
 	.sidebar-desc { color: var(--text-muted); font-size: 0.92rem; }
 	.launch-btn {
 		padding: 0.7rem 1rem;
 		border-radius: 12px;
-		border: 1px solid rgba(124,156,255,0.35);
-		background: rgba(124,156,255,0.15);
+		border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+		background: color-mix(in srgb, var(--accent) 15%, transparent);
 		color: var(--accent);
 		cursor: pointer;
 	}
@@ -1641,7 +2480,7 @@
 		align-items: center;
 		justify-content: center;
 		padding: 0.5rem;
-		background: rgba(4,6,14,0.88);
+		background: var(--cc-backdrop);
 		backdrop-filter: blur(16px);
 	}
 	.cc-shell {
@@ -1652,8 +2491,8 @@
 		display: flex;
 		flex-direction: column;
 		border-radius: 20px;
-		border: 1px solid rgba(255,255,255,0.08);
-		background: rgba(14,18,28,0.98);
+		border: 1px solid var(--border);
+		background: var(--bg);
 		box-shadow: 0 32px 80px rgba(0,0,0,0.55);
 		overflow: hidden;
 	}
@@ -1664,7 +2503,7 @@
 		align-items: center;
 		gap: 1rem;
 		padding: 0.65rem 1.1rem;
-		border-bottom: 1px solid rgba(255,255,255,0.06);
+		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
 	}
 	.header-left {
@@ -1699,47 +2538,51 @@
 		justify-content: center;
 		font-size: 0.72rem;
 		font-weight: 600;
-		border: 1.5px solid rgba(255,255,255,0.12);
-		background: rgba(255,255,255,0.03);
-		color: rgba(255,255,255,0.5);
+		border: 1.5px solid var(--border);
+		background: var(--surface);
+		color: var(--text-muted);
 		cursor: pointer;
 		transition: all 0.15s;
 	}
 	.step-node.active {
-		background: rgba(124,156,255,0.22);
-		border-color: rgba(124,156,255,0.5);
-		color: #fff;
+		background: color-mix(in srgb, var(--accent) 22%, transparent);
+		border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+		color: var(--accent);
 	}
 	.step-node.done {
-		background: rgba(124,156,255,0.12);
-		border-color: rgba(124,156,255,0.35);
-		color: rgba(124,156,255,0.9);
+		background: color-mix(in srgb, var(--accent) 12%, transparent);
+		border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+		color: var(--accent);
 	}
 	.step-node.error {
-		border-color: rgba(255,120,120,0.4);
-		background: rgba(255,120,120,0.1);
-		color: #ffb0b0;
+		border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+		background: color-mix(in srgb, var(--danger) 10%, transparent);
+		color: var(--danger);
 	}
 	.step-line {
 		width: 1.6rem;
 		height: 2px;
-		background: rgba(255,255,255,0.08);
+		background: var(--border);
 		flex-shrink: 0;
 	}
-	.step-line.filled { background: rgba(124,156,255,0.3); }
+	.step-line.filled { background: color-mix(in srgb, var(--accent) 40%, transparent); }
 
 	.close-btn {
 		width: 2rem;
 		height: 2rem;
 		border-radius: 50%;
-		border: 1px solid rgba(255,255,255,0.1);
-		background: rgba(255,255,255,0.04);
-		color: rgba(255,255,255,0.7);
+		border: 1px solid var(--border);
+		background: var(--bg-alt);
+		color: var(--text);
 		cursor: pointer;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		flex-shrink: 0;
+	}
+	.close-btn:disabled {
+		opacity: 0.3;
+		cursor: not-allowed;
 	}
 
 	/* â”€â”€ Error strip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
@@ -1748,13 +2591,13 @@
 		flex-wrap: wrap;
 		gap: 0.35rem 0.75rem;
 		padding: 0.55rem 1.1rem;
-		background: rgba(255,96,96,0.08);
-		border-bottom: 1px solid rgba(255,96,96,0.15);
-		color: #ffb0b0;
+		background: color-mix(in srgb, var(--danger) 8%, transparent);
+		border-bottom: 1px solid color-mix(in srgb, var(--danger) 15%, transparent);
+		color: var(--danger);
 		font-size: 0.88rem;
 		flex-shrink: 0;
 	}
-	.err-item { color: rgba(255,180,180,0.8); }
+	.err-item { color: var(--danger); }
 
 	/* â”€â”€ Body â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 	.cc-body {
@@ -1773,7 +2616,7 @@
 	}
 	.option-list {
 		overflow-y: auto;
-		border-right: 1px solid rgba(255,255,255,0.06);
+		border-right: 1px solid var(--border);
 		padding: 0.4rem;
 		display: flex;
 		flex-direction: column;
@@ -1795,16 +2638,28 @@
 		border: 1px solid transparent;
 		background: transparent;
 		text-align: left;
-		color: rgba(255,255,255,0.85);
+		color: var(--text);
 		cursor: pointer;
 		transition: all 0.12s;
 	}
-	.option-row:hover { background: rgba(255,255,255,0.04); }
+	.option-row:hover { background: var(--bg-alt); }
 	.option-row.selected {
-		background: rgba(124,156,255,0.12);
-		border-color: rgba(124,156,255,0.25);
+		background: color-mix(in srgb, var(--accent) 14%, transparent);
+		border-color: color-mix(in srgb, var(--accent) 30%, transparent);
 	}
 	.option-row strong { font-size: 0.95rem; }
+	.bg-option-row {
+		gap: 0.25rem;
+		padding: 0.75rem 0.85rem;
+	}
+	.bg-option-row .option-sub {
+		-webkit-line-clamp: unset;
+		overflow: visible;
+		white-space: normal;
+	}
+	.bg-additions {
+		opacity: 0.72;
+	}
 	.option-sub {
 		font-size: 0.78rem;
 		color: var(--text-muted);
@@ -1812,6 +2667,11 @@
 		-webkit-line-clamp: 2;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
+	}
+	.option-sub-stats {
+		font-size: 0.72rem;
+		color: var(--text-muted);
+		opacity: 0.8;
 	}
 	.row-top {
 		display: flex;
@@ -1823,9 +2683,17 @@
 		font-size: 0.72rem;
 		padding: 0.15rem 0.45rem;
 		border-radius: 999px;
-		background: rgba(124,156,255,0.12);
+		background: color-mix(in srgb, var(--accent) 14%, transparent);
 		color: var(--accent);
 		white-space: nowrap;
+	}
+	.hit-die-label {
+		font-size: 0.72rem;
+		color: var(--text-muted);
+		white-space: nowrap;
+		display: flex;
+		align-items: center;
+		gap: 0.3rem;
 	}
 
 	/* â”€â”€ Detail pane â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
@@ -1842,6 +2710,24 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.45rem;
+	}
+	.equip-columns {
+		display: flex;
+		gap: 0.5rem 1.5rem;
+		align-items: flex-start;
+	}
+	.equip-columns .equip-list { flex: 1; }
+	.equip-list {
+		margin: 0;
+		padding-left: 1.1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+	}
+	.equip-list li {
+		font-size: 0.82rem;
+		color: var(--text-muted);
+		line-height: 1.4;
 	}
 	.detail-section h4 {
 		font-size: 0.85rem;
@@ -1861,15 +2747,15 @@
 	.tag {
 		padding: 0.25rem 0.6rem;
 		border-radius: 999px;
-		background: rgba(255,255,255,0.06);
-		border: 1px solid rgba(255,255,255,0.08);
+		background: var(--bg-alt);
+		border: 1px solid var(--border);
 		font-size: 0.78rem;
-		color: rgba(255,255,255,0.7);
+		color: var(--text);
 		white-space: nowrap;
 	}
 	.tag.accent {
-		background: rgba(124,156,255,0.1);
-		border-color: rgba(124,156,255,0.2);
+		background: color-mix(in srgb, var(--accent) 12%, transparent);
+		border-color: color-mix(in srgb, var(--accent) 25%, transparent);
 		color: var(--accent);
 	}
 
@@ -1877,8 +2763,8 @@
 	.trait-entry {
 		padding: 0.55rem 0.75rem;
 		border-radius: 12px;
-		background: rgba(255,255,255,0.025);
-		border: 1px solid rgba(255,255,255,0.06);
+		background: var(--surface);
+		border: 1px solid var(--border);
 	}
 	.trait-entry strong { font-size: 0.88rem; }
 	.trait-entry p {
@@ -1900,22 +2786,22 @@
 		gap: 0.15rem;
 		padding: 0.6rem 0.8rem;
 		border-radius: 12px;
-		border: 1px solid rgba(255,255,255,0.1);
-		background: rgba(255,255,255,0.025);
+		border: 1px solid var(--border);
+		background: var(--surface);
 		text-align: left;
-		color: rgba(255,255,255,0.85);
+		color: var(--text);
 		cursor: pointer;
 		transition: all 0.12s;
 	}
-	.choice-card:hover { background: rgba(255,255,255,0.05); }
+	.choice-card:hover { background: var(--bg-alt); }
 	.choice-card.selected {
-		background: rgba(124,156,255,0.12);
-		border-color: rgba(124,156,255,0.28);
+		background: color-mix(in srgb, var(--accent) 14%, transparent);
+		border-color: color-mix(in srgb, var(--accent) 30%, transparent);
 	}
 	.choice-card.flat {
 		cursor: default;
-		border: 1px solid rgba(255,255,255,0.08);
-		background: rgba(255,255,255,0.02);
+		border: 1px solid var(--border);
+		background: var(--surface);
 	}
 	.choice-card small { font-size: 0.8rem; color: var(--text-muted); }
 
@@ -1950,10 +2836,10 @@
 	}
 	.prof-item {
 		font-size: 0.88rem;
-		color: rgba(255,255,255,0.7);
+		color: var(--text);
 	}
 	.prof-item strong {
-		color: rgba(255,255,255,0.9);
+		color: var(--text);
 		margin-right: 0.3rem;
 	}
 
@@ -1966,22 +2852,22 @@
 	.pill {
 		padding: 0.38rem 0.7rem;
 		border-radius: 999px;
-		border: 1px solid rgba(255,255,255,0.12);
-		background: rgba(255,255,255,0.04);
-		color: rgba(255,255,255,0.8);
+		border: 1px solid var(--border);
+		background: var(--bg-alt);
+		color: var(--text);
 		cursor: pointer;
 		font-size: 0.88rem;
 		transition: all 0.12s;
 	}
-	.pill:hover:not(:disabled):not(.locked) { background: rgba(255,255,255,0.08); }
+	.pill:hover:not(:disabled):not(.locked) { background: var(--surface); }
 	.pill.selected {
-		background: rgba(124,156,255,0.18);
-		border-color: rgba(124,156,255,0.35);
+		background: color-mix(in srgb, var(--accent) 18%, transparent);
+		border-color: color-mix(in srgb, var(--accent) 35%, transparent);
 		color: var(--accent);
 	}
 	.pill.accent {
-		background: rgba(124,156,255,0.18);
-		border-color: rgba(124,156,255,0.35);
+		background: color-mix(in srgb, var(--accent) 18%, transparent);
+		border-color: color-mix(in srgb, var(--accent) 35%, transparent);
 		color: var(--accent);
 	}
 	.pill:disabled {
@@ -2014,9 +2900,74 @@
 
 	/* â”€â”€ Hints / errors â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 	.hint { color: var(--text-muted); font-size: 0.84rem; }
+	.hint.muted { opacity: 0.65; }
 	.field-error {
-		color: #ffb0b0;
+		color: var(--danger);
 		font-size: 0.88rem;
+	}
+
+	/* ── Background equipment choices ───────────────────────────── */
+	.bg-choice-section {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+		margin-top: 0.75rem;
+	}
+	.bg-choice-options {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+		margin-top: 0.2rem;
+	}
+	.bg-choice-pill {
+		display: flex;
+		flex-direction: column;
+		gap: 0.1rem;
+		padding: 0.3rem 0.65rem;
+		border-radius: 10px;
+		border: 1px solid var(--border);
+		cursor: pointer;
+		background: var(--bg-alt);
+		transition: background 0.12s, border-color 0.12s;
+	}
+	.bg-choice-pill.selected {
+		border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+		background: color-mix(in srgb, var(--accent) 13%, transparent);
+	}
+	.bg-choice-pill input[type='radio'] { display: none; }
+	.choice-label { font-size: 0.82rem; color: var(--text); }
+	.choice-desc { font-size: 0.72rem; color: var(--text-muted); font-style: italic; }
+	.bg-text-input {
+		width: 100%;
+		min-height: 3.2rem;
+		resize: vertical;
+		background: var(--bg-alt);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 0.45rem 0.6rem;
+		font-size: 0.82rem;
+		color: var(--text);
+		font-family: inherit;
+		margin-top: 0.2rem;
+	}
+	.bg-text-input.optional-input { opacity: 0.72; }
+	.bg-choice-or-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-top: 0.25rem;
+	}
+	.hint-small { font-size: 0.78rem; color: var(--text-muted); }
+	.char-counter {
+		font-size: 0.7rem;
+		color: var(--text-muted);
+		text-align: right;
+	}
+	.char-counter.over { color: var(--danger, #e44); }
+	.field-error-inline {
+		font-size: 0.75rem;
+		color: var(--danger, #e44);
+		margin-top: 0.15rem;
 	}
 	.counter {
 		font-weight: 600;
@@ -2038,17 +2989,17 @@
 		gap: 0.15rem;
 		padding: 0.65rem 0.75rem;
 		border-radius: 14px;
-		border: 1px solid rgba(255,255,255,0.1);
-		background: rgba(255,255,255,0.025);
-		color: rgba(255,255,255,0.8);
+		border: 1px solid var(--border);
+		background: var(--surface);
+		color: var(--text);
 		cursor: pointer;
 		text-align: center;
 		transition: all 0.12s;
 	}
-	.method-btn:hover { background: rgba(255,255,255,0.05); }
+	.method-btn:hover { background: var(--bg-alt); }
 	.method-btn.selected {
-		background: rgba(124,156,255,0.14);
-		border-color: rgba(124,156,255,0.3);
+		background: color-mix(in srgb, var(--accent) 14%, transparent);
+		border-color: color-mix(in srgb, var(--accent) 30%, transparent);
 	}
 	.method-btn small { font-size: 0.78rem; color: var(--text-muted); }
 
@@ -2062,14 +3013,14 @@
 		justify-content: space-between;
 		padding: 0.5rem 0.85rem;
 		border-radius: 12px;
-		background: rgba(124,156,255,0.08);
-		border: 1px solid rgba(124,156,255,0.15);
+		background: color-mix(in srgb, var(--accent) 8%, transparent);
+		border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
 		font-size: 0.88rem;
 	}
 	.budget-bar.over {
-		background: rgba(255,96,96,0.08);
-		border-color: rgba(255,96,96,0.2);
-		color: #ffb0b0;
+		background: color-mix(in srgb, var(--danger) 8%, transparent);
+		border-color: color-mix(in srgb, var(--danger) 20%, transparent);
+		color: var(--danger);
 	}
 
 	.ability-grid-builder {
@@ -2084,8 +3035,8 @@
 		gap: 0.3rem;
 		padding: 0.65rem 0.35rem;
 		border-radius: 14px;
-		background: rgba(255,255,255,0.025);
-		border: 1px solid rgba(255,255,255,0.08);
+		background: var(--surface);
+		border: 1px solid var(--border);
 	}
 	.ab-label {
 		font-size: 0.72rem;
@@ -2103,9 +3054,9 @@
 		width: 1.6rem;
 		height: 1.6rem;
 		border-radius: 50%;
-		border: 1px solid rgba(255,255,255,0.12);
-		background: rgba(255,255,255,0.04);
-		color: rgba(255,255,255,0.7);
+		border: 1px solid var(--border);
+		background: var(--bg-alt);
+		color: var(--text);
 		cursor: pointer;
 		display: flex;
 		align-items: center;
@@ -2126,7 +3077,7 @@
 	}
 	.ab-bonus {
 		font-size: 0.7rem;
-		color: rgba(124,156,255,0.8);
+		color: var(--accent);
 	}
 	.ab-total { text-align: center; }
 	.ab-total strong { font-size: 1.25rem; }
@@ -2160,8 +3111,8 @@
 		letter-spacing: 0.03em;
 	}
 	.dice-rolled s {
-		color: rgba(255,96,96,0.65);
-		text-decoration-color: rgba(255,96,96,0.65);
+		color: var(--danger);
+		text-decoration-color: var(--danger);
 	}
 	.dice-calc { font-size: 0.78rem; color: var(--accent); }
 
@@ -2186,7 +3137,7 @@
 		height: 2.4rem;
 		border-radius: 10px;
 		border: 1px solid var(--border);
-		background: rgba(255,255,255,0.06);
+		background: var(--bg-alt);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -2212,6 +3163,29 @@
 	.ab-drop-slot.drag-over { border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: color-mix(in srgb, var(--accent) 9%, transparent); }
 	.drop-hint { font-size: 0.72rem; color: var(--text-muted); font-style: italic; }
 	.standard-hint { font-size: 1rem; color: var(--text-muted); text-align: center; margin-top: 0.25rem; }
+	.spec-btn-row {
+		display: flex;
+		gap: 0.5rem;
+		justify-content: center;
+		margin-top: 0.6rem;
+	}
+	.spec-btn {
+		font-size: 0.75rem;
+		padding: 0.3rem 0.8rem;
+		border-radius: 6px;
+		border: 1px solid var(--border);
+		background: color-mix(in srgb, var(--accent) 10%, transparent);
+		color: var(--text-muted);
+		cursor: pointer;
+		transition: background 0.15s, color 0.15s, border-color 0.15s;
+		white-space: nowrap;
+	}
+	.spec-btn:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--accent) 22%, transparent);
+		color: var(--accent);
+		border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+	}
+	.spec-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 	/* â”€â”€ Skills â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 	.skill-section {
@@ -2220,8 +3194,8 @@
 		gap: 0.45rem;
 		padding: 0.85rem;
 		border-radius: 14px;
-		background: rgba(255,255,255,0.02);
-		border: 1px solid rgba(255,255,255,0.06);
+		background: var(--surface);
+		border: 1px solid var(--border);
 	}
 	.skill-section h4 {
 		display: flex;
@@ -2235,8 +3209,13 @@
 		gap: 0.75rem;
 		padding: 0.85rem;
 		border-radius: 14px;
-		background: rgba(255,255,255,0.02);
-		border: 1px solid rgba(255,255,255,0.06);
+		background: var(--surface);
+		border: 1px solid var(--border);
+	}
+	.equip-guaranteed-note {
+		font-size: 0.82rem;
+		color: var(--text-muted);
+		margin: 0;
 	}
 	.spell-group {
 		display: flex;
@@ -2259,7 +3238,7 @@
 	.equip-label {
 		font-size: 0.84rem;
 		font-weight: 600;
-		color: rgba(255,255,255,0.7);
+		color: var(--text);
 	}
 	.equip-options {
 		display: flex;
@@ -2269,27 +3248,222 @@
 	.equip-card {
 		padding: 0.5rem 0.85rem;
 		border-radius: 12px;
-		border: 1px solid rgba(255,255,255,0.1);
-		background: rgba(255,255,255,0.025);
-		color: rgba(255,255,255,0.8);
+		border: 1px solid var(--border);
+		background: var(--surface);
+		color: var(--text);
 		cursor: pointer;
 		font-size: 0.88rem;
 		text-align: left;
 		transition: all 0.12s;
 	}
-	.equip-card:hover { background: rgba(255,255,255,0.05); }
+	.equip-card:hover { background: var(--bg-alt); }
 	.equip-card.selected {
-		background: rgba(124,156,255,0.14);
-		border-color: rgba(124,156,255,0.3);
+		background: color-mix(in srgb, var(--accent) 14%, transparent);
+		border-color: color-mix(in srgb, var(--accent) 30%, transparent);
 		color: var(--accent);
+	}
+
+	/* ── Equipment detail panels ────────────────────────────────────────── */
+	.equip-detail-panel {
+		margin-top: 0.35rem;
+		padding: 0.55rem 0.7rem;
+		border-radius: 10px;
+		background: var(--bg-alt);
+		border: 1px solid var(--border);
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+	.equip-detail-header {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 0.5rem;
+	}
+	.equip-detail-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.83rem;
+		color: var(--text);
+	}
+	.equip-detail-title {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.83rem;
+		color: var(--text);
+	}
+	.armor-type-tag {
+		padding: 0.1rem 0.4rem;
+		border-radius: 6px;
+		background: color-mix(in srgb, var(--accent) 10%, transparent);
+		color: var(--accent);
+		font-size: 0.73rem;
+		text-transform: capitalize;
+	}
+	.ac-formula {
+		color: var(--text-muted);
+		font-size: 0.79rem;
+	}
+	.equip-detail-caret {
+		background: none;
+		border: none;
+		color: var(--text-muted);
+		cursor: pointer;
+		font-size: 0.78rem;
+		padding: 0 0.2rem;
+		line-height: 1;
+		flex-shrink: 0;
+		margin-top: 0.05rem;
+	}
+	.equip-detail-caret:hover { color: var(--text); }
+	.equip-pack-contents {
+		margin: 0;
+		padding: 0 0 0 1rem;
+		list-style: disc;
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+	}
+	.equip-pack-contents li {
+		font-size: 0.79rem;
+		color: var(--text-muted);
+	}
+
+	/* ── Weapon / instrument list ── */
+	.equip-weapon-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+		margin-top: 0.35rem;
+	}
+	.weapon-header-row,
+	.equip-weapon-row {
+		display: grid;
+		grid-template-columns: 2fr 1.4fr 0.5fr 2.4fr;
+		gap: 0.45rem;
+		align-items: center;
+	}
+	.weapon-header-row {
+		padding: 0.18rem 0.55rem;
+		font-size: 0.69rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: var(--text-muted);
+	}
+	.equip-weapon-row {
+		padding: 0.28rem 0.55rem;
+		border-radius: 8px;
+		border: 1px solid var(--border);
+		background: var(--surface);
+		color: var(--text);
+		cursor: pointer;
+		text-align: left;
+		transition: background 0.1s, border-color 0.1s, opacity 0.15s;
+		font-size: 0.82rem;
+		width: 100%;
+	}
+	.equip-weapon-row:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+	.equip-weapon-row.selected {
+		background: color-mix(in srgb, var(--accent) 15%, transparent);
+		border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+		color: var(--accent);
+	}
+	.equip-weapon-row.selected .damage-type { color: color-mix(in srgb, var(--accent) 65%, white); }
+	.equip-weapon-row.readonly {
+		cursor: default;
+		pointer-events: none;
+		border-color: transparent;
+		background: transparent;
+	}
+	.equip-instrument-list .weapon-header-row,
+	.equip-instrument-list .equip-weapon-row {
+		grid-template-columns: 2fr 0.6fr 0.5fr 1.5fr;
+	}
+
+	/* Weapon selection badge */
+	.weapon-sel-badge {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 1.15rem;
+		height: 1.15rem;
+		padding: 0 0.18rem;
+		border-radius: 50%;
+		background: var(--accent);
+		color: #fff;
+		font-size: 0.66rem;
+		font-weight: 700;
+		margin-left: 0.25rem;
+		vertical-align: middle;
+		line-height: 1;
+	}
+	.weapon-sel-badge.weapon-sel-double {
+		border-radius: 8px;
+		padding: 0 0.3rem;
+		box-shadow: 0 0 7px color-mix(in srgb, var(--accent) 80%, transparent),
+		            0 0 2px var(--accent);
+	}
+
+	/* Weapon tag pills */
+	.weapon-tag {
+		display: inline-block;
+		padding: 0.07rem 0.32rem;
+		border-radius: 5px;
+		background: color-mix(in srgb, var(--bg-alt, var(--surface)) 80%, transparent);
+		border: 1px solid var(--border);
+		font-size: 0.68rem;
+		color: var(--text-muted);
+		white-space: nowrap;
+		margin-right: 0.18rem;
+	}
+	/* Tag color coding */
+	.tag-one-handed  { background: #ffffff; border-color: #cccccc; color: #111111; }
+	.tag-two-handed  { background: color-mix(in srgb, #e05555 15%, transparent); border-color: color-mix(in srgb, #e05555 40%, transparent); color: #e05555; }
+	.tag-ranged      { background: color-mix(in srgb, #4caf50 15%, transparent); border-color: color-mix(in srgb, #4caf50 40%, transparent); color: #4caf50; }
+	.tag-reach       { background: color-mix(in srgb, #2196f3 15%, transparent); border-color: color-mix(in srgb, #2196f3 40%, transparent); color: #2196f3; }
+	.tag-finesse     { background: color-mix(in srgb, #ab47bc 15%, transparent); border-color: color-mix(in srgb, #ab47bc 40%, transparent); color: #ab47bc; }
+	.tag-versatile   { background: color-mix(in srgb, #ffb300 15%, transparent); border-color: color-mix(in srgb, #ffb300 40%, transparent); color: #ffb300; }
+	.tag-heavy       { background: color-mix(in srgb, #fb8c00 15%, transparent); border-color: color-mix(in srgb, #fb8c00 40%, transparent); color: #fb8c00; }
+	.damage-type { color: var(--text-muted); font-size: 0.78rem; }
+	.damage-none { color: var(--text-muted); font-style: italic; }
+	/* Special: descriptor text — spans full weapon-row grid width */
+	.weapon-special {
+		grid-column: 1 / -1;
+		font-size: 0.72rem;
+		color: var(--text-muted);
+		line-height: 1.4;
+		padding-top: 0.18rem;
+		border-top: 1px solid var(--border);
+		margin-top: 0.12rem;
+	}
+	.weapon-special em { font-style: italic; color: var(--text); }
+	.wcol-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.wcol-damage { font-size: 0.79rem; }
+	.wcol-stat { font-size: 0.77rem; color: var(--text-muted); }
+	.wcol-tags { display: flex; flex-wrap: wrap; gap: 0.12rem; align-items: center; }
+
+	.pick-count-badge {
+		display: inline-block;
+		padding: 0.05rem 0.38rem;
+		border-radius: 6px;
+		background: color-mix(in srgb, var(--accent) 20%, transparent);
+		color: var(--accent);
+		font-size: 0.72rem;
+		font-weight: 700;
+		vertical-align: middle;
+		margin-left: 0.25rem;
 	}
 
 	/* â”€â”€ Flavor section (background characteristics) â”€â”€ */
 	.flavor-section {
 		padding: 0.75rem;
 		border-radius: 14px;
-		background: rgba(255,255,255,0.015);
-		border: 1px solid rgba(255,255,255,0.05);
+		background: var(--surface);
+		border: 1px solid var(--border);
 	}
 	.flavor-grid {
 		display: grid;
@@ -2317,15 +3491,15 @@
 		width: 100%;
 		padding: 0.85rem 1rem;
 		border-radius: 14px;
-		border: 1px solid rgba(124,156,255,0.25);
-		background: rgba(255,255,255,0.04);
+		border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+		background: var(--bg-alt);
 		color: inherit;
 		font: inherit;
 		font-size: 1.3rem;
 		font-weight: 600;
 		text-align: center;
 	}
-	.name-input::placeholder { color: rgba(255,255,255,0.25); font-weight: 400; }
+	.name-input::placeholder { color: var(--text-muted); font-weight: 400; }
 
 	.alignment-grid {
 		display: grid;
@@ -2337,18 +3511,18 @@
 	.alignment-cell {
 		padding: 0.45rem 0.5rem;
 		border-radius: 10px;
-		border: 1px solid rgba(255,255,255,0.1);
-		background: rgba(255,255,255,0.025);
-		color: rgba(255,255,255,0.7);
+		border: 1px solid var(--border);
+		background: var(--surface);
+		color: var(--text);
 		cursor: pointer;
 		font-size: 0.82rem;
 		text-align: center;
 		transition: all 0.12s;
 	}
-	.alignment-cell:hover { background: rgba(255,255,255,0.05); }
+	.alignment-cell:hover { background: var(--bg-alt); }
 	.alignment-cell.selected {
-		background: rgba(124,156,255,0.14);
-		border-color: rgba(124,156,255,0.3);
+		background: color-mix(in srgb, var(--accent) 14%, transparent);
+		border-color: color-mix(in srgb, var(--accent) 30%, transparent);
 		color: var(--accent);
 	}
 
@@ -2363,8 +3537,8 @@
 	.backstory-label textarea {
 		padding: 0.65rem 0.8rem;
 		border-radius: 12px;
-		border: 1px solid rgba(255,255,255,0.12);
-		background: rgba(255,255,255,0.04);
+		border: 1px solid var(--border);
+		background: var(--bg-alt);
 		color: inherit;
 		font: inherit;
 		resize: vertical;
@@ -2379,8 +3553,8 @@
 		gap: 0.65rem;
 		padding: 1rem 1.1rem;
 		border-radius: 16px;
-		background: rgba(255,255,255,0.025);
-		border: 1px solid rgba(255,255,255,0.08);
+		background: var(--surface);
+		border: 1px solid var(--border);
 		text-align: left;
 	}
 	.summary-header h4 { font-size: 1.1rem; }
@@ -2419,7 +3593,7 @@
 		align-items: center;
 		justify-content: space-between;
 		padding: 0.6rem 1.1rem;
-		border-top: 1px solid rgba(255,255,255,0.06);
+		border-top: 1px solid var(--border);
 		flex-shrink: 0;
 	}
 	.footer-left {
@@ -2436,17 +3610,17 @@
 	.btn {
 		padding: 0.6rem 1.1rem;
 		border-radius: 12px;
-		border: 1px solid rgba(124,156,255,0.35);
+		border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
 		cursor: pointer;
 		font-weight: 500;
 	}
 	.btn.primary {
-		background: rgba(124,156,255,0.18);
+		background: color-mix(in srgb, var(--accent) 18%, transparent);
 		color: var(--accent);
 	}
 	.btn.secondary {
-		background: rgba(255,255,255,0.04);
-		border-color: rgba(255,255,255,0.12);
+		background: var(--bg-alt);
+		border-color: var(--border);
 		color: inherit;
 	}
 	.btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -2457,7 +3631,7 @@
 		.option-list {
 			max-height: 200px;
 			border-right: none;
-			border-bottom: 1px solid rgba(255,255,255,0.06);
+			border-bottom: 1px solid var(--border);
 		}
 		.ability-grid-builder { grid-template-columns: repeat(3, 1fr); }
 		.summary-stats { grid-template-columns: repeat(3, 1fr); }

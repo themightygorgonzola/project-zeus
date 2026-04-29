@@ -424,6 +424,26 @@
 	color: #1a5ca8;
 }
 
+/* ─── CharacterCreation backdrop ────────────────────────────
+   A dark page-dim overlay behind the modal. Dark themes use a deepened
+   version of their own bg hue; light themes use a dark tint of their
+   accent/theme hue so the overlay feels thematically grounded.
+   Usage: .cc-backdrop { background: var(--cc-backdrop); }
+──────────────────────────────────────────────────────────── */
+:root,
+[data-theme='arcane-celestial'] { --cc-backdrop: rgba(2,  6, 16, 0.92); } /* deep space navy   */
+[data-theme='dark-academia']    { --cc-backdrop: rgba(8,  3,  1, 0.90); } /* charred wood dark */
+[data-theme='void-astral']      { --cc-backdrop: rgba(0,  1,  4, 0.94); } /* void black        */
+[data-theme='silver-scroll']    { --cc-backdrop: rgba(12, 18, 40, 0.86); } /* dark scroll navy  */
+[data-theme='forge-iron']       { --cc-backdrop: rgba(5,  1,  0, 0.92); } /* smelter shadow    */
+[data-theme='morning-mist']     { --cc-backdrop: rgba(2,  6,  1, 0.90); } /* deep forest black */
+[data-theme='midnight-court']   { --cc-backdrop: rgba(4,  1, 10, 0.92); } /* velvet dark       */
+[data-theme='clean-slate']      { --cc-backdrop: rgba(3,  3,  5, 0.94); } /* forged steel      */
+[data-theme='blood-oath']       { --cc-backdrop: rgba(4,  0,  1, 0.92); } /* dried blood dark  */
+[data-theme='vellum-quill']     { --cc-backdrop: rgba(10,  5,  1, 0.88); } /* aged dark leather */
+[data-theme='sakura-court']     { --cc-backdrop: rgba(18,  4, 10, 0.86); } /* dark plum night   */
+[data-theme='frozen-spire']     { --cc-backdrop: rgba(4,  14, 32, 0.88); } /* deep glacier blue */
+
 /* ─── Reset ─────────────────────────────────────────────── */
 *,
 *::before,

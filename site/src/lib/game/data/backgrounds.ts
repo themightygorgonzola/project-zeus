@@ -41,6 +41,58 @@ export interface SuggestedCharacteristics {
 	flaws: string[];
 }
 
+/** One selectable item option inside a background equipment choice. */
+export interface BackgroundChoiceOption {
+	label: string;
+	description?: string;
+	/** Item strings added to the character's inventory when this option is selected. */
+	items: string[];
+}
+
+export type BackgroundChoiceType = 'radio' | 'text' | 'dual-radio';
+
+/**
+ * Describes a single interactive equipment choice block shown in the Background
+ * detail pane during character creation.
+ */
+export interface BackgroundEquipmentChoice {
+	/** Unique key stored in CharacterCreateInput.backgroundEquipmentChoices. */
+	id: string;
+	/** Heading shown above the choice block, e.g. "Choose One" | "Describe". */
+	sectionLabel: string;
+	/** Short instruction text shown below the heading. */
+	prompt: string;
+	type: BackgroundChoiceType;
+	required: boolean;
+
+	// ── radio / dual-radio ─────────────────────────────────────────────────
+	options?: BackgroundChoiceOption[];
+	/** dual-radio: id key for the second radio group. */
+	secondId?: string;
+	/** dual-radio: label/question shown above the second radio group. */
+	secondPrompt?: string;
+	/** dual-radio: options for the second radio group. */
+	secondOptions?: BackgroundChoiceOption[];
+
+	// ── text ───────────────────────────────────────────────────────────────
+	textMaxWords?: number;
+	textMaxChars?: number;
+	textPlaceholder?: string;
+	optional?: boolean;
+	/** Items always added regardless of the text value (text is flavour only). */
+	fixedItems?: string[];
+	/**
+	 * Template string for building an item name from the user's value.
+	 * The id placeholder (wrapped in `{}`) is replaced with the selected value.
+	 * e.g. "Map of {cityOfOrigin}" → "Map of Thornwall"
+	 */
+	itemNameTemplate?: string;
+	/** If the stored value equals this label, no items are added. */
+	skipLabel?: string;
+	/** An "Or:" fallback radio option rendered below a text box. */
+	orDefaultOption?: { label: string; items: string[] };
+}
+
 export interface BackgroundDefinition {
 	name: BackgroundName;
 	displayName: string;
@@ -50,6 +102,7 @@ export interface BackgroundDefinition {
 	languageChoices?: number;
 	languages?: Language[];
 	equipment: string[];
+	equipmentChoices?: BackgroundEquipmentChoice[];
 	feature: BackgroundFeature;
 	suggestedCharacteristics: SuggestedCharacteristics;
 }
@@ -66,7 +119,20 @@ export const BACKGROUNDS: BackgroundDefinition[] = [
 		skillProficiencies: ['insight', 'religion'],
 		toolProficiencies: [],
 		languageChoices: 2,
-		equipment: ['Holy Symbol', 'Prayer Book or Prayer Wheel', 'Incense (5 sticks)', 'Vestments', 'Common Clothes', 'Belt Pouch'],
+		equipment: ['Holy Symbol', 'Incense (5 sticks)', 'Vestments', 'Common Clothes', 'Belt Pouch'],
+		equipmentChoices: [
+			{
+				id: 'prayerItem',
+				sectionLabel: 'Choose One',
+				prompt: 'Your faith’s practice uses one of these sacred texts or tools.',
+				type: 'radio',
+				required: true,
+				options: [
+					{ label: 'Prayer Book', description: 'A bound collection of prayers and scripture.', items: ['Prayer Book'] },
+					{ label: 'Prayer Wheel', description: 'A spinning wheel inscribed with sacred mantras.', items: ['Prayer Wheel'] },
+				],
+			},
+		],
 		feature: {
 			name: 'Shelter of the Faithful',
 			description: 'You and your companions can expect free healing and care at a temple or shrine of your faith, though you must provide any material components needed for spells. Those who share your religion will support you, though only modestly.'
@@ -84,7 +150,24 @@ export const BACKGROUNDS: BackgroundDefinition[] = [
 		description: 'You have always had a way with people, and with words. Truth is flexible when survival depends on a convincing lie.',
 		skillProficiencies: ['deception', 'sleight-of-hand'],
 		toolProficiencies: ['disguise-kit', 'forgery-kit'],
-		equipment: ['Fine Clothes', 'Disguise Kit', 'Tools of the Con of Your Choice', 'Belt Pouch'],
+		equipment: ['Fine Clothes', 'Disguise Kit', 'Belt Pouch'],
+		equipmentChoices: [
+			{
+				id: 'conTool',
+				sectionLabel: 'Choose One',
+				prompt: 'Every charlatan has a preferred tool of the trade.',
+				type: 'radio',
+				required: true,
+				options: [
+					{ label: 'Thieves’ Tools (Lockpicks)', description: 'Precision picks for locks and pockets.', items: ['Thieves’ Tools (Lockpicks)'] },
+					{ label: 'Loaded Dice Set', description: 'Weighted dice that roll in your favor.', items: ['Loaded Dice Set'] },
+					{ label: 'Marked Playing Cards', description: 'A deck only you can truly read.', items: ['Marked Playing Cards'] },
+					{ label: 'False Merchant’s Seal Ring', description: 'A signet bearing a fabricated noble crest.', items: ['False Merchant’s Seal Ring'] },
+					{ label: 'Snake Oil Vials (x3)', description: 'Three vials of colored water sold as miracle cures.', items: ['Snake Oil Vials (x3)'] },
+					{ label: 'Confidence Letter Kit', description: 'Forged letters of credit and sealed blank warrants.', items: ['Confidence Letter Kit'] },
+				],
+			},
+		],
 		feature: {
 			name: 'False Identity',
 			description: 'You have created a second identity that includes documentation, established acquaintances, and disguises that allow you to assume that persona.'
@@ -120,7 +203,51 @@ export const BACKGROUNDS: BackgroundDefinition[] = [
 		description: 'You thrive in front of an audience. Music, dance, poetry, and storytelling are your tools.',
 		skillProficiencies: ['acrobatics', 'performance'],
 		toolProficiencies: ['disguise-kit', 'musical-instrument'],
-		equipment: ['Musical Instrument', 'Favor of an Admirer', 'Costume', 'Belt Pouch'],
+		equipment: ['Belt Pouch'],
+		equipmentChoices: [
+			{
+				id: 'instrument',
+				sectionLabel: 'Choose One',
+				prompt: 'Choose your primary musical instrument.',
+				type: 'radio',
+				required: true,
+				options: [
+					{ label: 'Lute', items: ['Lute'] },
+					{ label: 'Lyre', items: ['Lyre'] },
+					{ label: 'Flute', items: ['Flute'] },
+					{ label: 'Hand Drum', items: ['Hand Drum'] },
+					{ label: 'Viol', items: ['Viol'] },
+					{ label: 'Horn', items: ['Horn'] },
+					{ label: 'Bagpipes', items: ['Bagpipes'] },
+					{ label: 'Shawm', items: ['Shawm'] },
+				],
+			},
+			{
+				id: 'costume',
+				sectionLabel: 'Choose One',
+				prompt: 'Choose your performance costume.',
+				type: 'radio',
+				required: true,
+				options: [
+					{ label: 'Jester Motley', items: ['Jester Motley'] },
+					{ label: 'Performer’s Stage Robes', items: ['Performer’s Stage Robes'] },
+					{ label: 'Court Finery', items: ['Court Finery'] },
+					{ label: 'Acrobat Silks', items: ['Acrobat Silks'] },
+					{ label: 'Masquerade Costume', items: ['Masquerade Costume'] },
+				],
+			},
+			{
+				id: 'admirerFavor',
+				sectionLabel: 'Describe',
+				prompt: 'Describe the token or favor given to you by an admirer.',
+				type: 'text',
+				required: false,
+				optional: true,
+				textMaxWords: 20,
+				textPlaceholder: 'Describe the favor given by an admirer...',
+				fixedItems: ['Token from an Admirer'],
+			},
+		],
 		feature: {
 			name: 'By Popular Demand',
 			description: 'You can always find a place to perform, usually in an inn or tavern, where you receive free lodging and food of a modest standard as long as you perform each night.'
@@ -138,7 +265,26 @@ export const BACKGROUNDS: BackgroundDefinition[] = [
 		description: 'You come from a humble social rank, but you are destined for so much more.',
 		skillProficiencies: ['animal-handling', 'survival'],
 		toolProficiencies: ['artisan-tools', 'vehicles-land'],
-		equipment: ['Artisan’s Tools', 'Shovel', 'Iron Pot', 'Common Clothes', 'Belt Pouch'],
+		equipment: ['Shovel', 'Iron Pot', 'Common Clothes', 'Belt Pouch'],
+		equipmentChoices: [
+			{
+				id: 'artisanTool',
+				sectionLabel: 'Choose One',
+				prompt: 'What tools did you use in your trade before adventuring?',
+				type: 'radio',
+				required: true,
+				options: [
+					{ label: 'Blacksmith’s Tools', items: ['Blacksmith’s Tools'] },
+					{ label: 'Carpenter’s Tools', items: ['Carpenter’s Tools'] },
+					{ label: 'Mason’s Tools', items: ['Mason’s Tools'] },
+					{ label: 'Potter’s Tools', items: ['Potter’s Tools'] },
+					{ label: 'Weaver’s Tools', items: ['Weaver’s Tools'] },
+					{ label: 'Leatherworker’s Tools', items: ['Leatherworker’s Tools'] },
+					{ label: 'Cook’s Utensils', items: ['Cook’s Utensils'] },
+					{ label: 'Tinker’s Tools', items: ['Tinker’s Tools'] },
+				],
+			},
+		],
 		feature: {
 			name: 'Rustic Hospitality',
 			description: 'Commoners will shield you from the law or anyone else searching for you, though they will not risk their lives for you.'
@@ -157,7 +303,26 @@ export const BACKGROUNDS: BackgroundDefinition[] = [
 		skillProficiencies: ['insight', 'persuasion'],
 		toolProficiencies: ['artisan-tools'],
 		languageChoices: 1,
-		equipment: ['Artisan’s Tools', 'Letter of Introduction from Guild', 'Traveler’s Clothes', 'Belt Pouch'],
+		equipment: ['Traveler’s Clothes', 'Belt Pouch'],
+		equipmentChoices: [
+			{
+				id: 'artisanSpecialization',
+				sectionLabel: 'Choose Your Trade',
+				prompt: 'Choose your guild and the tools of your craft.',
+				type: 'radio',
+				required: true,
+				options: [
+					{ label: 'Blacksmiths’ Guild', description: 'Smithing metals and forging iron.', items: ['Blacksmith’s Tools', 'Letter of Introduction from the Blacksmiths’ Guild'] },
+					{ label: 'Carpenters’ Guild', description: 'Shaping timber into homes and furniture.', items: ['Carpenter’s Tools', 'Letter of Introduction from the Carpenters’ Guild'] },
+					{ label: 'Masons’ Guild', description: 'Working stone for buildings and monuments.', items: ['Mason’s Tools', 'Letter of Introduction from the Masons’ Guild'] },
+					{ label: 'Potters’ Guild', description: 'Shaping clay into vessels and tiles.', items: ['Potter’s Tools', 'Letter of Introduction from the Potters’ Guild'] },
+					{ label: 'Weavers’ Guild', description: 'Crafting cloth and garments from fiber.', items: ['Weaver’s Tools', 'Letter of Introduction from the Weavers’ Guild'] },
+					{ label: 'Leatherworkers’ Guild', description: 'Tanning hides and stitching leather goods.', items: ['Leatherworker’s Tools', 'Letter of Introduction from the Leatherworkers’ Guild'] },
+					{ label: 'Cooks’ Guild', description: 'Preparing meals for inns and feasts.', items: ['Cook’s Utensils', 'Letter of Introduction from the Cooks’ Guild'] },
+					{ label: 'Tinkers’ Guild', description: 'Building and repairing small mechanical devices.', items: ['Tinker’s Tools', 'Letter of Introduction from the Tinkers’ Guild'] },
+				],
+			},
+		],
 		feature: {
 			name: 'Guild Membership',
 			description: 'Your guild provides lodging and food if necessary and pays for your funeral. You can access guild halls and count on support from your fellow artisans.'
@@ -178,6 +343,19 @@ export const BACKGROUNDS: BackgroundDefinition[] = [
 		languages: ['Common'],
 		languageChoices: 1,
 		equipment: ['Scroll Case Stuffed with Notes', 'Winter Blanket', 'Common Clothes', 'Herbalism Kit', 'Belt Pouch'],
+		equipmentChoices: [
+			{
+				id: 'scrollNotes',
+				sectionLabel: 'Describe',
+				prompt: 'What fills the pages of your scroll case? Your private research or meditations.',
+				type: 'text',
+				required: false,
+				optional: true,
+				textMaxWords: 20,
+				textPlaceholder: 'What fills the pages of your scroll case?',
+				fixedItems: [],
+			},
+		],
 		feature: {
 			name: 'Discovery',
 			description: 'The quiet seclusion of your extended hermitage gave you access to a unique and powerful discovery. The precise nature of your revelation can shape the campaign.'
@@ -197,6 +375,19 @@ export const BACKGROUNDS: BackgroundDefinition[] = [
 		toolProficiencies: ['gaming-set'],
 		languageChoices: 1,
 		equipment: ['Fine Clothes', 'Signet Ring', 'Scroll of Pedigree', 'Purse'],
+		equipmentChoices: [
+			{
+				id: 'pedigreeDesc',
+				sectionLabel: 'Describe',
+				prompt: 'What is your family known for? Describe your lineage in a line or two.',
+				type: 'text',
+				required: false,
+				optional: true,
+				textMaxWords: 20,
+				textPlaceholder: 'What is your family known for?',
+				orDefaultOption: { label: 'Generalized Pedigree', items: [] },
+			},
+		],
 		feature: {
 			name: 'Position of Privilege',
 			description: 'People are inclined to think the best of you. You can secure an audience with a local noble if you need to, and common folk make every effort to accommodate you.'
@@ -215,7 +406,34 @@ export const BACKGROUNDS: BackgroundDefinition[] = [
 		skillProficiencies: ['athletics', 'survival'],
 		toolProficiencies: ['musical-instrument'],
 		languageChoices: 1,
-		equipment: ['Staff', 'Hunting Trap', 'Trophy from an Animal', 'Traveler’s Clothes', 'Belt Pouch'],
+		equipment: ['Staff', 'Traveler’s Clothes', 'Belt Pouch'],
+		equipmentChoices: [
+			{
+				id: 'huntingTrap',
+				sectionLabel: 'Choose One',
+				prompt: 'Choose the type of hunting trap you carry.',
+				type: 'radio',
+				required: true,
+				options: [
+					{ label: 'Bear Trap', description: 'A heavy iron trap for large prey.', items: ['Bear Trap'] },
+					{ label: 'Small Snare', description: 'A simple loop snare for small animals.', items: ['Small Snare'] },
+					{ label: 'Medium Snare', description: 'A sturdy snare for mid-sized game.', items: ['Medium Snare'] },
+					{ label: 'Large Snare', description: 'A reinforced snare for large animals.', items: ['Large Snare'] },
+					{ label: 'Pitfall Trap Kit', description: 'Stakes, rope, and cover for digging a pitfall.', items: ['Pitfall Trap Kit'] },
+					{ label: 'Net Trap', description: 'A weighted net rigged to drop on prey.', items: ['Net Trap'] },
+				],
+			},
+			{
+				id: 'animalTrophy',
+				sectionLabel: 'Describe',
+				prompt: 'Describe the trophy you carry from a notable kill.',
+				type: 'text',
+				required: true,
+				textMaxWords: 20,
+				textPlaceholder: 'Describe the trophy you carry...',
+				fixedItems: ['Trophy from an Animal'],
+			},
+		],
 		feature: {
 			name: 'Wanderer',
 			description: 'You have an excellent memory for maps and geography, and you can always recall the general layout of terrain, settlements, and other features around you. You can also find food and fresh water for yourself and up to five other people each day, provided the land offers berries, small game, water, and so forth.'
@@ -235,6 +453,19 @@ export const BACKGROUNDS: BackgroundDefinition[] = [
 		toolProficiencies: [],
 		languageChoices: 2,
 		equipment: ['Bottle of Black Ink', 'Quill', 'Small Knife', 'Letter from a Dead Colleague', 'Common Clothes', 'Belt Pouch'],
+		equipmentChoices: [
+			{
+				id: 'deadColleagueLetter',
+				sectionLabel: 'Describe',
+				prompt: 'Who was the colleague, and what question were they researching when they died?',
+				type: 'text',
+				required: false,
+				optional: true,
+				textMaxWords: 20,
+				textPlaceholder: 'What question were they researching?',
+				fixedItems: [],
+			},
+		],
 		feature: {
 			name: 'Researcher',
 			description: 'When you attempt to learn or recall a piece of lore, if you do not know it, you often know where and from whom you can obtain it.'
@@ -253,6 +484,19 @@ export const BACKGROUNDS: BackgroundDefinition[] = [
 		skillProficiencies: ['athletics', 'perception'],
 		toolProficiencies: ['navigator-tools', 'vehicles-water'],
 		equipment: ['Belaying Pin', '50 Feet of Silk Rope', 'Lucky Charm', 'Common Clothes', 'Belt Pouch'],
+		equipmentChoices: [
+			{
+				id: 'luckyCharmDesc',
+				sectionLabel: 'Describe',
+				prompt: 'What is your lucky charm and why do you keep it?',
+				type: 'text',
+				required: false,
+				optional: true,
+				textMaxWords: 20,
+				textPlaceholder: 'What is your lucky charm?',
+				fixedItems: [],
+			},
+		],
 		feature: {
 			name: 'Ship’s Passage',
 			description: 'When you need to, you can secure free passage on a sailing ship for yourself and your companions. You may need to assist the crew during the voyage.'
@@ -270,7 +514,57 @@ export const BACKGROUNDS: BackgroundDefinition[] = [
 		description: 'War has been your life for as long as you care to remember.',
 		skillProficiencies: ['athletics', 'intimidation'],
 		toolProficiencies: ['gaming-set', 'vehicles-land'],
-		equipment: ['Insignia of Rank', 'Trophy from a Fallen Enemy', 'Bone Dice or Deck of Cards', 'Common Clothes', 'Belt Pouch'],
+		equipment: ['Common Clothes', 'Belt Pouch'],
+		equipmentChoices: [
+			{
+				id: 'signiaRank',
+				sectionLabel: 'Choose Your Rank and Discharge',
+				prompt: 'What rank did you hold in your military service?',
+				type: 'dual-radio',
+				required: true,
+				itemNameTemplate: '{signiaRank} Insignia ({signiaSeparation})',
+				options: [
+					{ label: 'Private', items: [] },
+					{ label: 'Corporal', items: [] },
+					{ label: 'Sergeant', items: [] },
+					{ label: 'Lieutenant', items: [] },
+					{ label: 'Captain', items: [] },
+					{ label: 'Knight', items: [] },
+					{ label: 'Marshal', items: [] },
+				],
+				secondId: 'signiaSeparation',
+				secondPrompt: 'What were the circumstances of your discharge?',
+				secondOptions: [
+					{ label: 'With Full Honors', items: [] },
+					{ label: 'With Honors', items: [] },
+					{ label: 'Medical Discharge', items: [] },
+					{ label: 'Resigned Commission', items: [] },
+					{ label: 'Dishonorable Discharge', items: [] },
+					{ label: 'Stripped of Rank', items: [] },
+				],
+			},
+			{
+				id: 'fallenEnemyTrophy',
+				sectionLabel: 'Describe',
+				prompt: 'Describe the trophy you took from a fallen enemy.',
+				type: 'text',
+				required: true,
+				textMaxWords: 20,
+				textPlaceholder: 'What trophy did you take?',
+				fixedItems: ['Trophy from a Fallen Enemy'],
+			},
+			{
+				id: 'diceOrCards',
+				sectionLabel: 'Choose One',
+				prompt: 'Soldiers gamble. Choose your game of choice.',
+				type: 'radio',
+				required: true,
+				options: [
+					{ label: 'Bone Dice', description: 'A set of carved bone dice.', items: ['Bone Dice Set'] },
+					{ label: 'Deck of Cards', description: 'A worn deck of playing cards.', items: ['Deck of Cards'] },
+				],
+			},
+		],
 		feature: {
 			name: 'Military Rank',
 			description: 'You have a military rank from your career as a soldier. Soldiers loyal to your former organization still recognize your authority and influence.'
@@ -288,7 +582,41 @@ export const BACKGROUNDS: BackgroundDefinition[] = [
 		description: 'You grew up on the streets alone, orphaned, and poor, with no one to watch over you or provide for you.',
 		skillProficiencies: ['sleight-of-hand', 'stealth'],
 		toolProficiencies: ['disguise-kit', 'thieves-tools'],
-		equipment: ['Small Knife', 'Map of the City You Grew Up In', 'Pet Mouse', 'Token to Remember Your Parents By', 'Common Clothes', 'Belt Pouch'],
+		equipment: ['Small Knife', 'Common Clothes', 'Belt Pouch'],
+		equipmentChoices: [
+			{
+				id: 'cityOfOrigin',
+				sectionLabel: 'Choose Your City of Origin',
+				prompt: 'Which city did you grow up in? You carry a hand-drawn map of its streets.',
+				type: 'radio',
+				required: true,
+				itemNameTemplate: 'Map of {cityOfOrigin}',
+				options: [],
+			},
+			{
+				id: 'mouseName',
+				sectionLabel: 'Name Your Mouse',
+				prompt: 'Your pet mouse has been your companion on the streets. Give it a name.',
+				type: 'text',
+				required: true,
+				textMaxChars: 20,
+				textPlaceholder: 'Give your mouse a name',
+				itemNameTemplate: 'Pet Mouse ({mouseName}) in Cage',
+			},
+			{
+				id: 'parentToken',
+				sectionLabel: 'Token from Your Parents',
+				prompt: 'Do you carry something to remember your parents by?',
+				type: 'text',
+				required: false,
+				optional: true,
+				textMaxWords: 20,
+				textPlaceholder: 'Describe the token...',
+				skipLabel: 'No Token',
+				fixedItems: ['Token to Remember Your Parents By'],
+				orDefaultOption: { label: 'No Token', items: [] },
+			},
+		],
 		feature: {
 			name: 'City Secrets',
 			description: 'You know the secret patterns and flow to cities and can find passages through the urban sprawl that others would miss.'

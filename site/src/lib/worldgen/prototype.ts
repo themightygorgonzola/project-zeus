@@ -205,18 +205,25 @@ export function generatePrototypeWorld(seed = createWorldSeed()): PrototypeWorld
 
 	const settlements = Array.from({ length: settlementCount }, (_, index) => {
 		const state = pick(rng, states);
+		// Derive population first so we can assign the correct size label from it.
+		// Population is stored in thousands (0.2 = 200 people, 28 = 28,000 people).
+		const population = float(rng, 0.2, 28, 3);
+		const group =
+			population < 0.5  ? 'hamlet'  :
+			population < 2.0  ? 'village' :
+			population < 8.0  ? 'town'    : 'city';
 		return {
 			i: index + 1,
 			name: `${makeName(rng)} ${pick(rng, SETTLEMENT_FORMS)}`,
 			state: state.i,
 			stateName: state.name,
 			culture: state.culture,
-			population: float(rng, 0.2, 28, 3),
+			population,
 			type: pick(rng, ['River', 'Naval', 'Highland', 'Generic']),
 			x: float(rng, 0, 3432, 2),
 			y: float(rng, 0, 1308, 2),
 			capital: 0,
-			group: pick(rng, ['hamlet', 'village', 'town', 'city'])
+			group
 		};
 	});
 

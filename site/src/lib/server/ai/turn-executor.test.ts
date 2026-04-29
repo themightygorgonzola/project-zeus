@@ -305,7 +305,7 @@ describe('resolveTurn — rest', () => {
 		expect(result.status).toBe('ready-for-narration');
 		expect(result.stateChanges.clockAdvance).toBeDefined();
 		// 4 hours ≈ 1 period (each period ≈ 5 hours in 5-period cycle)
-		expect(result.mechanicResults[0].dice.total).toBe(1);
+		expect(result.mechanicResults[0].dice?.total).toBe(1);
 	});
 });
 

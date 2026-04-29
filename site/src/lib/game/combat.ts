@@ -619,6 +619,16 @@ function combineCombatAdvantage(
 }
 
 /**
+ * Returns the rage damage bonus for a barbarian at a given character level.
+ * +2 at levels 1–8, +3 at levels 9–15, +4 at levels 16+.
+ */
+function getRageDamageBonus(level: number): number {
+	if (level >= 16) return 4;
+	if (level >= 9) return 3;
+	return 2;
+}
+
+/**
  * Resolve a full attack in combat.
  *
  * Determines ability (STR vs DEX for finesse), checks conditions on both
@@ -686,7 +696,11 @@ export function resolveAttack(
 	// Build damage dice string with magic bonus
 	const magicBonus = weapon.magicBonus ?? 0;
 	const abilityMod = abilityModifier(attacker.abilities[useAbility]);
-	const totalDamageMod = abilityMod + magicBonus;
+	// Rage damage bonus applies on melee attacks when the attacker is raging.
+	const rageBonus = (attacker.conditions?.includes('raging') && !weapon.range)
+		? getRageDamageBonus(attacker.level ?? 1)
+		: 0;
+	const totalDamageMod = abilityMod + magicBonus + rageBonus;
 	const modStr = totalDamageMod >= 0 ? `+${totalDamageMod}` : `${totalDamageMod}`;
 
 	// Parse base weapon damage dice to build the full notation

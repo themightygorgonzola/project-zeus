@@ -14,6 +14,7 @@ import { ulid } from 'ulid';
 import type { Location, NPC, Quest, QuestObjective, QuestObjectiveType, Item, GameState, GameId, EncounterTemplateTier } from '$lib/game/types';
 import type { PrototypeWorld } from '$lib/worldgen/prototype';
 import { getArmor, getGear, getWeapon } from '$lib/game/data';
+import { calcSettlementTravelPeriods } from '$lib/game/travel';
 
 // ---------------------------------------------------------------------------
 // Starting Location
@@ -23,35 +24,36 @@ import { getArmor, getGear, getWeapon } from '$lib/game/data';
  * Pick a suitable starting settlement from the world and create a Location
  * entity for the game state.
  *
- * Heuristic: prefer a mid-sized settlement (village/town) that isn't a capital.
- * Falls back to the first settlement if nothing else fits.
+ * Preference order: largest city first (most content, most NPCs, most quests).
+ * Falls back to largest town if no cities exist, then any settlement.
  */
 export function seedStartingLocation(world: PrototypeWorld): Location {
-	const candidates = world.politics.settlements
-		.filter((s) => s.group === 'village' || s.group === 'town')
-		.filter((s) => !s.capital);
+	const byPopDesc = (
+		a: PrototypeWorld['politics']['settlements'][0],
+		b: PrototypeWorld['politics']['settlements'][0]
+	) => b.population - a.population;
 
-	const pick = candidates.length > 0 ? candidates[0] : world.politics.settlements[0];
+	const cities = world.politics.settlements.filter((s) => s.group === 'city').sort(byPopDesc);
+	const towns  = world.politics.settlements.filter((s) => s.group === 'town').sort(byPopDesc);
+	const pick =
+		cities.length > 0 ? cities[0] :
+		towns.length  > 0 ? towns[0]  :
+		world.politics.settlements.slice().sort(byPopDesc)[0];
 
 	const ownerState = world.politics.states.find((s) => s.i === pick.state);
 	const culture = world.societies.cultures.find((c) => c.i === pick.culture);
-
-	const description = buildSettlementDescription(pick, ownerState, culture, world);
 
 	return {
 		id: ulid(),
 		name: pick.name,
 		regionRef: pick.i,
 		type: 'settlement',
-		description,
+		description: buildSettlementDescription(pick, ownerState, culture, world),
 		connections: [],
 		npcs: [],
-		features: [
-			`A ${pick.group} of about ${Math.round(pick.population * 1000).toLocaleString('en')} people.`,
-			ownerState ? `Under the rule of ${ownerState.fullName}.` : '',
-			culture ? `The locals follow ${culture.name} customs.` : ''
-		].filter(Boolean),
-		visited: true
+		features: buildSettlementFeatures(pick, ownerState, culture, world),
+		visited: true,
+		gatePolicy: pick.group === 'city' ? 'guarded-at-night' : pick.group === 'town' ? 'daytime-only' : 'none'
 	};
 }
 
@@ -61,31 +63,127 @@ function buildSettlementDescription(
 	culture: PrototypeWorld['societies']['cultures'][0] | undefined,
 	world: PrototypeWorld
 ): string {
-	const parts: string[] = [];
+	const { name, group, type } = settlement;
+	const stateName  = state?.fullName ?? 'unknown lands';
+	const cultureName = culture?.name ?? 'the local people';
+	const riverName   = world.geography.rivers[0]?.name;
+	const religion    = state ? world.societies.religions.find((r) => r.i === state.religion) : null;
+	const faithName   = religion?.name;
 
-	parts.push(`${settlement.name} is a ${settlement.group} nestled in the lands of ${state?.fullName ?? 'an unknown realm'}.`);
-
-	if (culture) {
-		parts.push(`Its people follow the traditions of the ${culture.name}.`);
-	}
-
-	// Find a nearby river
-	const nearbyRiver = world.geography.rivers[0];
-	if (nearbyRiver) {
-		parts.push(`The ${nearbyRiver.name} flows nearby.`);
-	}
-
-	// Mention any relevant religions
-	if (state) {
-		const religion = world.societies.religions.find((r) => r.i === state.religion);
-		if (religion) {
-			parts.push(`The ${religion.name} holds sway here.`);
+	// Terrain / approach line — varies with settlement type for sensory variety
+	const terrainLine: string = (() => {
+		switch (type) {
+			case 'River':
+				return riverName
+					? `The ${riverName} cuts along its edge, busy with flat-bottomed trading barges.`
+					: 'A slow river runs alongside it, carrying fishing boats and a well-worn ferry crossing.';
+			case 'Naval':
+				return 'Stone quays face the harbour mouth, stacked with cargo nets and smelling of salt and tar.';
+			case 'Highland':
+				return 'The approach road climbs steeply before the buildings appear — the settlement commands a long view of the valley below.';
+			default:
+				return `The main road from ${stateName} passes directly through its centre.`;
 		}
+	})();
+
+	switch (group) {
+		case 'hamlet':
+			return [
+				`${name} is a name on a map more than a place — a loose cluster of low-roofed buildings where the track widens briefly before narrowing again.`,
+				`A covered well marks the centre. There are no walls, no gates; a few dogs and the smell of woodsmoke are the only greeting.`,
+				terrainLine,
+				faithName ? `A small ${faithName} shrine stands near the well, its offering bowl worn smooth with years of use.` : ''
+			].filter(Boolean).join(' ');
+
+		case 'village':
+			return [
+				`${name} exists because the road stops here for the night.`,
+				`Timber-framed buildings line a main street that widens into a market square, where a well and a handful of regular stalls serve the surrounding farmland.`,
+				`A low wooden palisade marks the edge of things — more tradition than defence. The people here are ${cultureName} in custom and regard newcomers with polite caution.`,
+				terrainLine,
+				faithName ? `The local ${faithName} shrine is the largest building on the square, its door left open through the day.` : ''
+			].filter(Boolean).join(' ');
+
+		case 'town':
+			return [
+				`${name} has the look of a place that grew faster than it planned.`,
+				`Stone buildings crowd alongside older timber ones; the market square can hold a proper crowd on guild-day. An earthwork wall rings the trade district, its gates watched but open through daylight hours.`,
+				`${cultureName} customs govern trade and hospitality here — contracts mean something, and the tavern keeper knows everyone's business.`,
+				terrainLine,
+				faithName ? `The ${faithName} hall at the north end of the square doubles as meeting house and minor court.` : '',
+				state ? `${state.fullName} authority is visible in the banner above the main gate and the seal on every merchant's licence.` : ''
+			].filter(Boolean).join(' ');
+
+		case 'city':
+		default:
+			return [
+				`${name} rises behind stone walls — the outer curtain old and scarred, the inner gates flanked by guards who check papers at their leisure.`,
+				`Inside, the city arranges itself in layers: the merchant quarter nearest the gate, packed and loud with calling voices and rolling cart wheels; artisan lanes behind it smelling of smoke and leather and fresh bread; deeper still, the civic buildings of ${stateName} bristle with official seals and armed couriers.`,
+				terrainLine,
+				faithName ? `The towers of the ${faithName} catch the last light above the roofline, their bells marking the hours the rest of the city lives by.` : '',
+				`${cultureName} customs hold here — the old families know it, and newcomers are expected to learn.`
+			].filter(Boolean).join(' ');
+	}
+}
+
+/**
+ * Build the features array for a location.
+ * Uses architectural and cultural cues — never raw population counts.
+ * These features appear in the AI's CURRENT LOCATION prompt and on the map UI.
+ */
+function buildSettlementFeatures(
+	settlement: PrototypeWorld['politics']['settlements'][0],
+	state: PrototypeWorld['politics']['states'][0] | undefined,
+	culture: PrototypeWorld['societies']['cultures'][0] | undefined,
+	world: PrototypeWorld
+): string[] {
+	const { group, type } = settlement;
+	const riverName = world.geography.rivers[0]?.name;
+	const religion  = state ? world.societies.religions.find((r) => r.i === state.religion) : null;
+	const features: string[] = [];
+
+	// Physical scale cue — what a traveller notices, not a census
+	switch (group) {
+		case 'hamlet':
+			features.push('No walls or defences — buildings cluster around a central well.');
+			break;
+		case 'village':
+			features.push('Market square with a well; weekly stalls serving the surrounding farmland.');
+			features.push('Low wooden palisade marks the boundary — more custom than fortification.');
+			break;
+		case 'town':
+			features.push('Earthwork outer wall with watched gates, open through daylight hours.');
+			features.push('Market square large enough for guild days and seasonal fairs.');
+			break;
+		case 'city':
+			features.push('Stone curtain walls; outer gate checked by guards, inner gate locked at night.');
+			features.push('Multiple merchant, artisan, and civic districts within the walls.');
+			break;
 	}
 
-	parts.push(`It is a place where adventurers might find work, supplies, and rumors.`);
+	// Terrain / water feature
+	switch (type) {
+		case 'River':
+			features.push(
+				riverName
+					? `Waterfront district on the ${riverName}; trade barges dock through daylight hours.`
+					: 'River-facing docks used by fishing boats and trade traffic.'
+			);
+			break;
+		case 'Naval':
+			features.push('Harbour with stone quays; fishing and trade vessels moored regularly.');
+			break;
+		case 'Highland':
+			features.push('Commanding elevated position; steep approach road from the valley below.');
+			break;
+	}
 
-	return parts.join(' ');
+	// Authority and culture
+	if (state)    features.push(`Under ${state.fullName} authority.`);
+	if (culture)  features.push(`${culture.name} customs govern trade, contracts, and hospitality.`);
+	if (religion) features.push(`${religion.name} faith has a presence here — shrine, hall, or chapel depending on the settlement's means.`);
+
+	return features;
 }
 
 // ---------------------------------------------------------------------------
@@ -118,25 +216,22 @@ export function seedNearbyLocations(
 		.sort((a, b) => a.dist - b.dist)
 		.slice(0, maxCount);
 
-	return others.map(({ settlement }) => {
+	return others.map(({ settlement, dist }) => {
 		const ownerState = world.politics.states.find((s) => s.i === settlement.state);
 		const culture = world.societies.cultures.find((c) => c.i === settlement.culture);
-		const description = buildSettlementDescription(settlement, ownerState, culture, world);
 
 		const loc: Location = {
 			id: ulid(),
 			name: settlement.name,
 			regionRef: settlement.i,
 			type: 'settlement',
-			description,
+			description: buildSettlementDescription(settlement, ownerState, culture, world),
 			connections: [startLocation.id], // connected to start
 			npcs: [],
-			features: [
-				`A ${settlement.group} of about ${Math.round(settlement.population * 1000).toLocaleString('en')} people.`,
-				ownerState ? `Under the rule of ${ownerState.fullName}.` : '',
-				culture ? `The locals follow ${culture.name} customs.` : ''
-			].filter(Boolean),
-			visited: false
+			features: buildSettlementFeatures(settlement, ownerState, culture, world),
+			visited: false,
+			travelPeriods: calcSettlementTravelPeriods(dist),
+			gatePolicy: settlement.group === 'city' ? 'guarded-at-night' : settlement.group === 'town' ? 'daytime-only' : 'none'
 		};
 
 		return loc;
@@ -487,6 +582,8 @@ function generateNpcName(cultureName: string, _role: string): string {
 
 /**
  * Generate starting equipment for a character based on their class.
+ * @deprecated Superseded by `ClassDefinition.startingEquipment` + `resolveStartingEquipment()` in character-creation.ts.
+ * This function is no longer called; preserved for reference only.
  */
 export function starterEquipment(className: string): Item[] {
 	const items: Item[] = [];
@@ -537,7 +634,7 @@ export function starterEquipment(className: string): Item[] {
 			name,
 			category: 'armor',
 			armorName: def?.name ?? name.toLowerCase().replace(/\s+/g, '-'),
-			description: `A set of ${name.toLowerCase()}.`,
+			description: def?.name === 'shield' ? 'A singular shield, of wood and steel.' : `A suit of ${name.toLowerCase()}.`,
 			baseAC: def?.baseAC ?? 10,
 			magicBonus: 0,
 			equipped: false,

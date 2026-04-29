@@ -29,11 +29,11 @@ import type {
 import type { GameEvent } from '$lib/game/events';
 import type { PrototypeWorld } from '$lib/worldgen/prototype';
 import { canLevelUp, applyLevelUp } from '$lib/game/leveling';
-import { createEncounter, resolveEncounter, initEncounterTurnOrder, syncCombatantsFromState } from '$lib/game/combat';
-import { generateCreatureStatBlock, averagePartyLevel, parseCreatureTier } from '$lib/game/creature-templates';
+import { createEncounter, resolveEncounter, allDefeated, initEncounterTurnOrder, syncCombatantsFromState } from '$lib/game/combat';
+import { generateCreatureStatBlock, averagePartyLevel, parseCreatureTier, isStatBlockFlat, type CreatureTier } from '$lib/game/creature-templates';
 import { skillCheck, abilityCheck, savingThrow } from '$lib/game/mechanics';
 import { SKILL_ABILITY_MAP } from '$lib/game/types';
-import { advanceClockOnState } from '$lib/game/travel';
+import { advanceClockOnState, IDLE_TURNS_PER_PERIOD } from '$lib/game/travel';
 
 // ---------------------------------------------------------------------------
 // Public types (unchanged interface for existing callers)
@@ -749,6 +749,29 @@ export async function executeAdventureTurn(
 			}
 		}
 
+		// Guard: strip any still-empty encounterStarted that survived the merge.
+		// This catches engine travel templates that the AI failed to populate.
+		if (finalStateChanges.encounterStarted && !finalStateChanges.encounterStarted.creatures?.length) {
+			console.warn('[encounterMerge] encounterStarted.creatures is empty after merge — stripped (AI did not populate travel template)');
+			delete finalStateChanges.encounterStarted;
+		}
+
+		// Idle turn clock advance: every IDLE_TURNS_PER_PERIOD consecutive turns without
+		// travel or combat advances the clock one period (time passes during exploration).
+		if (currentState) {
+			if (finalStateChanges.clockAdvance) {
+				// Travel or combat already moved time — reset idle counter
+				currentState.idleTurnCount = 0;
+			} else {
+				currentState.idleTurnCount = (currentState.idleTurnCount ?? 0) + 1;
+				if (currentState.idleTurnCount >= IDLE_TURNS_PER_PERIOD) {
+					const idleClock = advanceClockOnState(currentState, 1);
+					currentState.idleTurnCount = 0;
+					finalStateChanges = { ...finalStateChanges, clockAdvance: idleClock.clockAdvance };
+				}
+			}
+		}
+
 		// Persist the turn and apply state changes
 		const finalResolvedTurn: ResolvedTurn = {
 			...resolvedTurn,
@@ -763,7 +786,7 @@ export async function executeAdventureTurn(
 		}
 
 		// Broadcast typed game events AFTER persistence
-		await broadcastTurnEvents(partyHost, payload.adventureId, finalResolvedTurn, narrativeText, turnNumber);
+		if (currentState) await broadcastTurnEvents(partyHost, payload.adventureId, finalResolvedTurn, narrativeText, turnNumber, currentState);
 
 		// ai:turn:end fires AFTER persistence + broadcast so the client can
 		// safely invalidateAll() immediately without a setTimeout race.
@@ -977,7 +1000,7 @@ export async function resolveCheckAndResume(
 		} : null;
 
 		await persistResolvedTurnAndState(payload, resolvedTurn, narrativeText, state, debugData);
-		await broadcastTurnEvents(partyHost, adventureId, resolvedTurn, narrativeText, turnNumber);
+		await broadcastTurnEvents(partyHost, adventureId, resolvedTurn, narrativeText, turnNumber, state);
 
 		return { narrativeText, model: profile.model };
 	} catch (cause) {
@@ -1010,7 +1033,8 @@ async function broadcastTurnEvents(
 	adventureId: string,
 	resolvedTurn: ResolvedTurn,
 	narrativeText: string,
-	turnNumber: number
+	turnNumber: number,
+	state: GameState
 ): Promise<void> {
 	const now = Date.now();
 
@@ -1084,6 +1108,28 @@ async function broadcastTurnEvents(
 		}
 	}
 
+	// Quest status update events
+	if (sc.questUpdates) {
+		for (const qu of sc.questUpdates) {
+			if (qu.field !== 'status') continue;
+			const newVal = qu.newValue as string;
+			const reason = newVal === 'active' ? 'accepted'
+				: newVal === 'completed' ? 'completed'
+				: newVal === 'failed' ? 'failed'
+				: null;
+			if (!reason) continue;
+			const quest = state.quests.find(q => q.id === qu.questId);
+			if (!quest) continue;
+			await broadcastGameEvent(host, adventureId, {
+				type: 'game:quest-update',
+				adventureId,
+				timestamp: now,
+				quest,
+				reason
+			});
+		}
+	}
+
 	// Combat start event
 	if (sc.encounterStarted) {
 		const enemies = (sc.encounterStarted.creatures ?? []).map(c => c.name);
@@ -1147,8 +1193,21 @@ export function mergeStateChanges(engine: StateChange, gm: StateChange): StateCh
 	return {
 		hpChanges: mergeUniqueByKey(engine.hpChanges, gm.hpChanges, (hc) => `${hc.characterId}|${hc.oldHp}|${hc.newHp}|${hc.reason ?? ''}`),
 		conditionsApplied: mergeUniqueByKey(engine.conditionsApplied, gm.conditionsApplied, (ca) => `${ca.characterId}|${ca.condition}|${ca.applied}`),
-		xpAwarded: mergeUniqueByKey(engine.xpAwarded, gm.xpAwarded, (xp) => `${xp.characterId}|${xp.amount}`),
-		goldChange: mergeUniqueByKey(engine.goldChange, gm.goldChange, (gc) => `${gc.characterId}|${gc.delta}|${gc.reason ?? ''}`),
+		xpAwarded: mergeUniqueByKey(engine.xpAwarded, gm.xpAwarded, (xp) => `${xp.characterId}|${xp.amount}|${xp.reason ?? ''}`),
+		goldChange: (() => {
+			// Strip GM gold entries whose (characterId, delta) matches an engine quest-reward
+			// distribution. Prevents double-payment when the AI narrates an NPC paying out
+			// a quest reward in the same turn the engine calls distributeQuestRewards.
+			const engineQuestRewardKeys = new Set(
+				(engine.goldChange ?? [])
+					.filter(gc => gc.reason?.startsWith('Quest reward:'))
+					.map(gc => `${gc.characterId}|${gc.delta}`)
+			);
+			const gmGoldFiltered = (gm.goldChange ?? []).filter(
+				gc => !engineQuestRewardKeys.has(`${gc.characterId}|${gc.delta}`)
+			);
+			return mergeUniqueByKey(engine.goldChange, gmGoldFiltered, (gc) => `${gc.characterId}|${gc.delta}|${gc.reason ?? ''}`);
+		})(),
 		locationChange: engine.locationChange ?? gm.locationChange,
 		questUpdates: mergeUniqueByKey(engine.questUpdates, gm.questUpdates, (qu) => `${qu.questId}|${qu.field}|${qu.objectiveId ?? ''}`),
 		npcChanges: mergeUniqueByKey(engine.npcChanges, gm.npcChanges, (nc) => `${nc.npcId}|${nc.field}`),
@@ -1169,7 +1228,14 @@ export function mergeStateChanges(engine: StateChange, gm: StateChange): StateCh
 		// Companion promotion
 		companionPromoted: engine.companionPromoted ?? gm.companionPromoted,
 		// Encounter lifecycle
-		encounterStarted: engine.encounterStarted ?? gm.encounterStarted,
+		// If the engine set an empty-template encounter (travel trigger), let the GM's
+		// populated creatures fill it. Without this, AI-supplied creatures are discarded.
+		encounterStarted: (() => {
+			const eng = engine.encounterStarted;
+			const gm_ = gm.encounterStarted;
+			if (eng && !eng.creatures?.length && gm_?.creatures?.length) return gm_;
+			return eng ?? gm_;
+		})(),
 		encounterEnded: engine.encounterEnded ?? gm.encounterEnded,
 		deathSaveResult: engine.deathSaveResult ?? gm.deathSaveResult,
 		deathSaveOutcome: engine.deathSaveOutcome ?? gm.deathSaveOutcome,
@@ -1398,6 +1464,45 @@ function resolveObjectiveId(raw: string, objectives: Array<{ id: string; text: s
 	return normalized;
 }
 
+// ---------------------------------------------------------------------------
+// Canonical weapon and armor stat maps (used during sanitizeStateChanges)
+// ---------------------------------------------------------------------------
+function normalizeWeaponKey(s: string): string {
+	return s.toLowerCase().replace(/[-_\s]+/g, '');
+}
+
+const CANONICAL_WEAPONS: Record<string, { damage: string; damageType: string; properties: string[] }> = {
+	dagger:        { damage: '1d4',  damageType: 'piercing',    properties: ['finesse', 'thrown', 'light'] },
+	longsword:     { damage: '1d8',  damageType: 'slashing',    properties: ['versatile'] },
+	shortsword:    { damage: '1d6',  damageType: 'piercing',    properties: ['finesse', 'light'] },
+	greatsword:    { damage: '2d6',  damageType: 'slashing',    properties: ['heavy', 'two-handed'] },
+	greataxe:      { damage: '1d12', damageType: 'slashing',    properties: ['heavy', 'two-handed'] },
+	handaxe:       { damage: '1d6',  damageType: 'slashing',    properties: ['thrown', 'light'] },
+	mace:          { damage: '1d6',  damageType: 'bludgeoning', properties: [] },
+	quarterstaff:  { damage: '1d6',  damageType: 'bludgeoning', properties: ['versatile'] },
+	rapier:        { damage: '1d8',  damageType: 'piercing',    properties: ['finesse'] },
+	spear:         { damage: '1d6',  damageType: 'piercing',    properties: ['thrown', 'versatile'] },
+	battleaxe:     { damage: '1d8',  damageType: 'slashing',    properties: ['versatile'] },
+	warhammer:     { damage: '1d8',  damageType: 'bludgeoning', properties: ['versatile'] },
+	flail:         { damage: '1d8',  damageType: 'bludgeoning', properties: [] },
+	glaive:        { damage: '1d10', damageType: 'slashing',    properties: ['heavy', 'reach', 'two-handed'] },
+	halberd:       { damage: '1d10', damageType: 'slashing',    properties: ['heavy', 'reach', 'two-handed'] },
+};
+
+const CANONICAL_ARMOR: Record<string, { baseAC: number }> = {
+	leather:        { baseAC: 11 },
+	studdedleather: { baseAC: 12 },
+	chainshirt:     { baseAC: 13 },
+	scalemail:      { baseAC: 14 },
+	breastplate:    { baseAC: 14 },
+	halfplate:      { baseAC: 15 },
+	ringmail:       { baseAC: 14 },
+	chainmail:      { baseAC: 16 },
+	splint:         { baseAC: 17 },
+	platearmor:     { baseAC: 18 },
+	plate:          { baseAC: 18 },
+};
+
 /**
  * Validate and sanitize the AI-produced stateChanges.
  * Strips entries with wrong types, logs warnings for each.
@@ -1474,7 +1579,13 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					console.warn(`[sanitize] conditionsApplied[${i}].characterId is not a non-empty string — stripped`);
 					return false;
 				}
-				ca.characterId = resolveEntityId(ca.characterId, state.characters, `conditionsApplied[${i}].characterId`);
+				// Resolve against characters first, then NPCs
+				const charResolved = resolveEntityId(ca.characterId, state.characters, `conditionsApplied[${i}].characterId`);
+				if (state.characters.find(c => c.id === charResolved)) {
+					ca.characterId = charResolved;
+				} else {
+					ca.characterId = resolveEntityId(ca.characterId, state.npcs, `conditionsApplied[${i}].characterId`);
+				}
 				if (!validConditions.has(ca.condition)) {
 					console.warn(`[sanitize] conditionsApplied[${i}].condition="${ca.condition}" is not a valid condition — stripped`);
 					return false;
@@ -1732,6 +1843,41 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 				if (item.category === 'ammunition') {
 					if (!Array.isArray(item.ammoFor)) item.ammoFor = [];
 				}
+				// Normalize canonical weapon stats (damage, damageType, properties)
+				if (item.category === 'weapon' && typeof item.weaponName === 'string') {
+					const exactKey = normalizeWeaponKey(item.weaponName as string);
+					// Fuzzy fallback: if exact key misses, try each word from last to first.
+					// Handles prefixed names like "Finely-crafted Dagger" → "dagger".
+					const canonical = CANONICAL_WEAPONS[exactKey] ?? (() => {
+						const words = (item.weaponName as string).toLowerCase().split(/[\s\-_,]+/).reverse();
+						for (const w of words) { if (CANONICAL_WEAPONS[w]) return CANONICAL_WEAPONS[w]; }
+						return undefined;
+					})();
+					if (canonical) {
+						if (item.damage !== canonical.damage) {
+							console.warn(`[sanitize] weapon "${item.weaponName as string}" damage normalized ${String(item.damage)} → ${canonical.damage}`);
+							item.damage = canonical.damage;
+						}
+						if (item.damageType !== canonical.damageType) item.damageType = canonical.damageType;
+						if (!Array.isArray(item.properties) || (item.properties as string[]).length === 0) {
+							item.properties = canonical.properties;
+						}
+					}
+				}
+				// Normalize canonical armor baseAC
+				if (item.category === 'armor') {
+					const exactArmorKey = normalizeWeaponKey(item.name as string);
+					// Fuzzy fallback for prefixed names like "Lightweight Leather Armor" → "leather".
+					const canonical = CANONICAL_ARMOR[exactArmorKey] ?? (() => {
+						const words = (item.name as string).toLowerCase().split(/[\s\-_,]+/).reverse();
+						for (const w of words) { if (CANONICAL_ARMOR[w]) return CANONICAL_ARMOR[w]; }
+						return undefined;
+					})();
+					if (canonical && item.baseAC !== canonical.baseAC) {
+						console.warn(`[sanitize] armor "${item.name as string}" baseAC normalized ${String(item.baseAC)} → ${canonical.baseAC}`);
+						item.baseAC = canonical.baseAC;
+					}
+				}
 				// B4: Dedup — skip if an item with the same name or weaponName already exists in inventory.
 				const targetChar = state.characters.find((c) => c.id === ig.characterId);
 				if (targetChar) {
@@ -1785,6 +1931,11 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 				const char = state.characters.find((c) => c.id === il.characterId);
 				if (char) {
 					il.itemId = resolveEntityId(il.itemId, char.inventory.map((item) => ({ id: item.id, name: item.name })), `itemsLost[${i}].itemId`);
+					// Guard: strip if item is not actually in the character's inventory
+					if (!char.inventory.some(inv => inv.id === il.itemId)) {
+						console.warn(`[sanitize] itemsLost references unknown itemId="${il.itemId}" (not in ${char.name}'s inventory) — stripped`);
+						return false;
+					}
 				}
 				if (typeof il.quantity !== 'number' || il.quantity < 1) {
 					il.quantity = 1;
@@ -1920,6 +2071,20 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 						console.warn(`[sanitize] encounterStarted.creatures[${i}].name is missing — stripped`);
 						return false;
 					}
+					// Guard: reject quest-givers, merchants, allies, and companions from hostile
+					// encounters. Prevents the AI from recycling a friendly NPC's id as a combatant
+					// (e.g., reusing Captain Arlen's id as an enemy commander).
+					const existingNpc = state.npcs.find(n => n.id === cr.id);
+					if (existingNpc && (
+						existingNpc.role === 'quest-giver' ||
+						existingNpc.role === 'merchant' ||
+						existingNpc.role === 'ally' ||
+						existingNpc.role === 'companion' ||
+						existingNpc.disposition >= 0
+					)) {
+						console.warn(`[sanitize] encounterStarted.creatures[${i}] id="${cr.id}" matches friendly NPC "${existingNpc.name}" (role: ${existingNpc.role}) — stripped to protect quest-giver`);
+						return false;
+					}
 					if (typeof cr.role !== 'string') cr.role = 'hostile';
 					if (typeof cr.disposition !== 'number') cr.disposition = -100;
 					if (typeof cr.description !== 'string') cr.description = cr.name;
@@ -1935,6 +2100,13 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 				// strip encounterEnded — encounterStarted takes priority.
 				if (sc.encounterEnded) {
 					console.warn('[sanitize] encounterStarted + encounterEnded in same response — encounterEnded stripped (encounters should span multiple turns)');
+				}
+
+				// Guard: empty creatures array is never valid — an encounter with no combatants
+				// breaks the entire encounter system downstream.
+				if (validCreatures.length === 0) {
+					console.warn('[sanitize] encounterStarted.creatures is empty (0 valid entries) — stripped');
+					// fall through: neither branch below sets clean.encounterStarted
 				}
 
 				// Content-based gating: require explicit combat evidence in the narrative
@@ -1960,7 +2132,25 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 	// --- encounterEnded (only if no encounterStarted in same response) ---
 	if (sc.encounterEnded && !sc.encounterStarted) {
 		if (typeof sc.encounterEnded === 'object' && sc.encounterEnded) {
-			clean.encounterEnded = sc.encounterEnded;
+			const proposedOutcome = sc.encounterEnded.outcome ?? 'victory';
+			if (proposedOutcome === 'victory' && state.activeEncounter) {
+				// Reject premature victory: if any NPC combatant still has HP > 0 and is not
+				// marked defeated, the AI is declaring victory too early. Strip the field and
+				// let the auto-close logic in persistResolvedTurnAndState handle it once HP
+				// changes are actually applied.
+				const hasLivingEnemies = state.activeEncounter.combatants.some(
+					(c) => c.type === 'npc' && !c.defeated && (c.currentHp ?? 1) > 0
+				);
+				if (hasLivingEnemies) {
+					console.warn(
+						'[sanitize] encounterEnded: victory rejected — living NPC combatants still present; auto-close will handle it'
+					);
+				} else {
+					clean.encounterEnded = sc.encounterEnded;
+				}
+			} else {
+				clean.encounterEnded = sc.encounterEnded;
+			}
 		}
 	}
 
@@ -1987,6 +2177,15 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 				}
 				if (typeof npc.disposition !== 'number') npc.disposition = 0;
 				if (typeof npc.description !== 'string') npc.description = npc.name;
+				// Reject duplicate: same name (case-insensitive) at the same location
+				if (state.npcs.some(n =>
+					n.alive !== false &&
+					n.name.toLowerCase() === npc.name.toLowerCase() &&
+					n.locationId === npc.locationId
+				)) {
+					console.warn(`[sanitize] npcsAdded[${i}] NPC "${npc.name}" already exists at location "${npc.locationId}" — stripped`);
+					return false;
+				}
 				return true;
 			});
 			if (clean.npcsAdded.length === 0) delete clean.npcsAdded;
@@ -2036,14 +2235,40 @@ export function sanitizeStateChanges(sc: StateChange, state: GameState, narrativ
 					return false;
 				}
 				if (typeof q.description !== 'string') q.description = q.name;
+				// Sanitize status — only 'available' and 'active' are permitted on new quests
+				if (q.status !== undefined && q.status !== 'available' && q.status !== 'active') {
+					console.warn(`[sanitize] questsAdded[${i}] "${q.name}" has invalid status="${q.status}" — forcing available`);
+					q.status = 'available';
+				}
 				if (typeof q.giverNpcId === 'string' && q.giverNpcId) {
 					q.giverNpcId = resolveEntityId(q.giverNpcId, npcRefs, `questsAdded[${i}].giverNpcId`);
+					// Validate resolved giverNpcId exists (or is being added in this same response)
+					if (!state.npcs.some(n => n.id === q.giverNpcId) && !sc.npcsAdded?.some(n => n.id === q.giverNpcId)) {
+						console.warn(`[sanitize] questsAdded[${i}] "${q.name}" giverNpcId="${q.giverNpcId}" not found in state — set to null`);
+						q.giverNpcId = null;
+					}
 				}
 					if (!Array.isArray(q.objectives)) q.objectives = [];
 				// Enforce at least one objective — zero-objective quests can never auto-complete
 				if (q.objectives.length === 0) {
 					console.warn(`[sanitize] questsAdded[${i}] "${q.name}" has no objectives — injecting default`);
 					q.objectives.push({ id: `obj-${q.id}-1`, text: `Complete: ${q.name}` });
+				}
+				// Duplicate quest guard: reject if same giver already has a quest with high
+				// name/description word-overlap (prevents near-identical quests from same NPC).
+				if (q.giverNpcId) {
+					const STOP_WORDS = new Set(['the','a','an','of','in','for','to','and','or','from','with']);
+					const sigWords = (str: string): string[] =>
+						str.toLowerCase().split(/\W+/).filter(w => w.length > 3 && !STOP_WORDS.has(w));
+					const qWords = new Set(sigWords(`${q.name} ${q.description ?? ''}`));
+					const isDuplicate = state.quests.some(existing =>
+						existing.giverNpcId === q.giverNpcId &&
+						sigWords(`${existing.name} ${existing.description ?? ''}`).filter(w => qWords.has(w)).length >= 2
+					);
+					if (isDuplicate) {
+						console.warn(`[sanitize] questsAdded[${i}] "${q.name}" duplicates existing quest from same giver — stripped`);
+						return false;
+					}
 				}
 				return true;
 			});
@@ -2271,15 +2496,86 @@ async function persistResolvedTurnAndState(
 		syncCombatantsFromState(state, state.activeEncounter);
 	}
 
+	// Auto-close encounter if all enemies are defeated but the GM forgot to emit encounterEnded.
+	// Handles full-gm-2pass turns where the AI narrated a victory without including encounterEnded
+	// in the state-extraction JSON. Must run AFTER syncCombatantsFromState (so defeated flags are fresh)
+	// and AFTER applyGMStateChanges (so a GM-supplied encounterEnded is not double-processed).
+	if (state.activeEncounter && !resolvedTurn.stateChanges.encounterEnded) {
+		if (allDefeated(state, state.activeEncounter, 'npc')) {
+			console.log('[autoClose] All enemies defeated — auto-closing encounter as victory');
+
+			// Mirror the victory path in applyGMStateChanges: mark all non-companion enemy NPCs
+			// as dead and record each change so the turn log has an accurate audit trail.
+			for (const combatant of state.activeEncounter.combatants) {
+				if (combatant.type === 'npc') {
+					const npc = state.npcs.find((n) => n.id === combatant.referenceId);
+					if (npc && npc.role !== 'companion') {
+						combatant.defeated = true;
+						if (npc.alive !== false) {
+							npc.alive = false;
+							if (npc.statBlock) npc.statBlock.hp = 0;
+							if (npc.conditions?.length) npc.conditions = [];
+							if (!resolvedTurn.stateChanges.npcChanges) resolvedTurn.stateChanges.npcChanges = [];
+							resolvedTurn.stateChanges.npcChanges.push({ npcId: npc.id, field: 'alive', oldValue: true, newValue: false });
+						}
+					}
+				}
+			}
+
+			// Compute XP awards via the encounter resolver
+			const encounterNpcIds = state.activeEncounter.combatants
+				.filter((c) => c.type === 'npc')
+				.map((c) => c.referenceId);
+			const encounterNpcs = state.npcs.filter((n) => encounterNpcIds.includes(n.id));
+			const partySize = state.characters.length;
+			const resolution = resolveEncounter(state, state.activeEncounter, 'victory', encounterNpcs, partySize);
+
+			// Apply XP to characters and surface awards in the turn record
+			if (resolution.stateChange.xpAwarded) {
+				for (const award of resolution.stateChange.xpAwarded) {
+					const char = state.characters.find((c) => c.id === award.characterId);
+					if (char) char.xp += award.amount;
+				}
+				if (!resolvedTurn.stateChanges.xpAwarded) resolvedTurn.stateChanges.xpAwarded = [];
+				resolvedTurn.stateChanges.xpAwarded.push(...resolution.stateChange.xpAwarded);
+			}
+
+			// Emit encounterEnded so it appears in the persisted turn record
+			resolvedTurn.stateChanges.encounterEnded = { outcome: 'victory' };
+
+			// Auto-advance clock: 1 period per 3 rounds, minimum 1
+			const combatRounds = state.activeEncounter.round ?? 1;
+			const combatPeriods = Math.max(1, Math.floor(combatRounds / 3));
+			const combatClock = advanceClockOnState(state, combatPeriods);
+			if (!resolvedTurn.stateChanges.clockAdvance) resolvedTurn.stateChanges.clockAdvance = combatClock.clockAdvance;
+
+			// Rage ends when combat ends — clear raging condition from all characters
+			for (const char of state.characters) {
+				char.conditions = char.conditions.filter(c => c !== 'raging');
+			}
+			state.activeEncounter = undefined;
+		}
+	}
+
 	// Trigger periodic world reaction every 5 turns
 	if (turnNumber > 0 && turnNumber % 5 === 0) {
 		enrichmentIntents.push({ type: 'react-to-party' });
 	}
 
-	// Update lastInteractionTurn for NPCs mentioned by name in the narrative
+	// Update lastInteractionTurn for NPCs mentioned by name in the narrative.
+	// Scoped to NPCs at the party's current location — prevents distant NPCs
+	// that are merely referenced in lore or backstory from getting their
+	// interaction timestamp bumped incorrectly (fixes BUG-13).
 	if (narrativeText) {
 		const narrativeLower = narrativeText.toLowerCase();
+		// Collect NPCs already updated this turn via state changes (don't double-touch).
+		const alreadyUpdatedThisTurn = new Set<string>(
+			state.npcs.filter((n) => n.lastInteractionTurn === turnNumber).map((n) => n.id)
+		);
 		for (const npc of state.npcs) {
+			if (alreadyUpdatedThisTurn.has(npc.id)) continue;
+			// Only update NPCs physically present at the party's location.
+			if (npc.locationId !== state.partyLocationId) continue;
 			const nameLower = npc.name.toLowerCase();
 			const firstName = npc.name.split(/\s+/)[0].toLowerCase();
 			if (narrativeLower.includes(nameLower) || (firstName.length >= 3 && narrativeLower.includes(firstName))) {
@@ -2374,6 +2670,13 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 				alive: true,
 				lastInteractionTurn: turnNumber
 			};
+			// Fill flat stat blocks for hostile/boss NPCs so encounter combatants get meaningful stats
+			if ((npc.role === 'hostile' || npc.role === 'boss') && isStatBlockFlat(npcData.statBlock)) {
+				const tier: CreatureTier = npc.role === 'boss' ? 'boss' : 'normal';
+				npc.statBlock = generateCreatureStatBlock(npc.name, tier, averagePartyLevel(state.characters));
+			} else if (npcData.statBlock) {
+				npc.statBlock = npcData.statBlock;
+			}
 			state.npcs.push(npc);
 		}
 	}
@@ -2416,7 +2719,7 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 				name: qData.name,
 				description: qData.description,
 				giverNpcId: qData.giverNpcId ?? null,
-				status: 'available',
+				status: (qData as Record<string, unknown>).status === 'active' ? 'active' : 'available',
 				objectives: qData.objectives.map((o) => ({
 					id: o.id,
 					text: o.text,
@@ -2432,8 +2735,19 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 					reputationChanges: qData.giverNpcId ? [{ npcId: qData.giverNpcId, delta: 10 }] : []
 				},
 				recommendedLevel: qData.recommendedLevel ?? 1,
-				encounterTemplates: []
+				encounterTemplates: [],
+				failureConsequence: qData.failureConsequence,
+				deadline: qData.deadline,
+				followUpQuestIds: qData.followUpQuestIds,
+				prerequisiteQuestIds: qData.prerequisiteQuestIds
 			};
+			// BUG-02/15 guard: if the AI emitted empty rewards ({xp:0,gold:0}), apply a
+			// level-appropriate XP floor so distributeQuestRewards always has something to
+			// distribute when the quest completes.
+			if (quest.rewards.xp === 0 && quest.rewards.gold === 0) {
+				quest.rewards.xp = Math.max(50, (quest.recommendedLevel ?? 1) * 100);
+				console.warn(`[questsAdded] "${quest.name}" had empty rewards (xp=0,gold=0) — auto-set xp=${quest.rewards.xp}`);
+			}
 			state.quests.push(quest);
 		}
 	}
@@ -2448,6 +2762,10 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 			const char = state.characters.find((c) => c.id === hc.characterId);
 			if (char) {
 				char.hp = Math.max(0, Math.min(hc.newHp, char.maxHp));
+				// Auto-clear unconscious when character is restored to positive HP.
+				if (char.hp > 0 && char.conditions.includes('unconscious')) {
+					char.conditions = char.conditions.filter(c => c !== 'unconscious');
+				}
 			} else {
 				// May be an encounter combatant (NPC). Update combatant HP directly.
 				const combatant = state.activeEncounter?.combatants.find((c) => c.id === hc.characterId);
@@ -2460,7 +2778,10 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 					const npc = state.npcs.find((n) => n.id === combatant.referenceId || n.id === combatant.id);
 					if (npc) {
 						if (npc.statBlock) npc.statBlock.hp = combatant.currentHp;
-						if (defeated) npc.alive = false;
+						if (defeated) {
+							npc.alive = false;
+							if (npc.conditions?.length) npc.conditions = [];
+						}
 					}
 				} else {
 					console.warn(`[applyGMStateChanges] hpChange references unknown characterId="${hc.characterId}" — skipped`);
@@ -2469,7 +2790,7 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 		}
 	}
 
-	// Conditions (validate characterId)
+	// Conditions (validate characterId — applies to both PCs and NPCs)
 	if (changes.conditionsApplied) {
 		for (const ca of changes.conditionsApplied) {
 			const char = state.characters.find((c) => c.id === ca.characterId);
@@ -2480,7 +2801,17 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 					char.conditions = char.conditions.filter((c) => c !== ca.condition);
 				}
 			} else {
-				console.warn(`[applyGMStateChanges] conditionsApplied references unknown characterId="${ca.characterId}" — skipped`);
+				const npc = state.npcs.find((n) => n.id === ca.characterId);
+				if (npc) {
+					if (!npc.conditions) npc.conditions = [];
+					if (ca.applied && !npc.conditions.includes(ca.condition)) {
+						npc.conditions.push(ca.condition);
+					} else if (!ca.applied) {
+						npc.conditions = npc.conditions.filter((c) => c !== ca.condition);
+					}
+				} else {
+					console.warn(`[applyGMStateChanges] conditionsApplied references unknown characterId="${ca.characterId}" — skipped`);
+				}
 			}
 		}
 	}
@@ -2571,9 +2902,34 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 				}
 				const previousStatus = quest.status;
 				quest.status = qu.newValue as typeof quest.status;
+
+				// Store how the quest was resolved
+				if (qu.completionMethod) {
+					quest.completionMethod = qu.completionMethod;
+				}
+
 				// Quest reward auto-distribution on manual completion
 				if (previousStatus !== 'completed' && quest.status === 'completed') {
 					distributeQuestRewards(state, quest, changes);
+					// Activate follow-up quests
+					if (quest.followUpQuestIds) {
+						for (const fid of quest.followUpQuestIds) {
+							const followUp = state.quests.find((q) => q.id === fid);
+							if (followUp && followUp.status === 'available') {
+								// Already available; eligibility is correct
+							} else if (followUp && followUp.status !== 'active' && followUp.status !== 'completed') {
+								followUp.status = 'available';
+							}
+						}
+					}
+				}
+
+				// Emit failure scene fact so world state reflects consequence
+				if (previousStatus !== 'failed' && quest.status === 'failed') {
+					if (quest.failureConsequence) {
+						if (!changes.sceneFactsAdded) changes.sceneFactsAdded = [];
+						changes.sceneFactsAdded.push(`Quest "${quest.name}" failed: ${quest.failureConsequence}`);
+					}
 				}
 			} else if (qu.field === 'objective' && qu.objectiveId) {
 				const obj = quest.objectives.find((o) => o.id === qu.objectiveId);
@@ -2592,6 +2948,15 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 					quest.status = 'completed';
 					// Distribute quest rewards to all party characters
 					distributeQuestRewards(state, quest, changes);
+					// Activate follow-up quests
+					if (quest.followUpQuestIds) {
+						for (const fid of quest.followUpQuestIds) {
+							const followUp = state.quests.find((q) => q.id === fid);
+							if (followUp && followUp.status !== 'active' && followUp.status !== 'completed') {
+								followUp.status = 'available';
+							}
+						}
+					}
 					// Trigger follow-up quest generation
 					enrichmentIntents.push({ type: 'extend-quest-arc', questId: quest.id });
 				}
@@ -2627,10 +2992,10 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 			}
 			if (nc.field === 'alive' && typeof nc.newValue === 'boolean') {
 				npc.alive = nc.newValue;
-				// When killing an NPC, also zero out statBlock.hp so that
-				// syncCombatantsFromState correctly marks the combatant as defeated.
-				if (!nc.newValue && npc.statBlock) {
-					npc.statBlock.hp = 0;
+				// When killing an NPC, also zero out statBlock.hp and clear conditions.
+				if (!nc.newValue) {
+					if (npc.statBlock) npc.statBlock.hp = 0;
+					npc.conditions = [];
 				}
 			}
 			// Companion HP tracking — apply HP changes to the NPC's stat block
@@ -2653,6 +3018,20 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 	// Clock advance
 	if (changes.clockAdvance) {
 		state.clock = changes.clockAdvance.to;
+	}
+
+	// Feature uses (Rage, Channel Divinity, Bardic Inspiration, etc.)
+	if (changes.featureUsed) {
+		const char = state.characters.find(c => c.id === changes.featureUsed!.characterId);
+		if (char?.featureUses) {
+			const entry = char.featureUses[changes.featureUsed.feature];
+			if (entry && entry.current > 0) entry.current--;
+		}
+		// When Rage activates, enter the raging condition so downstream mechanics fire
+		// (rage damage bonus in resolveAttack, resistance in turn-executor).
+		if (changes.featureUsed.feature === 'Rage' && char && !char.conditions.includes('raging')) {
+			char.conditions.push('raging');
+		}
 	}
 
 	// Items gained (validate characterId)
@@ -2873,11 +3252,17 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 			(n) => n.alive && n.role === 'companion' && n.locationId === state.partyLocationId && n.statBlock
 		);
 
-		// Use the combat engine to roll initiative and build the encounter
+		// Use the combat engine to roll initiative and build the encounter.
+		// Guard: skip creation if there are no combatants — an empty encounter
+		// would leave state.activeEncounter set with no enemies to fight.
 		const allCombatCreatures = [...hostileNpcs, ...companionNpcs];
-		const { encounter } = createEncounter(state, allCombatCreatures);
-		initEncounterTurnOrder(state, encounter, state.npcs);
-		state.activeEncounter = encounter;
+		if (allCombatCreatures.length === 0) {
+			console.warn('[applyGMStateChanges] encounterStarted produced no valid combatants — encounter creation skipped');
+		} else {
+			const { encounter } = createEncounter(state, allCombatCreatures);
+			initEncounterTurnOrder(state, encounter, state.npcs);
+			state.activeEncounter = encounter;
+		}
 	}
 
 	// Encounter ended — resolve XP and clear the active encounter
@@ -2901,6 +3286,7 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 						if (npc.alive !== false) {
 							npc.alive = false;
 							if (npc.statBlock) npc.statBlock.hp = 0;
+							if (npc.conditions?.length) npc.conditions = [];
 							if (!changes.npcChanges) changes.npcChanges = [];
 							changes.npcChanges.push({ npcId: npc.id, field: 'alive', oldValue: true, newValue: false });
 						}
@@ -2932,6 +3318,10 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 		const combatClock = advanceClockOnState(state, combatPeriods);
 		if (!changes.clockAdvance) changes.clockAdvance = combatClock.clockAdvance;
 
+		// Rage ends when combat ends — clear raging condition from all characters
+		for (const char of state.characters) {
+			char.conditions = char.conditions.filter(c => c !== 'raging');
+		}
 		state.activeEncounter = undefined;
 	}
 
@@ -3023,7 +3413,7 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 			switch (obj.type) {
 				case 'talk-to': {
 					const npc = state.npcs.find(n => n.id === obj.linkedEntityId);
-					if (npc && npc.lastInteractionTurn !== undefined && npc.lastInteractionTurn >= 0) {
+					if (npc && npc.alive !== false && npc.lastInteractionTurn === turnNumber) {
 						completed = true;
 					}
 					break;
@@ -3062,11 +3452,19 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 
 		// If objectives changed, check for quest auto-completion
 		if (anyObjectiveChanged && quest.objectives.length > 0 && quest.objectives.every(o => o.done)) {
-			if (quest.status !== 'completed') {
-				quest.status = 'completed';
-				distributeQuestRewards(state, quest, changes);
-				enrichmentIntents.push({ type: 'extend-quest-arc', questId: quest.id });
+			// At this point quest.status is narrowed to 'active' | 'available' by the loop guard above
+			quest.status = 'completed';
+			distributeQuestRewards(state, quest, changes);
+			// Activate follow-up quests
+			if (quest.followUpQuestIds) {
+				for (const fid of quest.followUpQuestIds) {
+					const followUp = state.quests.find((q) => q.id === fid);
+					if (followUp && followUp.status !== 'active' && followUp.status !== 'completed') {
+						followUp.status = 'available';
+					}
+				}
 			}
+			enrichmentIntents.push({ type: 'extend-quest-arc', questId: quest.id });
 		}
 
 		// Auto-activate available quests when the player interacts with the giver
@@ -3076,6 +3474,26 @@ function applyGMStateChanges(state: GameState, changes: StateChange, turnNumber:
 				quest.status = 'active';
 			}
 		}
+	}
+
+	// -----------------------------------------------------------------------
+	// Deadline enforcement — auto-fail active quests whose deadline has passed.
+	// Runs after all other changes so the clock is up-to-date for this turn.
+	// -----------------------------------------------------------------------
+	for (const quest of state.quests) {
+		if (quest.status !== 'active') continue;
+		if (!quest.deadline) continue;
+		if (state.clock.day <= quest.deadline.day) continue;
+
+		quest.status = 'failed';
+		quest.completionMethod = 'expired';
+
+		// Emit a scene fact so consequences persist in world memory
+		const consequenceFact = quest.failureConsequence
+			? `Quest "${quest.name}" expired (Day ${quest.deadline.day}): ${quest.failureConsequence}`
+			: `Quest "${quest.name}" expired without completion (deadline was Day ${quest.deadline.day})`;
+		if (!changes.sceneFactsAdded) changes.sceneFactsAdded = [];
+		changes.sceneFactsAdded.push(consequenceFact);
 	}
 
 	return enrichmentIntents;
@@ -3104,7 +3522,7 @@ function distributeQuestRewards(state: GameState, quest: Quest, changes?: StateC
 			// Surface quest XP in the turn record for audit trail
 			if (changes) {
 				if (!changes.xpAwarded) changes.xpAwarded = [];
-				changes.xpAwarded.push({ characterId: char.id, amount: rewards.xp });
+				changes.xpAwarded.push({ characterId: char.id, amount: rewards.xp, reason: `Quest: ${quest.name}` });
 			}
 		}
 	}

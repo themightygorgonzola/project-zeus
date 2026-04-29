@@ -14,6 +14,7 @@ import { loadGameState, saveGameState, loadRecentTurns } from '$lib/game/state';
 import { expandSettlement, extendQuestArc, reactToPartyHistory, type EnrichmentOptions } from '../lib/server/ai/world-enrichment';
 import { notifyRoom } from '../lib/server/ai/party';
 import type { GameId, StateChange, NPC, Location, Quest } from '$lib/game/types';
+import { generateCreatureStatBlock, isStatBlockFlat, averagePartyLevel, type CreatureTier } from '$lib/game/creature-templates';
 import type { EnrichmentCompleteEvent, NpcDiscoveredEvent, LocationDiscoveredEvent, QuestDiscoveredEvent } from '$lib/game/events';
 
 // ---------------------------------------------------------------------------
@@ -116,11 +117,11 @@ async function broadcastEnrichmentEvents(
  * Mirrors the applyGMStateChanges logic from adventure-turn.ts but
  * operates on the subset of changes world enrichment can produce.
  */
-function applyEnrichmentChanges(state: { npcs: NPC[]; locations: Location[]; quests: Quest[] }, changes: StateChange): void {
+function applyEnrichmentChanges(state: { npcs: NPC[]; locations: Location[]; quests: Quest[] }, changes: StateChange, partyLevel = 3): void {
 	if (changes.npcsAdded) {
 		for (const npcData of changes.npcsAdded) {
 			if (state.npcs.some((n) => n.id === npcData.id)) continue;
-			state.npcs.push({
+			const newNpc: NPC = {
 				id: npcData.id,
 				name: npcData.name,
 				role: npcData.role,
@@ -129,7 +130,15 @@ function applyEnrichmentChanges(state: { npcs: NPC[]; locations: Location[]; que
 				description: npcData.description,
 				notes: npcData.notes ?? '',
 				alive: true
-			});
+			};
+			// Fill flat stat blocks for hostile/boss NPCs with archetype-scaled values
+			if ((newNpc.role === 'hostile' || newNpc.role === 'boss') && isStatBlockFlat(npcData.statBlock)) {
+				const tier: CreatureTier = newNpc.role === 'boss' ? 'boss' : 'normal';
+				newNpc.statBlock = generateCreatureStatBlock(newNpc.name, tier, partyLevel);
+			} else if (npcData.statBlock) {
+				newNpc.statBlock = npcData.statBlock;
+			}
+			state.npcs.push(newNpc);
 		}
 	}
 
@@ -169,7 +178,11 @@ function applyEnrichmentChanges(state: { npcs: NPC[]; locations: Location[]; que
 				objectives: qData.objectives.map((o) => ({ id: o.id, text: o.text, done: false })),
 				rewards: { xp: 0, gold: 0, items: [], reputationChanges: [] },
 				recommendedLevel: qData.recommendedLevel ?? 1,
-				encounterTemplates: []
+				encounterTemplates: [],
+				failureConsequence: qData.failureConsequence,
+				deadline: qData.deadline,
+				followUpQuestIds: qData.followUpQuestIds,
+				prerequisiteQuestIds: qData.prerequisiteQuestIds
 			});
 		}
 	}
@@ -205,7 +218,7 @@ export const expandSettlementTask = task({
 		const result = await expandSettlement(state, locationId, enrichmentOptions);
 		if (!result.success) return result;
 
-		applyEnrichmentChanges(state, result.stateChanges);
+		applyEnrichmentChanges(state, result.stateChanges, averagePartyLevel(state.characters));
 		state.updatedAt = Date.now();
 		await saveGameState(adventureId, state);
 
@@ -229,7 +242,23 @@ export const extendQuestArcTask = task({
 		const result = await extendQuestArc(state, questId, enrichmentOptions);
 		if (!result.success) return result;
 
-		applyEnrichmentChanges(state, result.stateChanges);
+		applyEnrichmentChanges(state, result.stateChanges, averagePartyLevel(state.characters));
+
+		// Phase 5 quest chain wiring: link newly generated quests back to the
+		// source quest's followUpQuestIds so the chain is browsable both ways.
+		if (result.stateChanges.questsAdded && result.stateChanges.questsAdded.length > 0) {
+			const sourceQuest = state.quests.find((q) => q.id === questId);
+			if (sourceQuest) {
+				const newIds = result.stateChanges.questsAdded.map((q) => q.id);
+				if (!sourceQuest.followUpQuestIds) sourceQuest.followUpQuestIds = [];
+				for (const newId of newIds) {
+					if (!sourceQuest.followUpQuestIds.includes(newId)) {
+						sourceQuest.followUpQuestIds.push(newId);
+					}
+				}
+			}
+		}
+
 		state.updatedAt = Date.now();
 		await saveGameState(adventureId, state);
 
@@ -254,7 +283,7 @@ export const reactToPartyHistoryTask = task({
 		const result = await reactToPartyHistory(state, recentTurns, enrichmentOptions);
 		if (!result.success) return result;
 
-		applyEnrichmentChanges(state, result.stateChanges);
+		applyEnrichmentChanges(state, result.stateChanges, averagePartyLevel(state.characters));
 		state.updatedAt = Date.now();
 		await saveGameState(adventureId, state);
 

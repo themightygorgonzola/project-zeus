@@ -13,6 +13,7 @@ import type {
 	WeaponItem,
 	ArmorItem,
 	ConsumableItem,
+	ContainerItem,
 	GameId
 } from './types';
 import { hasClass } from './types';
@@ -368,6 +369,16 @@ export function addItemToInventory(
 	const newInventory = character.inventory.map((i) => ({ ...i }));
 
 	// Try to stack with existing item of same name and category
+	// Containers are never stacked — each is a distinct object with its own contents.
+	if (item.category === 'container') {
+		const newItem = { ...item, id: item.id || ulid() } as Item;
+		return {
+			character: { ...character, inventory: [...newInventory, newItem] },
+			itemId: newItem.id,
+			stacked: false
+		};
+	}
+
 	const existing = newInventory.find(
 		(i) => i.name === item.name && i.category === item.category
 	);
@@ -614,4 +625,83 @@ export function getEquippedShield(character: PlayerCharacter): ArmorItem | undef
  */
 export function findItem(character: PlayerCharacter, itemId: GameId): Item | undefined {
 	return character.inventory.find((i) => i.id === itemId);
+}
+
+// ---------------------------------------------------------------------------
+// Container helpers
+// ---------------------------------------------------------------------------
+
+/** Type guard: returns true and narrows to ContainerItem when item is a container. */
+export function isContainer(item: Item): item is ContainerItem {
+	return item.category === 'container';
+}
+
+/**
+ * Add an item into a container's contents list.
+ * Returns a new character with the updated container; does not remove the item from
+ * the top-level inventory (callers should do that separately if needed).
+ */
+export function addItemToContainer(
+	character: PlayerCharacter,
+	containerId: GameId,
+	item: Item
+): { success: true; character: PlayerCharacter } | { success: false; reason: string; character: PlayerCharacter } {
+	const idx = character.inventory.findIndex((i) => i.id === containerId);
+	if (idx === -1) return { success: false, reason: 'Container not found.', character };
+	const container = character.inventory[idx];
+	if (!isContainer(container)) return { success: false, reason: 'Item is not a container.', character };
+
+	const { maxSlots } = container.capacity;
+	if (maxSlots !== undefined && container.contents.length >= maxSlots) {
+		return { success: false, reason: 'Container is full.', character };
+	}
+
+	const updatedContainer: ContainerItem = {
+		...container,
+		contents: [...container.contents, item]
+	};
+	const newInventory = character.inventory.map((i) => (i.id === containerId ? updatedContainer : i));
+	return { success: true, character: { ...character, inventory: newInventory } };
+}
+
+/**
+ * Remove an item by ID from a container's contents list.
+ */
+export function removeItemFromContainer(
+	character: PlayerCharacter,
+	containerId: GameId,
+	itemId: GameId
+): { success: true; character: PlayerCharacter; item: Item } | { success: false; reason: string; character: PlayerCharacter } {
+	const container = character.inventory.find((i) => i.id === containerId);
+	if (!container || !isContainer(container)) {
+		return { success: false, reason: 'Container not found.', character };
+	}
+	const target = container.contents.find((i) => i.id === itemId);
+	if (!target) return { success: false, reason: 'Item not found in container.', character };
+
+	const updatedContainer: ContainerItem = {
+		...container,
+		contents: container.contents.filter((i) => i.id !== itemId)
+	};
+	const newInventory = character.inventory.map((i) => (i.id === containerId ? updatedContainer : i));
+	return { success: true, character: { ...character, inventory: newInventory }, item: target };
+}
+
+/**
+ * Returns all items across the top-level inventory and inside any containers.
+ * Useful for searching or displaying a flattened item list.
+ */
+export function getAllInventoryItems(character: PlayerCharacter): Item[] {
+	const result: Item[] = [];
+	function pushItems(items: Item[]) {
+		for (const item of items) {
+			result.push(item);
+			if (isContainer(item)) pushItems(item.contents);
+		}
+	}
+	for (const item of character.inventory) {
+		result.push(item);
+		if (isContainer(item)) pushItems(item.contents);
+	}
+	return result;
 }

@@ -48,24 +48,28 @@ export const ENCOUNTER_CHANCE: Record<LocationType, number> = {
 
 /**
  * Travel time in periods between location type pairs.
- * Key format: "from→to" (alphabetically ordered pair for symmetry).
+ * Key format: "from→to".
+ *
+ * 5 periods = 1 full day (dawn → morning → afternoon → dusk → night).
+ * These are fallback values — Location.travelPeriods overrides these for
+ * seeded settlement routes where real map distance is known.
  */
 export const TRAVEL_TIME: Record<string, number> = {
-	// settlement ↔ settlement = half day (2-3 periods)
-	'settlement→settlement': 3,
-	// settlement ↔ wilderness = quarter day (1-2 periods)
-	'settlement→wilderness': 2,
-	'wilderness→settlement': 2,
-	// settlement ↔ road
-	'settlement→road': 1,
-	'road→settlement': 1,
-	// road ↔ wilderness
-	'road→wilderness': 2,
-	'wilderness→road': 2,
-	// road ↔ road
-	'road→road': 2,
-	// wilderness ↔ wilderness
-	'wilderness→wilderness': 3,
+	// settlement ↔ settlement: fallback for AI-invented locations (~1 day)
+	'settlement→settlement': 5,
+	// settlement ↔ wilderness: edge of town to the tree line (a couple hours)
+	'settlement→wilderness': 1,
+	'wilderness→settlement': 1,
+	// settlement ↔ road: road within the settlement (instant)
+	'settlement→road': 0,
+	'road→settlement': 0,
+	// road ↔ wilderness: stepping off the road
+	'road→wilderness': 1,
+	'wilderness→road': 1,
+	// road ↔ road: following a road
+	'road→road': 1,
+	// wilderness ↔ wilderness: cross-country travel (half a day)
+	'wilderness→wilderness': 2,
 	// dungeon transitions = 1 period
 	'dungeon→dungeon': 1,
 	'settlement→dungeon': 1,
@@ -74,12 +78,12 @@ export const TRAVEL_TIME: Record<string, number> = {
 	'dungeon→settlement': 1,
 	'dungeon→road': 1,
 	'dungeon→wilderness': 1,
-	// interior transitions = 1 period
-	'interior→interior': 1,
-	'settlement→interior': 1,
-	'interior→settlement': 1,
-	'road→interior': 1,
-	'interior→road': 1,
+	// interior transitions: stepping indoors is instant; wilderness requires travel
+	'interior→interior': 0,
+	'settlement→interior': 0,
+	'interior→settlement': 0,
+	'road→interior': 0,
+	'interior→road': 0,
 	'wilderness→interior': 1,
 	'interior→wilderness': 1,
 	'dungeon→interior': 1,
@@ -92,7 +96,26 @@ const DEFAULT_TRAVEL_PERIODS = 2;
 /** Storm travel time multiplier. */
 export const STORM_TRAVEL_MULTIPLIER = 1.5;
 
-/** Biome weather weight tables: each biome maps to weighted weather chances. */
+/**
+ * Number of consecutive idle turns (no travel or combat) that elapse before
+ * the in-game clock automatically advances one period.
+ * Represents time passing during conversation, shopping, and local exploration.
+ */
+export const IDLE_TURNS_PER_PERIOD = 4;
+
+/**
+ * Pre-compute settlement-to-settlement travel periods from worldgen coordinate distance.
+ * Called by world-bridge at world-seed time to store distance-accurate travel costs.
+ *
+ * Coordinate space is roughly 0–3432 × 0–1308 units.
+ */
+export function calcSettlementTravelPeriods(distUnits: number): number {
+	if (distUnits <  150) return  2; // nearby — a few hours
+	if (distUnits <  400) return  5; // ~1 day
+	if (distUnits <  900) return 10; // ~2 days
+	if (distUnits < 1800) return 15; // ~3 days
+	return 20;                       // remote — 4+ days
+}
 export const BIOME_WEATHER: Record<string, readonly WeatherType[]> = {
 	// Each entry is a flat distribution — pick randomly from the array.
 	// Repeated entries increase probability of that weather.
@@ -143,6 +166,10 @@ export interface TravelResult {
 	weatherGenerated: boolean;
 	/** Random encounter result, if any. */
 	encounter: RandomEncounterResult | null;
+	/** True if the destination gate was sealed and entry was blocked (no movement occurred). */
+	gateSealed?: boolean;
+	/** True if guards challenged entry at the gate (travel succeeded, roleplay required). */
+	gateChallenge?: boolean;
 }
 
 export interface RandomEncounterResult {
@@ -479,8 +506,30 @@ export function travelBetween(
 		};
 	}
 
-	// Calculate travel time
-	const periods = getTravelTime(from.type, to.type, state.clock.weather);
+	// Gate policy: enforce access restrictions by time of day
+	if (to.gatePolicy === 'daytime-only') {
+		if (state.clock.timeOfDay === 'dusk' || state.clock.timeOfDay === 'night') {
+			return {
+				success: false,
+				reason: `The gates of ${to.name} are sealed at dusk and will not reopen until dawn.`,
+				stateChanges: {},
+				periodsElapsed: 0,
+				newClock: { ...state.clock },
+				weatherGenerated: false,
+				encounter: null,
+				gateSealed: true
+			};
+		}
+	}
+	const gateChallenge = to.gatePolicy === 'guarded-at-night' && state.clock.timeOfDay === 'night';
+
+	// Calculate travel time: prefer pre-computed distance-based value if available
+	const basePeriods = to.travelPeriods !== undefined
+		? to.travelPeriods
+		: (TRAVEL_TIME[`${from.type}→${to.type}`] ?? DEFAULT_TRAVEL_PERIODS);
+	const periods = state.clock.weather === 'storm'
+		? Math.ceil(basePeriods * STORM_TRAVEL_MULTIPLIER)
+		: basePeriods;
 
 	// Advance clock
 	const clockFrom = { ...state.clock };
@@ -516,7 +565,8 @@ export function travelBetween(
 		periodsElapsed: periods,
 		newClock: clockTo,
 		weatherGenerated: true,
-		encounter
+		encounter,
+		gateChallenge
 	};
 }
 

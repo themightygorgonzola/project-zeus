@@ -165,6 +165,10 @@ const CREATURE_KEYWORDS: Array<{ pattern: RegExp; attacks: AttackFlavour[] }> = 
 	{ pattern: /\bgnome\b/i, attacks: [{ name: 'Dagger', damageType: 'piercing' }, { name: 'Light Crossbow', damageType: 'piercing', range: '80/320 ft.' }] },
 	{ pattern: /\btiefling\b/i, attacks: [{ name: 'Scimitar', damageType: 'slashing' }, { name: 'Hellish Rebuke', damageType: 'fire', range: '60 ft.' }] },
 	{ pattern: /\bdragonborn\b/i, attacks: [{ name: 'Greataxe', damageType: 'slashing' }, { name: 'Breath Weapon', damageType: 'fire', range: '15 ft. cone' }] },
+
+	// Generic unknown beast fallback — catches any creature not matched above (e.g. "Corrupted Beast", "Shadowed Monster")
+	// Gives claw + bite as universal wild-animal attacks so stat blocks are never empty
+	{ pattern: /\bbeast\b|\bmonster\b|\bcreature\b|\bfiend\b|\bentity\b/i, attacks: [{ name: 'Claw', damageType: 'slashing' }, { name: 'Bite', damageType: 'piercing' }] },
 ];
 
 /** Default attacks when no keyword matches. */
@@ -228,6 +232,11 @@ function generateAbilities(name: string, cr: number): AbilityScores {
 	} else if (/wolf|snake|rat|bandit|guard|soldier|skeleton|zombie/i.test(lower)) {
 		abilities.str += 2;
 		abilities.dex += 2;
+	} else if (/\bbeast\b|\bmonster\b|\bcreature\b|\bentity\b/i.test(lower)) {
+		// Generic unknown creature — assume physically powerful
+		abilities.str += 3;
+		abilities.con += 2;
+		abilities.dex = Math.max(8, abilities.dex - 1);
 	}
 
 	// Clamp all scores to [1, 30]
@@ -490,4 +499,15 @@ export function parseCreatureTier(value: unknown): CreatureTier {
 		return value as CreatureTier;
 	}
 	return 'normal';
+}
+
+/**
+ * Returns true when a stat block is "flat" — all ability scores are absent or
+ * all equal to 10 (the all-10s default indicating the AI generated no
+ * meaningful stats). Used to detect NPCs that need archetype-scaled values.
+ */
+export function isStatBlockFlat(sb?: CreatureStatBlock): boolean {
+	if (!sb?.abilities) return true;
+	const { str, dex, con, int, wis, cha } = sb.abilities;
+	return [str, dex, con, int, wis, cha].every(s => !s || s === 10);
 }
