@@ -16,6 +16,7 @@ import type {
 	ClassSpellList,
 	ContainerItem,
 	ContainerType,
+	MiscItem,
 	PlayerCharacter,
 	SkillName,
 	WeaponItem
@@ -1244,6 +1245,43 @@ function resolveStartingEquipment(input: CharacterCreateInput, backgroundEquipme
 		}
 	}
 
+	// ── Auto-equip: clothing — always wear something ──────────────────────
+	{
+		const clothingItems = allBuilt.filter(
+			i => i.category === 'misc' && (i as MiscItem).tags?.includes('clothing')
+		) as (MiscItem & { equipped?: boolean })[];
+
+		if (clothingItems.length === 0) {
+			// No clothing found — inject Common Clothes, already equipped
+			const cd = CLOTHING_ITEM_DATA['common clothes'];
+			const commons: MiscItem & { equipped: boolean; isStartingEquipment: true } = {
+				id: ulid(),
+				name: 'Common Clothes',
+				category: 'misc',
+				description: cd.description,
+				tags: ['clothing'],
+				value: cd.value,
+				quantity: 1,
+				weight: cd.weight,
+				spaceTaken: computeSpaceTaken('Common Clothes', cd.weight),
+				rarity: 'common',
+				attunement: false,
+				equipped: true,
+				isStartingEquipment: true,
+			};
+			allBuilt.push(commons);
+		} else {
+			// Equip the highest-ranked clothing; leave the rest unequipped (route to backpack)
+			const sorted = [...clothingItems].sort((a, b) => {
+				const rankA = CLOTHING_ITEM_DATA[a.name.toLowerCase()]?.rank ?? 2;
+				const rankB = CLOTHING_ITEM_DATA[b.name.toLowerCase()]?.rank ?? 2;
+				return rankB - rankA;
+			});
+			for (const c of sorted) (c as { equipped?: boolean }).equipped = false;
+			(sorted[0] as { equipped?: boolean }).equipped = true;
+		}
+	}
+
 	// Build set of pack-origin item IDs BEFORE starting Pass 2
 	const packOriginItemIds = new Set<string>(
 		[...packOriginIndices].map(idx => allBuilt[idx]?.id).filter((id): id is string => Boolean(id))
@@ -1314,6 +1352,24 @@ function resolveStartingEquipment(input: CharacterCreateInput, backgroundEquipme
 	];
 }
 
+/** Clothing items recognised by display name; used by itemFromLabel to build proper misc items. */
+const CLOTHING_ITEM_DATA: Record<string, { weight: number; value: number; description: string; rank: number }> = {
+	'vestments':                        { weight: 3, value: 1,   rank: 6, description: 'Priestly garments of religious service, worn by acolytes and clergy during worship and travel.' },
+	'priest vestments':                  { weight: 3, value: 1,   rank: 6, description: 'Priestly garments of religious service, worn by acolytes and clergy during worship and travel.' },
+	'fine clothes':                      { weight: 6, value: 15,  rank: 5, description: 'Elegant clothing befitting a noble — tailored doublet, silk shirt, tailored trousers, buckled shoes, and a matching cloak.' },
+	'noble clothes':                     { weight: 6, value: 15,  rank: 5, description: 'Finely tailored noble attire — doublet, silk shirt, and matching accessories appropriate to a person of high station.' },
+	"traveler's clothes":                { weight: 4, value: 2,   rank: 4, description: 'Durable clothing designed for long journeys — reinforced stitching, practical pockets, and weather-resistant fabric.' },
+	'travelers clothes':                 { weight: 4, value: 2,   rank: 4, description: 'Durable clothing designed for long journeys — reinforced stitching, practical pockets, and weather-resistant fabric.' },
+	'robes':                             { weight: 4, value: 1,   rank: 3, description: 'Long flowing robes commonly worn by scholars, wizards, and clergy.' },
+	'costume':                           { weight: 4, value: 5,   rank: 3, description: 'Theatrical costume clothing suitable for a performer or someone adopting a persona.' },
+	'2 costumes':                        { weight: 8, value: 10,  rank: 3, description: 'Two sets of theatrical costume clothing, suitable for performance or disguise.' },
+	'costume clothes':                   { weight: 4, value: 5,   rank: 3, description: 'Theatrical costume clothing suitable for a performer or someone adopting a persona.' },
+	'dark common clothes':               { weight: 3, value: 1,   rank: 3, description: 'Common clothing dyed dark for discretion — ideal for moving unseen in the shadows of alleys and rooftops.' },
+	'dark common clothes with a hood':   { weight: 3, value: 1,   rank: 3, description: 'Common clothing dyed dark, with a hood for concealment — standard working attire for thieves and spies.' },
+	'dark clothes':                      { weight: 3, value: 1,   rank: 3, description: 'Dark-colored common clothing suited for discretion and moving unseen.' },
+	'common clothes':                    { weight: 3, value: 0.5, rank: 2, description: 'Simple, comfortable clothing suitable for everyday wear — a tunic, trousers or skirt, and a pair of boots.' },
+};
+
 /** Maps lowercase container names to their ContainerType. More specific entries must come first. */
 const CONTAINER_NAME_MAP: Array<[string, ContainerType, number]> = [
 	// [normalised label, ContainerType, weight in lbs]
@@ -1338,6 +1394,25 @@ function itemFromLabel(label: string, equipPrimary = false): PlayerCharacter['in
 
 	// Detect containers before weapon/gear lookup
 	const normBase = baseName.toLowerCase().replace(/^an?\s+/, '').trim();
+
+	// Detect clothing before everything else
+	const clothingInfo = CLOTHING_ITEM_DATA[normBase];
+	if (clothingInfo) {
+		return {
+			id: ulid(),
+			name: baseName,
+			category: 'misc',
+			description: clothingInfo.description,
+			tags: ['clothing'],
+			value: clothingInfo.value,
+			quantity,
+			weight: clothingInfo.weight,
+			spaceTaken: computeSpaceTaken(baseName, clothingInfo.weight),
+			rarity: 'common',
+			attunement: false,
+			equipped: false,
+		} as MiscItem & { equipped: boolean };
+	}
 	for (const [key, containerType, weightLbs] of CONTAINER_NAME_MAP) {
 		if (normBase === key) {
 			const defaults = CONTAINER_DEFAULTS[containerType];
@@ -1494,12 +1569,12 @@ function itemFromLabel(label: string, equipPrimary = false): PlayerCharacter['in
 		id: ulid(),
 		name: label,
 		category: 'misc',
-		description: `Starting equipment: ${label}.`,
+		description: `A personal item carried as starting equipment: ${label}.`,
 		notes: undefined,
 		tags: ['starting-equipment'],
 		value: 0,
 		quantity,
-		weight: 0,
+		weight: 0.1,
 		spaceTaken: 0.5,
 		rarity: 'common',
 		attunement: false

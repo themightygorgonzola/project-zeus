@@ -146,8 +146,17 @@
 		return pc.classes.map(c => fmt(c.name)).join(' / ');
 	}
 
-	function otherProficiencies(pc: PlayerCharacter): string[] {
-		return [...(pc.armorProficiencies ?? []), ...(pc.weaponProficiencies ?? []), ...(pc.toolProficiencies ?? [])];
+	const SIMPLE_WEAPON_NAMES = new Set(['club','dagger','greatclub','handaxe','javelin','light-hammer','mace','quarterstaff','sickle','spear','dart','light-crossbow','shortbow','sling','unarmed']);
+	const MARTIAL_WEAPON_NAMES = new Set(['battleaxe','flail','glaive','greataxe','greatsword','halberd','lance','longsword','maul','morningstar','pike','rapier','scimitar','shortsword','trident','war-pick','warhammer','whip','blowgun','hand-crossbow','heavy-crossbow','longbow','net']);
+
+	function dedupedWeaponProfs(profs: string[]): string[] {
+		const hasSimple = profs.includes('simple');
+		const hasMartial = profs.includes('martial');
+		return profs.filter(p => {
+			if (hasSimple && SIMPLE_WEAPON_NAMES.has(p)) return false;
+			if (hasMartial && MARTIAL_WEAPON_NAMES.has(p)) return false;
+			return true;
+		});
 	}
 
 	function hasNonPactSlots(pc: PlayerCharacter): boolean {
@@ -497,12 +506,67 @@
 	};
 
 	const PROF_DISPLAY: Record<string, string> = {
-		'light':   'Light Armor',
-		'medium':  'Medium Armor',
-		'heavy':   'Heavy Armor',
-		'unarmed': 'Unarmed Strikes',
-		'simple':  'Simple Weapons',
-		'martial': 'Martial Weapons',
+		// Armor
+		'light':              'Light Armor',
+		'medium':             'Medium Armor',
+		'heavy':              'Heavy Armor',
+		'shields':            'Shields',
+		// Weapons (broad)
+		'unarmed':            'Unarmed Strikes',
+		'simple':             'Simple Weapons',
+		'martial':            'Martial Weapons',
+		// Individual simple weapons
+		'club':               'Club',
+		'dagger':             'Dagger',
+		'greatclub':          'Greatclub',
+		'handaxe':            'Handaxe',
+		'javelin':            'Javelin',
+		'light-hammer':       'Light Hammer',
+		'mace':               'Mace',
+		'quarterstaff':       'Quarterstaff',
+		'sickle':             'Sickle',
+		'spear':              'Spear',
+		'dart':               'Dart',
+		'light-crossbow':     'Light Crossbow',
+		'shortbow':           'Shortbow',
+		'sling':              'Sling',
+		// Individual martial weapons
+		'battleaxe':          'Battleaxe',
+		'flail':              'Flail',
+		'glaive':             'Glaive',
+		'greataxe':           'Greataxe',
+		'greatsword':         'Greatsword',
+		'halberd':            'Halberd',
+		'lance':              'Lance',
+		'longsword':          'Longsword',
+		'maul':               'Maul',
+		'morningstar':        'Morningstar',
+		'pike':               'Pike',
+		'rapier':             'Rapier',
+		'scimitar':           'Scimitar',
+		'shortsword':         'Shortsword',
+		'trident':            'Trident',
+		'war-pick':           'War Pick',
+		'warhammer':          'Warhammer',
+		'whip':               'Whip',
+		'blowgun':            'Blowgun',
+		'hand-crossbow':      'Hand Crossbow',
+		'heavy-crossbow':     'Heavy Crossbow',
+		'longbow':            'Longbow',
+		'net':                'Net',
+		// Tools
+		'thieves-tools':      "Thieves' Tools",
+		'disguise-kit':       'Disguise Kit',
+		'forgery-kit':        'Forgery Kit',
+		'herbalism-kit':      'Herbalism Kit',
+		'artisan-tools':      "Artisan's Tools",
+		'gaming-set':         'Gaming Set',
+		'navigator-tools':    "Navigator's Tools",
+		'poisoners-kit':      "Poisoner's Kit",
+		'musical-instrument': 'Musical Instruments',
+		// Vehicles
+		'vehicles-land':      'Land Vehicles',
+		'vehicles-water':     'Water Vessels',
 	};
 
 	const PROF_TOOLTIPS: Record<string, string> = {
@@ -517,10 +581,25 @@
 		'herbalism kit':        'You have proficiency with an Herbalism Kit. You can identify plants and herbs, prepare antitoxins, and craft basic healing poultices and salves.',
 		"alchemist's supplies": "You have proficiency with Alchemist's Supplies. You can identify alchemical substances and craft items such as acid, alchemist's fire, and antitoxins.",
 		"navigator's tools":    "You have proficiency with Navigator's Tools — compass, sextant, and charts. You can plot a course at sea or through unmarked wilderness without getting lost.",
+		'navigator-tools':      "You have proficiency with Navigator's Tools — compass, sextant, and charts. You can plot a course at sea or through unmarked wilderness without getting lost.",
 		'disguise kit':         'You have proficiency with a Disguise Kit. Using clothing, makeup, and props, you can convincingly alter your appearance to impersonate others or conceal your identity.',
+		'disguise-kit':         'You have proficiency with a Disguise Kit. Using clothing, makeup, and props, you can convincingly alter your appearance to impersonate others or conceal your identity.',
 		'forgery kit':          'You have proficiency with a Forgery Kit. You can create convincing duplicates of handwritten documents, forge official seals, and replicate signatures.',
+		'forgery-kit':          'You have proficiency with a Forgery Kit. You can create convincing duplicates of handwritten documents, forge official seals, and replicate signatures.',
 		"poisoner's kit":       "You have proficiency with a Poisoner's Kit. You can safely identify, prepare, and apply poisons without accidental self-harm.",
+		'poisoners-kit':        "You have proficiency with a Poisoner's Kit. You can safely identify, prepare, and apply poisons without accidental self-harm.",
 		'gaming set':           'You have proficiency with a Gaming Set. You understand the rules and strategies of one or more games of skill or chance, letting you compete without disadvantage.',
+		'gaming-set':           'You have proficiency with a Gaming Set — dice, cards, or other competitive play. You understand the rules and strategies, letting you compete without disadvantage.',
+		'herbalism-kit':        'You have proficiency with an Herbalism Kit. You can identify plants and herbs, prepare antitoxins, and craft basic healing poultices and salves.',
+		'artisan-tools':        "You have proficiency with Artisan's Tools appropriate to your craft. You can create, repair, and appraise items related to your trade, and your knowledge lends advantage to related ability checks.",
+		'thieves-tools':        "You have proficiency with Thieves' Tools — picks, tension rods, and other instruments of subtle craft. You can pick locks and disarm traps that would stop an unpracticed hand.",
+		'musical-instrument':   'You have proficiency with one or more Musical Instruments. You can play with enough skill to earn coin, entertain an audience, and use the instrument as a bardic focus if applicable.',
+		'vehicles-land':        'You have proficiency with Land Vehicles. You can pilot horses, wagons, chariots, and other ground-based conveyances confidently, even in difficult conditions or under pressure.',
+		'vehicles-water':       'You have proficiency with Water Vessels. You can pilot and navigate sailing ships, galleys, rowboats, and other watercraft, reading currents and tides with ease.',
+		'hand-crossbow':        'You have specific proficiency with the Hand Crossbow — a compact one-handed ranged weapon favored by rogues, on top of any broader weapon proficiency.',
+		'longsword':            'You have specific proficiency with the Longsword — a versatile martial blade, on top of any broader weapon proficiency.',
+		'rapier':               'You have specific proficiency with the Rapier — a light, finesse-based martial weapon ideal for dexterous combatants.',
+		'shortsword':           'You have specific proficiency with the Shortsword — a light, finesse martial weapon favored by quick-strike fighters and rogues.',
 	};
 
 	const LANG_TOOLTIPS: Record<string, string> = {
@@ -888,12 +967,36 @@
 						</div>
 					</div>
 
-					<!-- Other Proficiencies -->
-					{#if otherProficiencies(pc).length > 0}
+					<!-- Proficiencies: Armor -->
+					{#if (pc.armorProficiencies?.length ?? 0) > 0}
 						<div class="section-block">
-							<span class="section-title">Other Proficiencies</span>
+							<span class="section-title">Armor Proficiencies</span>
 							<div class="pill-row">
-								{#each otherProficiencies(pc) as prof}
+								{#each pc.armorProficiencies as prof}
+									<span class="info-pill" title={profTooltip(prof)}>{profDisplay(prof)}</span>
+								{/each}
+							</div>
+						</div>
+					{/if}
+
+					<!-- Proficiencies: Weapons -->
+					{#if dedupedWeaponProfs(pc.weaponProficiencies ?? []).length > 0}
+						<div class="section-block">
+							<span class="section-title">Weapon Proficiencies</span>
+							<div class="pill-row">
+								{#each dedupedWeaponProfs(pc.weaponProficiencies ?? []) as prof}
+									<span class="info-pill" title={profTooltip(prof)}>{profDisplay(prof)}</span>
+								{/each}
+							</div>
+						</div>
+					{/if}
+
+					<!-- Proficiencies: Tools & Vehicles -->
+					{#if (pc.toolProficiencies?.length ?? 0) > 0}
+						<div class="section-block">
+							<span class="section-title">Tools &amp; Vehicles</span>
+							<div class="pill-row">
+								{#each pc.toolProficiencies as prof}
 									<span class="info-pill" title={profTooltip(prof)}>{profDisplay(prof)}</span>
 								{/each}
 							</div>

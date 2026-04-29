@@ -394,6 +394,8 @@ export interface MiscItem extends BaseItem {
 	category: 'misc';
 	notes?: string;
 	tags?: string[];
+	/** True when this misc item (e.g. clothing) is currently worn/equipped. */
+	equipped?: boolean;
 }
 
 export interface AmmunitionItem extends BaseItem {
