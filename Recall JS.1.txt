@@ -7424,3 +7424,127 @@ GROUP 55 — FEATS TAB + AUTO-QUIVER FOR RANGED CHARACTERS
 
   Files changed: src/lib/components/JournalPanel.svelte
                  src/lib/game/character-creation.ts
+
+================================================================================
+GROUP 56 — PROFICIENCY SECTIONS + CLOTHING AUTO-EQUIP + URCHIN TOKEN + VESTMENTS
+================================================================================
+
+--- PROFICIENCY SUBDIVISION IN ADVENTURE STATUS PANEL ---
+
+  File: src/lib/components/JournalPanel.svelte
+
+  Replaced the single "Other Proficiencies" section with three distinct sections:
+
+  1. ARMOR PROFICIENCIES — uses pc.armorProficiencies
+     Displays: Light Armor, Medium Armor, Heavy Armor, Shields
+
+  2. WEAPON PROFICIENCIES — uses pc.weaponProficiencies with deduplication
+     Deduplication: if 'simple' is present, all individual simple weapon names
+     are hidden; if 'martial' is present, all individual martial weapon names
+     are hidden. This prevents redundant entries for classes like Rogue that
+     list both 'simple' and then specific individual weapons.
+
+     SIMPLE_WEAPON_NAMES set: club, dagger, greatclub, handaxe, javelin,
+       light-hammer, mace, quarterstaff, sickle, spear, dart, light-crossbow,
+       shortbow, sling, unarmed
+     MARTIAL_WEAPON_NAMES set: battleaxe, flail, glaive, greataxe, greatsword,
+       halberd, lance, longsword, maul, morningstar, pike, rapier, scimitar,
+       shortsword, trident, war-pick, warhammer, whip, blowgun, hand-crossbow,
+       heavy-crossbow, longbow, net
+
+     dedupedWeaponProfs() function added to filter the proficiency list.
+
+  3. TOOLS & VEHICLES — uses pc.toolProficiencies
+     Displays: thieves' tools, herbalism kit, artisan's tools, musical instruments,
+     navigator's tools, disguise kit, forgery kit, poisoner's kit, gaming sets,
+     Land Vehicles, Water Vessels.
+
+  PROF_DISPLAY expanded from 6 to ~50 entries covering all individual weapon
+  names, all tool/kit keys, and vehicle types.
+
+  PROF_TOOLTIPS expanded to include tooltips for all new PROF_DISPLAY keys.
+
+  "Vehicles Land" renamed to "Land Vehicles" game-wide:
+    - PROF_DISPLAY key 'vehicles-land' now maps to 'Land Vehicles'
+    - PROF_TOOLTIPS entry for 'vehicles-land' updated accordingly
+
+--- MISCITEM EQUIPPED FIELD ---
+
+  File: src/lib/game/types.ts
+
+  Added optional field to MiscItem interface:
+    equipped?: boolean;
+  Allows clothing and other wearable misc items to be tracked as
+  worn/equipped vs stored in backpack.
+
+--- CLOTHING AUTO-EQUIP SYSTEM ---
+
+  File: src/lib/game/character-creation.ts
+
+  New constant: CLOTHING_ITEM_DATA
+    Placed before CONTAINER_NAME_MAP. Maps lowercase clothing names to:
+      { weight, value (gp), description, rank }
+    Rank determines priority when choosing which set to auto-equip:
+      Rank 6: vestments, priest vestments
+      Rank 5: fine clothes, noble clothes
+      Rank 4: traveler's clothes, travelers clothes
+      Rank 3: robes, costume, 2 costumes, costume clothes, dark common clothes,
+               dark common clothes with a hood, dark clothes
+      Rank 2: common clothes (fallback default)
+
+  itemFromLabel() modification:
+    At the TOP of itemFromLabel (before container check), normalises baseName
+    to lowercase and checks against CLOTHING_ITEM_DATA. If matched, returns
+    a MiscItem with:
+      category: 'misc', tags: ['clothing'], equipped: false
+      + correct weight, value, description, and spaceTaken from CLOTHING_ITEM_DATA
+
+  Auto-equip block added after the weapon auto-equip block, before Pass 2:
+    - Finds all items in allBuilt where category === 'misc' and tags includes 'clothing'
+    - If NONE found: injects a new 'Common Clothes' item with equipped: true
+    - If found: sorts by rank (highest first); sets sorted[0].equipped = true,
+      all others equipped: false. Unequipped clothing routes to backpack via Pass 2.
+
+  Misc fallback updated:
+    - description: 'A personal item carried as starting equipment: .'
+      (was: 'Starting equipment: .')
+    - weight: 0.1 (was: 0)
+
+--- URCHIN BACKGROUND: TOKEN ITEM ---
+
+  File: src/lib/game/data/backgrounds.ts
+
+  The urchin background has a 'parentToken' choice. Previously this created
+  a fixed item named "Token to Remember Your Parents By" regardless of input.
+
+  New behaviour:
+    - itemNameTemplate: '{parentToken}' — item is named exactly what the player
+      typed (e.g. "Worn Pearl", "Cracked Locket", "Faded Portrait")
+    - description (from misc fallback): 'A personal item carried as starting
+      equipment: <typed name>.'
+    - prompt updated to ask for the item name (max 6 words) rather than a description
+    - placeholder: 'e.g. Worn Pearl, Cracked Locket...'
+
+--- VESTMENTS (ACOLYTE BACKGROUND) ---
+
+  No change to backgrounds.ts required. The acolyte background always included
+  'Vestments' as equipment. With the new CLOTHING_ITEM_DATA system, calling
+  itemFromLabel('Vestments') now creates a proper MiscItem with:
+    weight: 3, value: 1 gp, rank: 6
+    tags: ['clothing']
+    description: 'Priestly garments of religious service worn by acolytes and
+      clergy during worship and travel.'
+  Auto-equip selects vestments over common clothes due to higher rank.
+  Common clothes (also in the acolyte kit) goes to backpack.
+
+--- RESULTS ---
+  TypeScript: 0 new errors introduced
+    JournalPanel.svelte   : 0 errors (fixed duplicate 'shields' key in PROF_TOOLTIPS)
+    types.ts              : 0 errors
+    character-creation.ts : 0 errors
+    backgrounds.ts        : 0 errors
+
+  Files changed: src/lib/components/JournalPanel.svelte
+                 src/lib/game/types.ts
+                 src/lib/game/character-creation.ts
+                 src/lib/game/data/backgrounds.ts

@@ -178,12 +178,15 @@ export const CONTAINER_DEFAULTS: Record<ContainerType, ContainerDefaults> = {
 		]
 	},
 	quiver: {
-		maxWU: 2,
+		// A quiver is purpose-built for arrows and bolts – they stack vertically
+		// and are body-supported, so WU and SU are heavily discounted inside one.
+		// 100 arrows (5×20 bundles = 7.5 raw WU) → only 0.75 effective WU at ×0.1.
+		maxWU: 10,
 		maxSU: 20,
 		discounts: [
-			{ category: 'ammunition', wuMultiplier: 1.0, suMultiplier: 0.5 },
-			{ nameMatch: 'arrow', wuMultiplier: 1.0, suMultiplier: 0.5 },
-			{ nameMatch: 'bolt', wuMultiplier: 1.0, suMultiplier: 0.5 }
+			{ category: 'ammunition', wuMultiplier: 0.1, suMultiplier: 0.05 },
+			{ nameMatch: 'arrow',     wuMultiplier: 0.1, suMultiplier: 0.05 },
+			{ nameMatch: 'bolt',      wuMultiplier: 0.1, suMultiplier: 0.05 }
 		]
 	},
 	'scroll-case': {
