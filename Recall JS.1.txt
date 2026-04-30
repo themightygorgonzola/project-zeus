@@ -7548,3 +7548,42 @@ GROUP 56 — PROFICIENCY SECTIONS + CLOTHING AUTO-EQUIP + URCHIN TOKEN + VESTMEN
                  src/lib/game/types.ts
                  src/lib/game/character-creation.ts
                  src/lib/game/data/backgrounds.ts
+
+================================================================================
+GROUP 57 — QUIVER: HEAVY AMMO DISCOUNT + GUARANTEED AMMO ROUTING
+================================================================================
+
+  File: src/lib/game/item-dimensions.ts
+
+  Problem:
+    CONTAINER_DEFAULTS['quiver'] had maxWU: 2 and wuMultiplier: 1.0 (no WU
+    discount at all). A single bundle of 20 arrows weighs 1.5 WU raw, so after
+    two bundles the quiver was full and remaining ammo spilled to the backpack.
+    A character starting with 100 arrows could only fit ~1 bundle in the quiver.
+
+  Fix — CONTAINER_DEFAULTS['quiver']:
+    maxWU:  2  →  10
+    maxSU: 20  →  20  (unchanged)
+
+    Discount rules (all three: category 'ammunition', nameMatch 'arrow', nameMatch 'bolt'):
+      wuMultiplier: 1.0  →  0.1   (90% WU reduction — arrows are body-supported)
+      suMultiplier: 0.5  →  0.05  (95% SU reduction — arrows pack perfectly vertically)
+
+  Result:
+    100 arrows (5 × 20-bundle items, 7.5 raw WU):
+      Effective WU in quiver: 7.5 × 0.1 = 0.75 WU  (out of 10 max)
+      Effective SU in quiver: 0.25 × 0.05 = 0.0125 SU  (effectively nothing)
+    100 arrows + 100 bolts together: 15 raw WU → 1.5 effective WU. Trivially fits.
+
+  Ammo routing (no change needed):
+    Pass 2 in resolveStartingEquipment() already routes all items with
+    category === 'ammunition' to the quiver first, backpack as fallback:
+      if (item.category === 'ammunition') {
+          if (tryPutIn(item, quiver) || tryPutIn(item, backpack)) continue;
+      }
+    With the new capacity/discounts, all starting arrows and bolts now fit in
+    the quiver and are correctly placed there at character creation.
+
+--- RESULTS ---
+  TypeScript: 0 errors
+  Files changed: src/lib/game/item-dimensions.ts
